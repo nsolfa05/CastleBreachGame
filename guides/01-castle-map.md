@@ -34,15 +34,38 @@ art exists.
 
 A **Tile** is a paintable asset used by Tilemaps (Unity's grid system).
 
+> **Newer Unity versions (6.5+) removed the plain "Tile" entry** from
+> **Create → 2D → Tiles** — that menu now only offers **Animated Tile** and
+> **Auto Tile** (a submenu of Rule Tile variants for auto-blending terrain
+> edges), neither of which is what we want. Instead, generate a basic Tile
+> asset via the **Tile Palette**, which creates one automatically the moment
+> you drag a sprite into it:
+
 1. Create another folder: `Assets/Tiles`.
-2. Inside it, right-click → **Create → 2D → Tile** (in some versions it's under
-   **Create → 2D → Tiles → Tile**). Name it `GroundTile`.
-3. Select `GroundTile`; in the Inspector, set its **Sprite** field: click the small
-   circle ⊙ next to the field and pick `Square` (or drag the Square sprite from the
-   Project panel onto the field).
-4. Duplicate it twice (select it, **Ctrl+D**): name the copies `WallTile` and
-   `GateTile`. They can all share the same white square sprite — the map generator
-   colors them.
+2. **Window → 2D → Tile Palette.** Click the palette dropdown (top-left of
+   that window) → **Create New Palette**. Name it anything, e.g.
+   `ScratchPalette` — it's just scaffolding to generate the asset below, your
+   map won't use it.
+3. Drag the **`Square`** sprite (from `Assets/Sprites`) into the Tile
+   Palette's checkered grid area. A save dialog appears — save it into
+   `Assets/Tiles`. Unity creates a real Tile asset there (named after the
+   sprite) and paints it into the scratch palette.
+4. Find that new Tile asset in `Assets/Tiles`, select it, and rename it
+   (**F2**) to `GroundTile`.
+5. Duplicate it twice (select it, **Ctrl+D**): name the copies `WallTile` and
+   `GateTile`. They can all share the same white square sprite — the map
+   generator colors them per-cell in code, not on the asset itself.
+6. You can delete the `ScratchPalette` asset now if you like — it was only
+   needed to create the three Tile assets above.
+
+<details>
+<summary>If your Unity version still shows a plain "Tile" option</summary>
+
+Right-click inside `Assets/Tiles` → **Create → 2D → Tile** (or
+**Create → 2D → Tiles → Tile**), name it `GroundTile`, then set its
+**Sprite** field to `Square` in the Inspector (drag the sprite onto the
+field, or use the ⊙ picker). Duplicate twice as in steps 4–5 above.
+</details>
 
 ## Step 4 — Create the Grid and three Tilemaps
 
