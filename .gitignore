@@ -1,0 +1,25 @@
+# Unity generated folders/files for the CastleBreach project.
+# Only Assets/, Packages/, ProjectSettings/ (and their .meta files) belong in git.
+CastleBreach/[Ll]ibrary/
+CastleBreach/[Tt]emp/
+CastleBreach/[Oo]bj/
+CastleBreach/[Bb]uild/
+CastleBreach/[Bb]uilds/
+CastleBreach/[Ll]ogs/
+CastleBreach/[Uu]serSettings/
+CastleBreach/[Mm]emoryCaptures/
+CastleBreach/[Rr]ecordings/
+
+# IDE / OS noise
+CastleBreach/.vs/
+CastleBreach/.idea/
+CastleBreach/.vscode/
+CastleBreach/*.csproj
+CastleBreach/*.sln
+CastleBreach/*.user
+CastleBreach/*.userprefs
+CastleBreach/*.pidb
+CastleBreach/*.booproj
+CastleBreach/*.svd
+CastleBreach/crashlytics-build.properties
+.DS_Store

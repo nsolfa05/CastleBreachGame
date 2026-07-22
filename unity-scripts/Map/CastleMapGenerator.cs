@@ -1,0 +1,109 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Tilemaps;
+
+/// <summary>
+/// Generates the starting castle map from design doc §3.2–3.3:
+/// grass ground everywhere, 2-tile-thick walls on all four sides,
+/// and four gates carved into the inner wall column/row.
+///
+/// The layout is data (the region lists below), not code — future campaign
+/// maps just use different regions, per §3.4.
+///
+/// HOW TO USE IN THE EDITOR: fill in the Inspector fields, then right-click
+/// the component header and choose "Generate Map". Safe to re-run anytime.
+/// </summary>
+public class CastleMapGenerator : MonoBehaviour
+{
+    [Header("Tilemaps (children of the Grid object)")]
+    [SerializeField] private Tilemap groundTilemap;
+    [SerializeField] private Tilemap wallTilemap;
+    [SerializeField] private Tilemap gateTilemap;
+
+    [Header("Tiles [Placeholder] — swap for real art later, no code changes needed")]
+    [SerializeField] private TileBase groundTile;
+    [SerializeField] private TileBase wallTile;
+    [SerializeField] private TileBase gateTile;
+
+    [Header("Colors [Placeholder]")]
+    [SerializeField] private Color groundColor = new Color(0.55f, 0.70f, 0.45f);
+    [SerializeField] private Color wallColor = new Color(0.50f, 0.50f, 0.50f);
+    [Tooltip("Design doc: 50% opacity brown.")]
+    [SerializeField] private Color gateColor = new Color(0.55f, 0.35f, 0.20f, 0.5f);
+
+    [Header("Layout (design doc §3.2 — walls)")]
+    [SerializeField] private List<TileRegion> wallRegions = new List<TileRegion>
+    {
+        new TileRegion { name = "West wall",  from = "A1",  to = "B30"  },
+        new TileRegion { name = "North wall", from = "B1",  to = "AL2"  },
+        new TileRegion { name = "East wall",  from = "AM1", to = "AN30" },
+        new TileRegion { name = "South wall", from = "C29", to = "AL30" },
+    };
+
+    [Header("Layout (design doc §3.3 — gates, carved out of the walls)")]
+    [SerializeField] private List<TileRegion> gateRegions = new List<TileRegion>
+    {
+        new TileRegion { name = "West",  from = "B14",  to = "B17"  },
+        new TileRegion { name = "East",  from = "AM14", to = "AM17" },
+        new TileRegion { name = "South", from = "R29",  to = "W29"  },
+        new TileRegion { name = "North", from = "R2",   to = "W2"   },
+    };
+
+    /// <summary>Used by the WaveSpawner to find where monsters may spawn.</summary>
+    public IReadOnlyList<TileRegion> GateRegions => gateRegions;
+
+    [ContextMenu("Generate Map")]
+    public void GenerateMap()
+    {
+        if (groundTilemap == null || wallTilemap == null || gateTilemap == null)
+        {
+            Debug.LogError("CastleMapGenerator: assign all three Tilemaps in the Inspector first.");
+            return;
+        }
+
+        groundTilemap.ClearAllTiles();
+        wallTilemap.ClearAllTiles();
+        gateTilemap.ClearAllTiles();
+
+        for (int col = 0; col < GridMath.Columns; col++)
+            for (int row = 0; row < GridMath.Rows; row++)
+                SetTile(groundTilemap, new Vector2Int(col, row), groundTile, groundColor);
+
+        foreach (var region in wallRegions)
+            foreach (var tile in region.Tiles())
+                SetTile(wallTilemap, tile, wallTile, wallColor);
+
+        // Gates: remove the wall tile (so the gate is passable) and draw the gate tile.
+        foreach (var region in gateRegions)
+            foreach (var tile in region.Tiles())
+            {
+                wallTilemap.SetTile(GridMath.TileToCell(tile), null);
+                SetTile(gateTilemap, tile, gateTile, gateColor);
+            }
+
+        Debug.Log($"Castle map generated: {GridMath.Columns}x{GridMath.Rows} tiles, " +
+                  $"{wallRegions.Count} wall regions, {gateRegions.Count} gates.");
+    }
+
+    private void SetTile(Tilemap map, Vector2Int tile, TileBase tileAsset, Color color)
+    {
+        var cell = GridMath.TileToCell(tile);
+        map.SetTile(cell, tileAsset);
+        map.SetTileFlags(cell, TileFlags.None); // unlock the color so SetColor works
+        map.SetColor(cell, color);
+    }
+
+    /// <summary>True if a wall occupies this tile (gates count as open).</summary>
+    public bool IsWall(Vector2Int tile) =>
+        wallTilemap != null && wallTilemap.HasTile(GridMath.TileToCell(tile));
+
+    public bool IsGate(Vector2Int tile) =>
+        gateTilemap != null && gateTilemap.HasTile(GridMath.TileToCell(tile));
+
+    private void Start()
+    {
+        // Safety net: if the map was never generated in the Editor, build it on play.
+        if (groundTilemap != null && groundTilemap.GetUsedTilesCount() == 0)
+            GenerateMap();
+    }
+}
