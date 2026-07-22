@@ -37,26 +37,51 @@ A **Tile** is a paintable asset used by Tilemaps (Unity's grid system).
 > **Newer Unity versions (6.5+) removed the plain "Tile" entry** from
 > **Create → 2D → Tiles** — that menu now only offers **Animated Tile** and
 > **Auto Tile** (a submenu of Rule Tile variants for auto-blending terrain
-> edges), neither of which is what we want. Instead, generate a basic Tile
-> asset via the **Tile Palette**, which creates one automatically the moment
-> you drag a sprite into it:
+> edges), neither of which is what we want. The Tile Palette's drag-and-drop
+> workaround (drag a sprite into the palette to auto-generate a Tile) is also
+> easy to get wrong as a beginner — if you drag a sprite into the **Hierarchy**
+> or **Scene view** first, Unity creates a GameObject/Prefab instead of a
+> Tile, and it'll silently fail to show up anywhere a Tile is expected. To
+> avoid both traps, this repo ships a one-click Editor tool that creates the
+> three Tile assets correctly, every time.
 
-1. Create another folder: `Assets/Tiles`.
-2. **Window → 2D → Tile Palette.** Click the palette dropdown (top-left of
+1. Create a folder: `Assets/Tiles` (right-click `Assets` → **Create → Folder**).
+2. In the Project panel, go into `Assets/Scripts` (the folder Guide 00 created
+   from `unity-scripts/`) and confirm there's an **`Editor`** subfolder
+   containing `CreatePlaceholderTiles.cs`. If it's missing, pull the latest
+   from the repo (**Fetch/Pull origin** in GitHub Desktop) — a top-level
+   `unity-scripts/Editor/` folder will reappear on disk — then drag that
+   `Editor` folder into `Assets/Scripts` in Unity's Project panel, exactly
+   like importing the scripts in Guide 00. Delete the leftover top-level
+   `unity-scripts` folder afterward.
+3. Wait for the compile spinner (bottom-right of the Unity window) to finish,
+   then check the **Console** for zero errors.
+4. Top menu bar → **Tools → Castle Breach → Create Placeholder Tiles**.
+5. Check the Console: you should see
+   `Created GroundTile, WallTile and GateTile in Assets/Tiles`. Confirm the
+   three new assets exist there — they'll be `.asset` files, not `.prefab`
+   files (check the Project panel: hover or widen the columns if names are
+   truncated, or click one and confirm the Inspector shows **`Sprite`** and
+   **`Color`** fields, not a `Sprite Renderer` component — that's the
+   Prefab mistake described above).
+
+<details>
+<summary>Manual alternative (Tile Palette drag-and-drop)</summary>
+
+1. **Window → 2D → Tile Palette.** Click the palette dropdown (top-left of
    that window) → **Create New Palette**. Name it anything, e.g.
-   `ScratchPalette` — it's just scaffolding to generate the asset below, your
-   map won't use it.
-3. Drag the **`Square`** sprite (from `Assets/Sprites`) into the Tile
-   Palette's checkered grid area. A save dialog appears — save it into
-   `Assets/Tiles`. Unity creates a real Tile asset there (named after the
-   sprite) and paints it into the scratch palette.
-4. Find that new Tile asset in `Assets/Tiles`, select it, and rename it
-   (**F2**) to `GroundTile`.
-5. Duplicate it twice (select it, **Ctrl+D**): name the copies `WallTile` and
-   `GateTile`. They can all share the same white square sprite — the map
-   generator colors them per-cell in code, not on the asset itself.
-6. You can delete the `ScratchPalette` asset now if you like — it was only
-   needed to create the three Tile assets above.
+   `ScratchPalette`.
+2. Drag the **`Square`** sprite **directly from the Project panel
+   (`Assets/Sprites`)** into the Tile Palette window's own checkered grid
+   area — not into the Hierarchy or Scene view first. A save dialog may
+   appear (save into `Assets/Tiles`); on some Unity versions it saves
+   automatically without asking — check the Project panel for the new asset
+   either way.
+3. Rename it (**F2**) to `GroundTile`, then duplicate it twice (**Ctrl+D**)
+   as `WallTile` and `GateTile`.
+4. Delete the `ScratchPalette` asset when done — it was only scaffolding.
+
+</details>
 
 <details>
 <summary>If your Unity version still shows a plain "Tile" option</summary>
