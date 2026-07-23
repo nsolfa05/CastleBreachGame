@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: GateTile
   m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.Tilemaps.Tile
   m_Sprite: {fileID: 7482667652216324306, guid: 40439bb77c28ba0449cc3a93ddc46bbf, type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.54901963, g: 0.34901962, b: 0.2, a: 0.5019608}
   m_Transform:
     e00: 1
     e01: 0
