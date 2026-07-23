@@ -30,46 +30,57 @@ towers that block their way. After this guide the full game loop works:
      pre-set from §6. Wire:
      - **Enemy Layers** → check **Enemy**
      - **Projectile Prefab** ← the `Arrow` prefab
+     - **Targeting** → choose **Nearest Each Shot** (always retarget the closest
+       enemy) or **Finish Current Target** (lock onto one enemy until it dies or
+       leaves range, then retarget). Your call — tune it live and see which you
+       prefer.
 3. Health bar: drag the **HealthBar prefab** onto `ArcherTower` (as a child),
    Position `0, 1.2, 0`, and wire its **Health** field ← the `ArcherTower` object.
 4. Drag `ArcherTower` into `Assets/Prefabs`, then delete it from the Hierarchy.
 
+> **⚠️ Three things MUST be right on the tower or zombies won't be able to
+> damage it** (the zombie looks for structures on the Structure layer that have
+> health, and can only hit ones with a collider):
+> 1. **Layer = `Structure`** (top of the Inspector) — not Default.
+> 2. It has a **Box Collider 2D**.
+> 3. It has a **Health** component.
+> If a tower ever seems invincible to zombies, check these three first.
+
 *(With the tower selected in the Project panel you can see its cyan range circle
 in the Scene view whenever you place one — the script draws it as a gizmo.)*
 
-## Step 3 — The placement ghost
+## Step 3 — The build mode controller
 
-1. Hierarchy → **2D Object → Sprites → Square**, name it **`PlacementGhost`**.
-   Set **Order in Layer** to `40` (renders above everything). Position/scale/color
-   don't matter — the build script controls them.
-2. In the Inspector, **uncheck the box next to its name** (top-left) to deactivate
-   it — it should only appear during placement.
-
-## Step 4 — The build mode controller
+No separate ghost object to make — the controller builds its own preview by
+cloning the tower prefab at runtime (so the ghost is always the right size, and
+placed towers always keep their own color).
 
 1. Select the **`GameManager`** object → **Add Component → Build Mode Controller**
    (our script). Wire:
    - **Tower Prefab** ← the `ArcherTower` prefab (cost 150 pre-set, §6)
    - **Wall Tilemap** ← the `Walls` object; **Gate Tilemap** ← `Gates`
    - **Blocking Layers** → check **Player, Enemy, Structure, King**
-   - **Ghost** ← the `PlacementGhost` object
 
-## Step 5 — Play the full loop!
+## Step 4 — Play the full loop!
 
-- Press **B**: a translucent 2×2 square sticks to the grid under your mouse.
-  **Green** = buildable & affordable; **red** = not (over a wall/gate, on top of
-  someone, or you're broke). **Left-click** places it (gold drops by 150);
-  **right-click/Esc** cancels.
+- Press **B**: a translucent 2×2 tower ghost follows your mouse, snapped so the
+  cursor sits between the four tiles it will cover. **Green** = buildable &
+  affordable; **red** = not (over a wall/gate, on top of someone, or you're
+  broke). **Left-click** places a real tower (gold drops by 150) and you stay in
+  build mode, so you can place another right away; **right-click/Esc/B** exits.
 - Place a tower in front of the West gate and watch it pelt arrows — 4 damage,
   once per second: it kills a zombie alone in ~3 seconds, faster with your sword
   helping.
 - Watch zombies attack a tower that stands between them and the King — and
   destroy it if you don't defend it (50 HP, 3 damage per zombie every 1.5s).
+  (If they walk straight past without hitting it, the tower isn't in their
+  direct path to the King — zombies only attack structures blocking their way,
+  not every tower on the map.)
 - The real strategy loop: you start with 200 gold (one tower + change); each
   zombie pays 3. Can you afford a second tower by Wave 2, and hold all four gates
   by Wave 3?
 
-## Step 6 — Save, commit, and celebrate
+## Step 5 — Save, commit, and celebrate
 
 `Archer tower with build-mode placement — vertical slice complete`
 
