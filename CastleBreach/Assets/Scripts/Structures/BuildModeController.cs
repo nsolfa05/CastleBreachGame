@@ -37,7 +37,12 @@ public class BuildModeController : MonoBehaviour
     [SerializeField] private Color invalidColor = new Color(1f, 0f, 0f, 0.4f);
 
     private bool building;
-    private GameObject ghost;
+    // Named 'ghostInstance' (not 'ghost') on purpose: an earlier version had a
+    // serialized SpriteRenderer field literally named 'ghost'. Reusing that
+    // name here made Unity try to reconcile this runtime field with the old
+    // saved reference and warn about a type mismatch. A distinct name lets
+    // Unity drop the stale saved data cleanly.
+    private GameObject ghostInstance;
     private SpriteRenderer[] ghostRenderers;
 
     private void Update()
@@ -71,7 +76,7 @@ public class BuildModeController : MonoBehaviour
         // covered tiles; an odd footprint centers on a tile.
         Vector3 mouseWorld = Camera.main.ScreenToWorldPoint(mouse.position.ReadValue());
         Vector2 center = new Vector2(SnapAxis(mouseWorld.x, footprint.x), SnapAxis(mouseWorld.y, footprint.y));
-        if (ghost != null) ghost.transform.position = center;
+        if (ghostInstance != null) ghostInstance.transform.position = center;
 
         Vector2Int cornerTile = TopLeftCornerTile(center);
         bool valid = IsPlacementValid(cornerTile, center);
@@ -99,26 +104,26 @@ public class BuildModeController : MonoBehaviour
 
         // Build the ghost from the tower prefab so it's always the right shape,
         // then strip everything that would make it act like a real tower.
-        ghost = Instantiate(towerPrefab);
-        ghost.name = "TowerGhost";
+        ghostInstance = Instantiate(towerPrefab);
+        ghostInstance.name = "TowerGhost";
 
-        foreach (var healthBar in ghost.GetComponentsInChildren<HealthBar>())
+        foreach (var healthBar in ghostInstance.GetComponentsInChildren<HealthBar>())
             Destroy(healthBar.gameObject);           // no health bar floating over a preview
-        foreach (var behaviour in ghost.GetComponentsInChildren<MonoBehaviour>())
+        foreach (var behaviour in ghostInstance.GetComponentsInChildren<MonoBehaviour>())
             behaviour.enabled = false;                // don't shoot / act
-        foreach (var collider in ghost.GetComponentsInChildren<Collider2D>())
+        foreach (var collider in ghostInstance.GetComponentsInChildren<Collider2D>())
             collider.enabled = false;                 // don't block or take hits
-        foreach (var body in ghost.GetComponentsInChildren<Rigidbody2D>())
+        foreach (var body in ghostInstance.GetComponentsInChildren<Rigidbody2D>())
             body.simulated = false;                   // no physics
 
-        ghostRenderers = ghost.GetComponentsInChildren<SpriteRenderer>();
+        ghostRenderers = ghostInstance.GetComponentsInChildren<SpriteRenderer>();
     }
 
     private void StopBuilding()
     {
         building = false;
-        if (ghost != null) Destroy(ghost);
-        ghost = null;
+        if (ghostInstance != null) Destroy(ghostInstance);
+        ghostInstance = null;
         ghostRenderers = null;
     }
 
