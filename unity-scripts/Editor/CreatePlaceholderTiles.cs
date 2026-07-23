@@ -30,9 +30,12 @@ public static class CreatePlaceholderTiles
         if (!AssetDatabase.IsValidFolder(TilesFolder))
             AssetDatabase.CreateFolder("Assets", "Tiles");
 
-        CreateIfMissing("GroundTile", sprite);
-        CreateIfMissing("WallTile", sprite);
-        CreateIfMissing("GateTile", sprite);
+        // Colors baked directly onto each Tile asset (design doc §3.2/§3.3) —
+        // color lives here, not in CastleMapGenerator, so it survives Play
+        // Mode reliably like any other saved asset field.
+        CreateIfMissing("GroundTile", sprite, new Color32(140, 179, 115, 255));
+        CreateIfMissing("WallTile", sprite, new Color32(128, 128, 128, 255));
+        CreateIfMissing("GateTile", sprite, new Color32(140, 89, 51, 128));
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
@@ -40,7 +43,7 @@ public static class CreatePlaceholderTiles
                    "(existing correct ones were left alone).");
     }
 
-    private static void CreateIfMissing(string name, Sprite sprite)
+    private static void CreateIfMissing(string name, Sprite sprite, Color color)
     {
         string path = $"{TilesFolder}/{name}.asset";
 
@@ -52,7 +55,7 @@ public static class CreatePlaceholderTiles
 
         var tile = ScriptableObject.CreateInstance<Tile>();
         tile.sprite = sprite;
-        tile.color = Color.white;
+        tile.color = color;
         AssetDatabase.CreateAsset(tile, path);
     }
 }

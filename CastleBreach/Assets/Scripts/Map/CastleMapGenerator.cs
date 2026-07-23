@@ -24,16 +24,12 @@ public class CastleMapGenerator : MonoBehaviour
     [SerializeField] private Tilemap wallTilemap;
     [SerializeField] private Tilemap gateTilemap;
 
-    [Header("Tiles [Placeholder] — swap for real art later, no code changes needed")]
+    [Header("Tiles [Placeholder] — swap for real art later, no code changes needed.")]
+    [Tooltip("Color lives on each Tile asset itself (its own Color field), not here — " +
+             "edit GroundTile/WallTile/GateTile directly to change color.")]
     [SerializeField] private TileBase groundTile;
     [SerializeField] private TileBase wallTile;
     [SerializeField] private TileBase gateTile;
-
-    [Header("Colors [Placeholder]")]
-    [SerializeField] private Color groundColor = new Color(0.55f, 0.70f, 0.45f);
-    [SerializeField] private Color wallColor = new Color(0.50f, 0.50f, 0.50f);
-    [Tooltip("Design doc: 50% opacity brown.")]
-    [SerializeField] private Color gateColor = new Color(0.55f, 0.35f, 0.20f, 0.5f);
 
     [Header("Layout (design doc §3.2 — walls)")]
     [SerializeField] private List<TileRegion> wallRegions = new List<TileRegion>
@@ -71,18 +67,18 @@ public class CastleMapGenerator : MonoBehaviour
 
         for (int col = 0; col < GridMath.Columns; col++)
             for (int row = 0; row < GridMath.Rows; row++)
-                SetTile(groundTilemap, new Vector2Int(col, row), groundTile, groundColor);
+                groundTilemap.SetTile(GridMath.TileToCell(new Vector2Int(col, row)), groundTile);
 
         foreach (var region in wallRegions)
             foreach (var tile in region.Tiles())
-                SetTile(wallTilemap, tile, wallTile, wallColor);
+                wallTilemap.SetTile(GridMath.TileToCell(tile), wallTile);
 
         // Gates: remove the wall tile (so the gate is passable) and draw the gate tile.
         foreach (var region in gateRegions)
             foreach (var tile in region.Tiles())
             {
                 wallTilemap.SetTile(GridMath.TileToCell(tile), null);
-                SetTile(gateTilemap, tile, gateTile, gateColor);
+                gateTilemap.SetTile(GridMath.TileToCell(tile), gateTile);
             }
 
         Debug.Log($"Castle map generated: {GridMath.Columns}x{GridMath.Rows} tiles, " +
@@ -101,14 +97,6 @@ public class CastleMapGenerator : MonoBehaviour
             EditorSceneManager.MarkSceneDirty(gameObject.scene);
         }
 #endif
-    }
-
-    private void SetTile(Tilemap map, Vector2Int tile, TileBase tileAsset, Color color)
-    {
-        var cell = GridMath.TileToCell(tile);
-        map.SetTile(cell, tileAsset);
-        map.SetTileFlags(cell, TileFlags.None); // unlock the color so SetColor works
-        map.SetColor(cell, color);
     }
 
     /// <summary>True if a wall occupies this tile (gates count as open).</summary>
