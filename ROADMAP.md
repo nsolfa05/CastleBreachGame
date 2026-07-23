@@ -11,7 +11,12 @@ playtests; commit + push at every checkpoint.
 
 ---
 
-## Phase 1 — Foundations: monster stats as ScriptableObjects
+> **Status:** Phases 1–3 are **code-complete and pushed** — the Editor-side
+> work is written up as guides 07 (foundations), 08 (monster roster), and
+> 09 (easy structures). Phase 4 code starts after those are verified
+> in-Editor.
+
+## Phase 1 — Foundations: monster stats as ScriptableObjects ✅ code / guide 07
 
 *Why first: every later phase (new monsters, wave design, shop pricing, map
 builder) reads this data. Doing it before adding four more monsters means the
@@ -24,7 +29,7 @@ migration happens once, on one monster, instead of five times later.*
 - `WaveSpawner` upgrade: waves become lists of (monster type, count, gate) so
   mixed waves work as soon as a second monster exists.
 
-## Phase 2 — The monster roster (§7.3)
+## Phase 2 — The monster roster (§7.3) ✅ code / guide 08
 
 *Ordered easiest → hardest inside the phase; each one exercises the Phase 1
 foundation.*
@@ -39,7 +44,7 @@ foundation.*
 4. **Cyclops** — 2×2 hitbox, tile weight 6, prioritizes structures within 6
    tiles, slow lock-on attack with zone persistence (§7.3 detail note).
 
-## Phase 3 — Easy structures (§6, the non-blocking ones)
+## Phase 3 — Easy structures (§6, the non-blocking ones) ✅ code / guide 09
 
 *Why before walls/gates: these reuse the existing tower pipeline almost
 unchanged — no pathfinding needed. Praise the King Tower also completes the

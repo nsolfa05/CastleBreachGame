@@ -25,11 +25,14 @@ of any other project.
 - [x] Guide 03 — King & zombies
 - [x] Guide 04 — currency & HUD
 - [x] Guide 05 — archer tower & build mode → **vertical slice complete**
-- [ ] Guide 06 — tower range circle (code pushed; needs the one-component
-      Editor wiring in the guide)
+- [x] Guide 06 — tower range circle
+- [ ] Guide 07 — Phase 1: monster stats as ScriptableObjects (code pushed)
+- [ ] Guide 08 — Phase 2: full monster roster (code pushed)
+- [ ] Guide 09 — Phase 3: pike / catapult / praise-the-king towers (code pushed)
 
-**Next up:** the post-slice build order is in [`ROADMAP.md`](ROADMAP.md) —
-seven phases, foundations first (Phase 1: monster stats → ScriptableObjects).
+**Next up:** the full build order is in [`ROADMAP.md`](ROADMAP.md). Phases
+1–3 are code-complete — work through guides 07 → 08 → 09, then ask Claude
+for Phase 4 (walls, gates, pathfinding, tile weight).
 
 ## Deferred — noted for later
 

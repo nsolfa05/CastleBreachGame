@@ -4,35 +4,50 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Spawns a fixed list of waves (design doc §8 — campaign levels have a
-/// fixed number of waves). Monsters spawn only on gate tiles (§3.3), pulled
-/// from the CastleMapGenerator's gate regions. When the last wave is cleared
-/// the GameManager is told the level is won.
+/// Spawns a fixed list of waves (design doc §8 — campaign levels have a fixed
+/// number of waves). Each wave is a list of SPAWN GROUPS: (which monster,
+/// how many, from which gate, how fast, after what delay) — groups in the
+/// same wave run in parallel, so "3 Zombies from the West while 2 Goblins
+/// rush the South gate" is one wave with two groups.
 ///
-/// The wave list is plain Inspector data — tweak counts, pacing, and gates
-/// without touching code.
+/// Monsters spawn only on gate tiles (§3.3), pulled from the
+/// CastleMapGenerator's gate regions. All monster types share ONE generic
+/// Monster prefab — each group picks which MonsterDefinition asset to stamp
+/// onto it. When the last wave is cleared the GameManager is told the level
+/// is won.
 /// </summary>
 public class WaveSpawner : MonoBehaviour
 {
     public enum GateSide { North, South, East, West }
 
     [Serializable]
+    public class SpawnGroup
+    {
+        [Tooltip("Which monster type — a MonsterDefinition asset from Assets/Monsters.")]
+        public MonsterDefinition monster;
+
+        public int count = 4;
+        public GateSide gate = GateSide.West;
+
+        [Tooltip("Seconds between individual spawns in this group.")]
+        public float secondsBetweenSpawns = 1.5f;
+
+        [Tooltip("Seconds after the wave starts before this group begins spawning — for staggered assaults.")]
+        public float startDelay = 0f;
+    }
+
+    [Serializable]
     public class Wave
     {
         public string name = "Wave";
-
-        [Tooltip("Gates this wave spawns from — spawns rotate through the list.")]
-        public List<GateSide> gates = new List<GateSide> { GateSide.West };
-
-        public int zombieCount = 5;
-
-        [Tooltip("Seconds between individual spawns.")]
-        public float secondsBetweenSpawns = 1.5f;
+        public List<SpawnGroup> groups = new List<SpawnGroup>();
     }
 
     [Header("References")]
     [SerializeField] private CastleMapGenerator map;
-    [SerializeField] private ZombieAI zombiePrefab;
+
+    [Tooltip("The ONE generic Monster prefab — each spawn stamps a group's MonsterDefinition onto a fresh copy of it.")]
+    [SerializeField] private MonsterAI monsterPrefab;
 
     [Header("Pacing")]
     [SerializeField] private float delayBeforeFirstWave = 5f;
@@ -41,18 +56,27 @@ public class WaveSpawner : MonoBehaviour
     [Header("Waves")]
     [SerializeField] private List<Wave> waves = new List<Wave>
     {
-        new Wave { name = "Wave 1", zombieCount = 4,
-                   gates = new List<GateSide> { GateSide.West } },
-        new Wave { name = "Wave 2", zombieCount = 6,
-                   gates = new List<GateSide> { GateSide.West, GateSide.East } },
-        new Wave { name = "Wave 3", zombieCount = 10,
-                   gates = new List<GateSide> { GateSide.North, GateSide.South, GateSide.East, GateSide.West } },
+        new Wave { name = "Wave 1", groups = new List<SpawnGroup> {
+            new SpawnGroup { count = 4, gate = GateSide.West },
+        } },
+        new Wave { name = "Wave 2", groups = new List<SpawnGroup> {
+            new SpawnGroup { count = 3, gate = GateSide.West },
+            new SpawnGroup { count = 3, gate = GateSide.East },
+        } },
+        new Wave { name = "Wave 3", groups = new List<SpawnGroup> {
+            new SpawnGroup { count = 3, gate = GateSide.North },
+            new SpawnGroup { count = 3, gate = GateSide.South },
+            new SpawnGroup { count = 3, gate = GateSide.East, startDelay = 4f },
+            new SpawnGroup { count = 3, gate = GateSide.West, startDelay = 4f },
+        } },
     };
 
     /// <summary>1-based; 0 means the first wave hasn't started yet.</summary>
     public int CurrentWaveNumber { get; private set; }
     public int TotalWaves => waves.Count;
     public int AliveCount { get; private set; }
+
+    private int activeGroups;
 
     private void Start()
     {
@@ -68,12 +92,15 @@ public class WaveSpawner : MonoBehaviour
             CurrentWaveNumber = i + 1;
             var wave = waves[i];
 
-            for (int s = 0; s < wave.zombieCount; s++)
+            activeGroups = 0;
+            foreach (var group in wave.groups)
             {
-                SpawnZombie(wave.gates[s % wave.gates.Count]);
-                yield return new WaitForSeconds(wave.secondsBetweenSpawns);
+                activeGroups++;
+                StartCoroutine(RunGroup(group));
             }
 
+            // Wave is over when every group finished spawning AND everything is dead.
+            yield return new WaitUntil(() => activeGroups == 0);
             yield return new WaitUntil(() => AliveCount == 0);
 
             if (i < waves.Count - 1)
@@ -84,12 +111,35 @@ public class WaveSpawner : MonoBehaviour
             GameManager.Instance.ReportAllWavesCleared();
     }
 
-    private void SpawnZombie(GateSide side)
+    private IEnumerator RunGroup(SpawnGroup group)
+    {
+        if (group.monster == null)
+        {
+            Debug.LogWarning("WaveSpawner: a spawn group has no MonsterDefinition assigned — skipping it.");
+            activeGroups--;
+            yield break;
+        }
+
+        if (group.startDelay > 0f)
+            yield return new WaitForSeconds(group.startDelay);
+
+        for (int s = 0; s < group.count; s++)
+        {
+            SpawnMonster(group.monster, group.gate);
+            yield return new WaitForSeconds(group.secondsBetweenSpawns);
+        }
+
+        activeGroups--;
+    }
+
+    private void SpawnMonster(MonsterDefinition definition, GateSide side)
     {
         Vector2 position = RandomGateTileCenter(side);
-        var zombie = Instantiate(zombiePrefab, position, Quaternion.identity);
+        var monster = Instantiate(monsterPrefab, position, Quaternion.identity);
+        monster.gameObject.SetActive(true); // guard against the prefab being saved inactive
+        monster.SetDefinition(definition);
         AliveCount++;
-        zombie.GetComponent<Health>().Died += _ => AliveCount--;
+        monster.Killed += _ => AliveCount--;
     }
 
     private Vector2 RandomGateTileCenter(GateSide side)

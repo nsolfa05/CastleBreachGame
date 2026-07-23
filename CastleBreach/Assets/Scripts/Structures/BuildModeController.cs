@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Tilemaps;
@@ -6,18 +7,17 @@ using UnityEngine.Tilemaps;
 /// Vertical-slice version of the placement flow (design doc §10.3), without
 /// the Defense Hut menu yet.
 ///
-/// Flow: press B to pick up an Archer Tower — a translucent 2x2 ghost (a live
-/// clone of the tower prefab, so it's always the right size/shape) appears and
-/// follows the mouse, snapped to the grid (green = valid & affordable, red =
-/// not). Left-click places a real tower and pays for it; you keep carrying the
-/// ghost so you can place several in a row. Right-click, Esc, or B again puts
-/// the tower down / exits. The Defense Hut UI will drive this same flow later
-/// (its menu click becomes the "pick up the tower" trigger that B stands in
-/// for now).
+/// Controls: press a NUMBER KEY (1, 2, 3, ...) to pick up that entry from
+/// the Build Options list — a translucent ghost (a live clone of the
+/// structure's prefab, so it's always the right size/shape) follows the
+/// mouse, snapped to the grid (green = valid & affordable, red = not).
+/// Left-click places a real structure and pays for it; you keep carrying the
+/// ghost to place more. Press B to toggle carrying the last-used option.
+/// Right-click or Esc puts it away. The Defense Hut UI (a later phase)
+/// replaces these hotkeys — its menu click becomes the pick-up trigger.
 ///
-/// The ghost is generated FROM the tower prefab at runtime and tinted — the
-/// real prefab is never modified, so placed towers always keep their own
-/// color. No separate hand-made ghost object is needed.
+/// The ghost is generated FROM the prefab at runtime and tinted — the real
+/// prefab is never modified, so placed structures always keep their colors.
 /// </summary>
 public class BuildModeController : MonoBehaviour
 {
@@ -25,12 +25,21 @@ public class BuildModeController : MonoBehaviour
     /// click handlers (e.g. tower range-circle toggling) ignore clicks then.</summary>
     public static bool BuildingActive { get; private set; }
 
-    [Header("What to build")]
-    [SerializeField] private GameObject towerPrefab;
-    [SerializeField] private int towerCost = 150;
+    [System.Serializable]
+    public class BuildOption
+    {
+        [Tooltip("Shown in logs/UI later; pick something readable, e.g. \"Archer Tower\".")]
+        public string displayName = "Structure";
 
-    [Tooltip("Footprint in tiles (Archer Tower is 2x2). Even sizes snap to a grid intersection, odd sizes to a tile center.")]
-    [SerializeField] private Vector2Int footprint = new Vector2Int(2, 2);
+        public GameObject prefab;
+        public int cost = 150;
+
+        [Tooltip("Footprint in tiles. Even sizes (2x2) snap to grid intersections, odd sizes (1x1) to tile centers.")]
+        public Vector2Int footprint = new Vector2Int(2, 2);
+    }
+
+    [Header("What can be built (press number key 1, 2, 3... to pick up)")]
+    [SerializeField] private List<BuildOption> buildOptions = new List<BuildOption>();
 
     [Header("Validity checks")]
     [SerializeField] private Tilemap wallTilemap;
@@ -40,7 +49,7 @@ public class BuildModeController : MonoBehaviour
     [SerializeField] private LayerMask blockingLayers;
 
     [Header("Ghost preview tint [Placeholder]")]
-    [Tooltip("Opaque enough to see over any ground color; the green/red still reads as a tint over the tower shape.")]
+    [Tooltip("Opaque enough to see over any ground color; the green/red still reads as a tint over the structure shape.")]
     [SerializeField] private Color validColor = new Color(0.35f, 1f, 0.35f, 0.7f);
     [SerializeField] private Color invalidColor = new Color(1f, 0.3f, 0.3f, 0.7f);
 
@@ -48,6 +57,7 @@ public class BuildModeController : MonoBehaviour
     [SerializeField] private int ghostSortingOrder = 100;
 
     private bool building;
+    private int selectedIndex;
 
     private void Awake()
     {
@@ -64,6 +74,11 @@ public class BuildModeController : MonoBehaviour
     private GameObject ghostInstance;
     private SpriteRenderer[] ghostRenderers;
 
+    private BuildOption CurrentOption =>
+        (buildOptions.Count > 0 && selectedIndex >= 0 && selectedIndex < buildOptions.Count)
+            ? buildOptions[selectedIndex]
+            : null;
+
     private void Update()
     {
         var keyboard = Keyboard.current;
@@ -77,6 +92,19 @@ public class BuildModeController : MonoBehaviour
             return;
         }
 
+        // Number keys pick up a specific structure (and switch mid-carry).
+        for (int i = 0; i < buildOptions.Count && i < 9; i++)
+        {
+            if (keyboard[Key.Digit1 + i].wasPressedThisFrame)
+            {
+                selectedIndex = i;
+                StopBuilding();
+                StartBuilding();
+                break;
+            }
+        }
+
+        // B toggles carrying the last-used option.
         if (keyboard.bKey.wasPressedThisFrame)
         {
             if (building) StopBuilding();
@@ -90,70 +118,75 @@ public class BuildModeController : MonoBehaviour
             return;
         }
 
+        var option = CurrentOption;
+        if (option == null) { StopBuilding(); return; }
+
         // Snap the footprint's CENTER to the grid — an even footprint (2x2)
         // lands on a grid intersection so the cursor sits between the four
-        // covered tiles; an odd footprint centers on a tile.
+        // covered tiles; an odd footprint (1x1) centers on a tile.
         Vector3 mouseWorld = Camera.main.ScreenToWorldPoint(mouse.position.ReadValue());
-        Vector2 center = new Vector2(SnapAxis(mouseWorld.x, footprint.x), SnapAxis(mouseWorld.y, footprint.y));
+        Vector2 center = new Vector2(SnapAxis(mouseWorld.x, option.footprint.x),
+                                     SnapAxis(mouseWorld.y, option.footprint.y));
         if (ghostInstance != null) ghostInstance.transform.position = center;
 
-        Vector2Int cornerTile = TopLeftCornerTile(center);
-        bool valid = IsPlacementValid(cornerTile, center);
-        bool affordable = gm.Gold >= towerCost;
+        Vector2Int cornerTile = TopLeftCornerTile(center, option.footprint);
+        bool valid = IsPlacementValid(cornerTile, center, option.footprint);
+        bool affordable = gm.Gold >= option.cost;
         TintGhost((valid && affordable) ? validColor : invalidColor);
 
-        if (valid && affordable && mouse.leftButton.wasPressedThisFrame && gm.TrySpendGold(towerCost))
+        if (valid && affordable && mouse.leftButton.wasPressedThisFrame && gm.TrySpendGold(option.cost))
         {
-            // Place the real tower — a clean clone of the prefab, full color,
-            // scripts and colliders enabled. Nothing here touches its color.
-            // Force it active regardless of whatever active state the prefab
-            // asset was saved with — a prefab saved inactive would otherwise
-            // spawn silent, invisible, non-functional clones with no error.
-            var placed = Instantiate(towerPrefab, center, Quaternion.identity);
+            // Place the real structure — a clean clone of the prefab, full
+            // color, scripts and colliders enabled. Force it active in case
+            // the prefab asset was ever saved inactive (a prefab saved
+            // inactive would otherwise spawn silent, invisible clones).
+            var placed = Instantiate(option.prefab, center, Quaternion.identity);
             placed.SetActive(true);
-            // Keep carrying the ghost so several towers can be placed in a row.
+            // Keep carrying the ghost so several can be placed in a row.
         }
     }
 
     private void StartBuilding()
     {
-        if (towerPrefab == null)
+        var option = CurrentOption;
+        if (option == null || option.prefab == null)
         {
-            Debug.LogError("BuildModeController: assign a Tower Prefab in the Inspector.");
+            Debug.LogError("BuildModeController: the selected Build Option has no prefab assigned.");
             return;
         }
 
         building = true;
         BuildingActive = true;
 
-        // Build the ghost from the tower prefab so it's always the right shape,
-        // then strip everything that would make it act like a real tower.
-        ghostInstance = Instantiate(towerPrefab);
-        ghostInstance.name = "TowerGhost";
-        ghostInstance.SetActive(true); // same defensive reason as the placed tower above
+        // Build the ghost from the structure prefab so it's always the right
+        // shape, then strip everything that would make it act like the real thing.
+        ghostInstance = Instantiate(option.prefab);
+        ghostInstance.name = option.displayName + " Ghost";
+        ghostInstance.SetActive(true); // same defensive reason as placement above
 
         foreach (var healthBar in ghostInstance.GetComponentsInChildren<HealthBar>())
             Destroy(healthBar.gameObject);           // no health bar floating over a preview
         foreach (var behaviour in ghostInstance.GetComponentsInChildren<MonoBehaviour>())
-            behaviour.enabled = false;                // don't shoot / act
+            behaviour.enabled = false;                // don't shoot / generate gold / act
         foreach (var collider in ghostInstance.GetComponentsInChildren<Collider2D>())
             collider.enabled = false;                 // don't block or take hits
         foreach (var body in ghostInstance.GetComponentsInChildren<Rigidbody2D>())
             body.simulated = false;                   // no physics
 
-        // Show the ghost's attack-range circle so coverage is visible while
-        // choosing a spot. (Its component was created in Awake, before the
-        // strip loop above disabled behaviours — the method still works.)
+        // Show the attack-range circle (if this structure has one) so
+        // coverage is visible while choosing a spot. (Created in Awake,
+        // before the strip loop disabled behaviours — the call still works.)
         var rangeCircle = ghostInstance.GetComponent<TowerRangeCircle>();
         if (rangeCircle != null) rangeCircle.ShowCircle();
 
-        // Tint every renderer EXCEPT the range circle (it keeps its own look
-        // instead of going opaque green/red with the body).
+        // Tint every renderer EXCEPT the range/dead-zone circles (they keep
+        // their own look instead of going opaque green/red with the body).
         var allRenderers = ghostInstance.GetComponentsInChildren<SpriteRenderer>();
-        var tintable = new System.Collections.Generic.List<SpriteRenderer>();
+        var tintable = new List<SpriteRenderer>();
         foreach (var renderer in allRenderers)
         {
-            if (renderer.gameObject.name == "RangeCircle") continue;
+            if (renderer.gameObject.name == "RangeCircle" ||
+                renderer.gameObject.name == "DeadZoneCircle") continue;
             renderer.sortingOrder = ghostSortingOrder; // always draw on top so it's never hidden
             tintable.Add(renderer);
         }
@@ -180,14 +213,14 @@ public class BuildModeController : MonoBehaviour
     /// Snaps one world axis to the nearest valid footprint-center position:
     /// an even footprint size centers on a grid intersection (a whole
     /// number), an odd footprint size centers on a tile's own center
-    /// (a half-integer) — e.g. a future 1x1 Pike Tower would center on
-    /// whatever tile the cursor is over.
+    /// (a half-integer) — so the 1x1 Pike Tower centers on whatever tile
+    /// the cursor is over.
     /// </summary>
     private static float SnapAxis(float mouseCoord, int footprintSize) =>
         footprintSize % 2 == 0 ? Mathf.Round(mouseCoord) : Mathf.Floor(mouseCoord) + 0.5f;
 
     /// <summary>Doc-space tile at the footprint's top-left corner, derived from its snapped world center.</summary>
-    private Vector2Int TopLeftCornerTile(Vector2 center)
+    private Vector2Int TopLeftCornerTile(Vector2 center, Vector2Int footprint)
     {
         // Doc "top" is toward larger world Y (row 0 = top), so the top-left
         // corner of the footprint's bounding box is (min X, max Y). Nudge
@@ -197,7 +230,7 @@ public class BuildModeController : MonoBehaviour
         return GridMath.WorldToTile(topLeftWorld);
     }
 
-    private bool IsPlacementValid(Vector2Int cornerTile, Vector2 center)
+    private bool IsPlacementValid(Vector2Int cornerTile, Vector2 center, Vector2Int footprint)
     {
         for (int dx = 0; dx < footprint.x; dx++)
         {
@@ -212,7 +245,7 @@ public class BuildModeController : MonoBehaviour
             }
         }
 
-        // Slightly smaller than the footprint so towers can sit side by side.
+        // Slightly smaller than the footprint so structures can sit side by side.
         Vector2 overlapSize = new Vector2(footprint.x, footprint.y) * 0.9f;
         return Physics2D.OverlapBox(center, overlapSize, 0f, blockingLayers) == null;
     }

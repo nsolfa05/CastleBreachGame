@@ -14,6 +14,9 @@ public class Health : MonoBehaviour
     public float Current { get; private set; }
     public bool IsDead => Current <= 0f;
 
+    /// <summary>While true, TakeDamage does nothing (Skeleton bone pile).</summary>
+    public bool Invulnerable { get; set; }
+
     /// <summary>Fired every time health changes (including healing/reset).</summary>
     public event Action<Health> Damaged;
 
@@ -27,7 +30,7 @@ public class Health : MonoBehaviour
 
     public void TakeDamage(float amount)
     {
-        if (IsDead) return;
+        if (IsDead || Invulnerable) return;
         Current = Mathf.Max(0f, Current - amount);
         Damaged?.Invoke(this);
         if (Current <= 0f)
@@ -38,6 +41,15 @@ public class Health : MonoBehaviour
     public void ResetToFull()
     {
         Current = maxHealth;
+        Damaged?.Invoke(this);
+    }
+
+    /// <summary>Change max health at runtime — used by MonsterAI to apply a
+    /// MonsterDefinition's stats to the generic Monster prefab.</summary>
+    public void SetMax(float newMax, bool refill)
+    {
+        maxHealth = Mathf.Max(1f, newMax);
+        Current = refill ? maxHealth : Mathf.Min(Current, maxHealth);
         Damaged?.Invoke(this);
     }
 }
