@@ -34,15 +34,63 @@ art exists.
 
 A **Tile** is a paintable asset used by Tilemaps (Unity's grid system).
 
-1. Create another folder: `Assets/Tiles`.
-2. Inside it, right-click → **Create → 2D → Tile** (in some versions it's under
-   **Create → 2D → Tiles → Tile**). Name it `GroundTile`.
-3. Select `GroundTile`; in the Inspector, set its **Sprite** field: click the small
-   circle ⊙ next to the field and pick `Square` (or drag the Square sprite from the
-   Project panel onto the field).
-4. Duplicate it twice (select it, **Ctrl+D**): name the copies `WallTile` and
-   `GateTile`. They can all share the same white square sprite — the map generator
-   colors them.
+> **Newer Unity versions (6.5+) removed the plain "Tile" entry** from
+> **Create → 2D → Tiles** — that menu now only offers **Animated Tile** and
+> **Auto Tile** (a submenu of Rule Tile variants for auto-blending terrain
+> edges), neither of which is what we want. The Tile Palette's drag-and-drop
+> workaround (drag a sprite into the palette to auto-generate a Tile) is also
+> easy to get wrong as a beginner — if you drag a sprite into the **Hierarchy**
+> or **Scene view** first, Unity creates a GameObject/Prefab instead of a
+> Tile, and it'll silently fail to show up anywhere a Tile is expected. To
+> avoid both traps, this repo ships a one-click Editor tool that creates the
+> three Tile assets correctly, every time.
+
+1. Create a folder: `Assets/Tiles` (right-click `Assets` → **Create → Folder**).
+2. In the Project panel, go into `Assets/Scripts` (the folder Guide 00 created
+   from `unity-scripts/`) and confirm there's an **`Editor`** subfolder
+   containing `CreatePlaceholderTiles.cs`. If it's missing, pull the latest
+   from the repo (**Fetch/Pull origin** in GitHub Desktop) — a top-level
+   `unity-scripts/Editor/` folder will reappear on disk — then drag that
+   `Editor` folder into `Assets/Scripts` in Unity's Project panel, exactly
+   like importing the scripts in Guide 00. Delete the leftover top-level
+   `unity-scripts` folder afterward.
+3. Wait for the compile spinner (bottom-right of the Unity window) to finish,
+   then check the **Console** for zero errors.
+4. Top menu bar → **Tools → Castle Breach → Create Placeholder Tiles**.
+5. Check the Console: you should see
+   `Created GroundTile, WallTile and GateTile in Assets/Tiles`. Confirm the
+   three new assets exist there — they'll be `.asset` files, not `.prefab`
+   files (check the Project panel: hover or widen the columns if names are
+   truncated, or click one and confirm the Inspector shows **`Sprite`** and
+   **`Color`** fields, not a `Sprite Renderer` component — that's the
+   Prefab mistake described above).
+
+<details>
+<summary>Manual alternative (Tile Palette drag-and-drop)</summary>
+
+1. **Window → 2D → Tile Palette.** Click the palette dropdown (top-left of
+   that window) → **Create New Palette**. Name it anything, e.g.
+   `ScratchPalette`.
+2. Drag the **`Square`** sprite **directly from the Project panel
+   (`Assets/Sprites`)** into the Tile Palette window's own checkered grid
+   area — not into the Hierarchy or Scene view first. A save dialog may
+   appear (save into `Assets/Tiles`); on some Unity versions it saves
+   automatically without asking — check the Project panel for the new asset
+   either way.
+3. Rename it (**F2**) to `GroundTile`, then duplicate it twice (**Ctrl+D**)
+   as `WallTile` and `GateTile`.
+4. Delete the `ScratchPalette` asset when done — it was only scaffolding.
+
+</details>
+
+<details>
+<summary>If your Unity version still shows a plain "Tile" option</summary>
+
+Right-click inside `Assets/Tiles` → **Create → 2D → Tile** (or
+**Create → 2D → Tiles → Tile**), name it `GroundTile`, then set its
+**Sprite** field to `Square` in the Inspector (drag the sprite onto the
+field, or use the ⊙ picker). Duplicate twice as in steps 4–5 above.
+</details>
 
 ## Step 4 — Create the Grid and three Tilemaps
 
