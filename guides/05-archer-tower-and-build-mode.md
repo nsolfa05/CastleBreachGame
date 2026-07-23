@@ -109,23 +109,13 @@ Everything from the design doc's §11 priority list now works:
 - [ ] Archer Tower with §6 stats and the §10.3 placement flow
 - [ ] Win/lose + restart
 
-## What's next (pick what sounds fun — ask Claude to build any of these)
+## What's next
 
-Roughly in the order the doc suggests:
+The full prioritized build order for everything after the slice lives in
+[`ROADMAP.md`](../ROADMAP.md) at the repo root — seven phases, sequenced so
+foundational work (monster stats as ScriptableObjects) comes first and each
+phase feeds the later ones.
 
-1. **More monsters** (§7.3) — Skeleton (bone-pile revive!), Armored Zombie,
-   Goblin (king-seeker), Cyclops. This is also when monster stats should move
-   into ScriptableObjects (designer-editable asset files) instead of per-prefab
-   fields.
-2. **More structures** (§6) — Pike Tower, Catapult (AoE + dead zone), Praise the
-   King Tower (economy), Walls & Gates — which forces real **pathfinding** and
-   the §7.1 tile-weight rule.
-3. **Shop huts** (§3.6, §5) — walkable hut tiles, the darkening menu overlay,
-   player upgrades, and moving tower-buying into the Defense Hut.
-4. **Title screen & scenes** (§2) — menu, campaign level select, settings.
-5. **Map Builder** (§3.5, §10.5) — the designer tool, with levels saved as data
-   files. The groundwork exists: maps are already just lists of tile regions.
-
-When you're ready, start a Claude session on this repo and say what you want —
-the code lives in `CastleBreach/Assets/Scripts`, and since your scenes and
-prefabs are committed too, Claude can read and reason about all of it.
+When you're ready, start a Claude session on this repo and say which phase to
+build — the code lives in `CastleBreach/Assets/Scripts`, and since your scenes
+and prefabs are committed too, Claude can read and reason about all of it.

@@ -21,6 +21,10 @@ using UnityEngine.Tilemaps;
 /// </summary>
 public class BuildModeController : MonoBehaviour
 {
+    /// <summary>True while the player is carrying a placement ghost — other
+    /// click handlers (e.g. tower range-circle toggling) ignore clicks then.</summary>
+    public static bool BuildingActive { get; private set; }
+
     [Header("What to build")]
     [SerializeField] private GameObject towerPrefab;
     [SerializeField] private int towerCost = 150;
@@ -44,6 +48,14 @@ public class BuildModeController : MonoBehaviour
     [SerializeField] private int ghostSortingOrder = 100;
 
     private bool building;
+
+    private void Awake()
+    {
+        // Statics survive a scene reload (pressing R after win/lose) — make
+        // sure a restart never starts with a stale "still building" flag.
+        BuildingActive = false;
+    }
+
     // Named 'ghostInstance' (not 'ghost') on purpose: an earlier version had a
     // serialized SpriteRenderer field literally named 'ghost'. Reusing that
     // name here made Unity try to reconcile this runtime field with the old
@@ -112,6 +124,7 @@ public class BuildModeController : MonoBehaviour
         }
 
         building = true;
+        BuildingActive = true;
 
         // Build the ghost from the tower prefab so it's always the right shape,
         // then strip everything that would make it act like a real tower.
@@ -128,14 +141,29 @@ public class BuildModeController : MonoBehaviour
         foreach (var body in ghostInstance.GetComponentsInChildren<Rigidbody2D>())
             body.simulated = false;                   // no physics
 
-        ghostRenderers = ghostInstance.GetComponentsInChildren<SpriteRenderer>();
-        foreach (var renderer in ghostRenderers)
+        // Show the ghost's attack-range circle so coverage is visible while
+        // choosing a spot. (Its component was created in Awake, before the
+        // strip loop above disabled behaviours — the method still works.)
+        var rangeCircle = ghostInstance.GetComponent<TowerRangeCircle>();
+        if (rangeCircle != null) rangeCircle.ShowCircle();
+
+        // Tint every renderer EXCEPT the range circle (it keeps its own look
+        // instead of going opaque green/red with the body).
+        var allRenderers = ghostInstance.GetComponentsInChildren<SpriteRenderer>();
+        var tintable = new System.Collections.Generic.List<SpriteRenderer>();
+        foreach (var renderer in allRenderers)
+        {
+            if (renderer.gameObject.name == "RangeCircle") continue;
             renderer.sortingOrder = ghostSortingOrder; // always draw on top so it's never hidden
+            tintable.Add(renderer);
+        }
+        ghostRenderers = tintable.ToArray();
     }
 
     private void StopBuilding()
     {
         building = false;
+        BuildingActive = false;
         if (ghostInstance != null) Destroy(ghostInstance);
         ghostInstance = null;
         ghostRenderers = null;
