@@ -19,15 +19,17 @@ of any other project.
       its doc section, e.g. `§7.3`)
 - [x] Vertical-slice code written (16 scripts: map generator, player, king,
       zombie, waves, currency, archer tower, build mode, camera, HUD)
-- [ ] Guide 00 — Unity installed, project created, scripts imported
-- [ ] Guide 01 — castle map (grid, walls, gates)
-- [ ] Guide 02 — player & camera
-- [ ] Guide 03 — King & zombies
-- [ ] Guide 04 — currency & HUD
-- [ ] Guide 05 — archer tower & build mode → **vertical slice complete**
+- [x] Guide 00 — Unity installed, project created, scripts imported
+- [x] Guide 01 — castle map (grid, walls, gates)
+- [x] Guide 02 — player & camera
+- [x] Guide 03 — King & zombies
+- [x] Guide 04 — currency & HUD
+- [x] Guide 05 — archer tower & build mode → **vertical slice complete**
+- [ ] Guide 06 — tower range circle (code pushed; needs the one-component
+      Editor wiring in the guide)
 
-(Tick these off in commits as you go, so any future session knows where things
-stand.)
+**Next up:** the post-slice build order is in [`ROADMAP.md`](ROADMAP.md) —
+seven phases, foundations first (Phase 1: monster stats → ScriptableObjects).
 
 ## Deferred — noted for later
 

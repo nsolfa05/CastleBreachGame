@@ -42,6 +42,9 @@ public class ArcherTower : MonoBehaviour
     private float nextShotTime;
     private Transform currentTarget;
 
+    /// <summary>Attack radius in tiles — read by TowerRangeCircle to size its indicator.</summary>
+    public float Range => range;
+
     private void Update()
     {
         var gm = GameManager.Instance;
