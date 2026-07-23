@@ -120,8 +120,10 @@ public class CastleMapGenerator : MonoBehaviour
 
     private void Start()
     {
-        // Safety net: if the map was never generated in the Editor, build it on play.
-        if (groundTilemap != null && groundTilemap.GetUsedTilesCount() == 0)
-            GenerateMap();
+        // Always regenerate at runtime, unconditionally: the map is fully
+        // described by the serialized data above (regions + colors), so
+        // there's no need to depend on whatever got painted and saved in
+        // the Editor beforehand — every Play session repaints itself fresh.
+        GenerateMap();
     }
 }
