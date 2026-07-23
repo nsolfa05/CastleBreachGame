@@ -46,6 +46,16 @@ towers that block their way. After this guide the full game loop works:
 > 3. It has a **Health** component.
 > If a tower ever seems invincible to zombies, check these three first.
 
+> **⚠️ Also check the checkbox right next to the `ArcherTower` name field, top-left
+> of the Inspector — make sure it's CHECKED (active).** If a prefab's root object
+> ever gets saved inactive, every copy of it (the build-mode ghost, and every
+> placed tower) spawns invisible and completely inert — no errors anywhere,
+> gold still gets spent when "placed," and in the Hierarchy its name shows in
+> grayed-out text instead of normal white. That grayed-out name is the tell:
+> it means "this object is inactive," and it's easy to miss. `BuildModeController`
+> now force-activates both the ghost and placed towers as a safety net, but
+> it's worth fixing at the source too.
+
 *(With the tower selected in the Project panel you can see its cyan range circle
 in the Scene view whenever you place one — the script draws it as a gizmo.)*
 

@@ -94,7 +94,11 @@ public class BuildModeController : MonoBehaviour
         {
             // Place the real tower — a clean clone of the prefab, full color,
             // scripts and colliders enabled. Nothing here touches its color.
-            Instantiate(towerPrefab, center, Quaternion.identity);
+            // Force it active regardless of whatever active state the prefab
+            // asset was saved with — a prefab saved inactive would otherwise
+            // spawn silent, invisible, non-functional clones with no error.
+            var placed = Instantiate(towerPrefab, center, Quaternion.identity);
+            placed.SetActive(true);
             // Keep carrying the ghost so several towers can be placed in a row.
         }
     }
@@ -113,6 +117,7 @@ public class BuildModeController : MonoBehaviour
         // then strip everything that would make it act like a real tower.
         ghostInstance = Instantiate(towerPrefab);
         ghostInstance.name = "TowerGhost";
+        ghostInstance.SetActive(true); // same defensive reason as the placed tower above
 
         foreach (var healthBar in ghostInstance.GetComponentsInChildren<HealthBar>())
             Destroy(healthBar.gameObject);           // no health bar floating over a preview
