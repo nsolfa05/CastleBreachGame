@@ -51,26 +51,40 @@ stand.)
   own baked-in color, and assign them to that level's `MapGenerator` Ground/
   Wall/Gate Tile fields instead. One `CastleMapGenerator` instance per level/
   scene, each pointing at its own themed tile set.
-- **Changing the map size** (larger or smaller than 40×30). This one *does*
-  need a code change, unlike the two above — `Columns`/`Rows` are
-  `public const int` in `GridMath.cs`, compile-time constants shared globally
-  by everything that touches grid coordinates (`CastleMapGenerator`,
-  `TileRef`'s bounds-checking, `WaveSpawner`'s fallback spawn point,
-  `BuildModeController`'s placement bounds check). Two different asks here,
-  worth telling apart:
-  - **Resize this one map** (still just a single fixed size): edit the two
-    constants in `GridMath.cs`, then update `CastleMapGenerator`'s wall/gate
-    region coordinates (`A1`–`B30` etc. are hand-typed to the current 40×30
-    bounds per doc §3.2/§3.3), the King/Player spawn positions, and the Main
-    Camera's starting position/size from Guide 01/02 — all manual but
-    mechanical.
-  - **Different grid sizes per campaign level** (design doc §3.4 explicitly
-    anticipates "grid size" varying by level) — a real refactor: `Columns`/
-    `Rows` would need to stop being global `const`s and become per-level data
-    instead (e.g. fields on `CastleMapGenerator`, with `GridMath`'s methods
-    taking columns/rows as parameters rather than reading static consts).
-    Worth doing once actual campaign levels/the Map Builder are being built,
-    not speculatively before then.
+- **Per-level map data — grid size, King spawn position, and immovable
+  obstacles (rocks).** Design doc §3.4 explicitly groups these three
+  together: *"Later maps will vary: king spawn position, grid size, starting
+  walls/buildings, and immovable obstacles (e.g., rocks)."* Worth designing
+  as one coherent thing when the time comes, not three separate patches —
+  notes on each:
+  - **Grid size** — the one with a real code cost. `Columns`/`Rows` are
+    `public const int` in `GridMath.cs`, compile-time constants shared
+    globally by everything touching grid coordinates
+    (`CastleMapGenerator`, `TileRef`'s bounds-checking, `WaveSpawner`'s
+    fallback spawn point, `BuildModeController`'s placement bounds check). A
+    one-off resize of *this* map is just editing those two constants plus
+    updating the hand-typed wall/gate region coordinates, King/Player spawn
+    positions, and Main Camera framing to match. *Per-level* varying sizes
+    is a bigger refactor: `Columns`/`Rows` would need to become per-level
+    instance data (e.g. fields on `CastleMapGenerator`) instead of global
+    consts, with `GridMath`'s methods taking them as parameters.
+  - **King spawn position** — currently just the King GameObject's hand-set
+    Transform position (Guide 03: `20, 15, 0`, map center). If each campaign
+    level ends up as its own Scene, this already works with zero code
+    changes — just place the King wherever that level needs. If levels
+    instead load from shared data (matching the Map Builder plan in §10.5),
+    King spawn position should become a field in that level data, with
+    whatever loads the level moving the King there at runtime.
+  - **Immovable obstacles (rocks)** — mechanically simple, since it's the
+    same trick walls already use: a Tilemap Collider 2D physically blocks
+    both the player and monsters via ordinary Rigidbody2D collision (there's
+    no pathfinding yet — monsters move in a straight line per `ZombieAI` and
+    just get physically stopped by anything solid, same as they are by
+    walls today). Difference from walls: rocks are permanent, unbreakable
+    level terrain with no HP, not a player-purchased structure (§6). Cleanest
+    fit: its own Tilemap layer + Tile asset + an `obstacleRegions` list on
+    `CastleMapGenerator`, mirroring the existing `wallRegions`/`gateRegions`
+    pattern exactly.
 
 ## Conventions (for future work — human or Claude)
 
