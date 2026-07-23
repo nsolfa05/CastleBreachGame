@@ -37,6 +37,20 @@ stand.)
   The user wants this eventually — likely folds into the **Map Builder tool**
   (design doc §3.5/§10.5) rather than being its own thing. Revisit when that
   gets built.
+- **Gates showing open/closed state visually** (e.g. opacity change). Not in
+  the vertical slice yet. When built: this is a *runtime* change, not
+  Editor-authored state, so it's unaffected by the tile-coloring rule below —
+  either swap between two pre-made Tile assets (`GateOpenTile`/
+  `GateClosedTile`, each with its own baked color/alpha) via
+  `tilemap.SetTile(cell, asset)`, or call `tilemap.SetColor(cell, color)`
+  live from gameplay code. Both are fine; only Editor-time-only color writes
+  were the problem (see below).
+- **Different ground/wall/gate colors per campaign level** (e.g. a snow or
+  ruins theme). Already supported by the current architecture with zero code
+  changes: make new Tile assets per level (e.g. `GroundTile_Snow`) with their
+  own baked-in color, and assign them to that level's `MapGenerator` Ground/
+  Wall/Gate Tile fields instead. One `CastleMapGenerator` instance per level/
+  scene, each pointing at its own themed tile set.
 
 ## Conventions (for future work — human or Claude)
 
@@ -47,8 +61,21 @@ stand.)
 - **Sprite sort orders:** map 0–2, coins 15, structures 19, characters 20–21,
   projectiles 25, health bars 30–31, placement ghost 40.
 - **Placeholder policy (doc §1):** every visual is a tinted white Square/Circle
-  sprite; colors, sizes, timings and stats are Inspector fields — swapping in
-  real art or tuning numbers must never require code changes.
+  sprite; sizes, timings and stats are Inspector fields — swapping in real art
+  or tuning numbers must never require code changes.
+- **Tile colors live on the Tile asset itself** (`GroundTile`/`WallTile`/
+  `GateTile`'s own `Color` field), not on `CastleMapGenerator` or applied
+  per-cell via script. Reason (hard-won): `Tilemap.SetTile()` applies the
+  placed tile's own default flags to that cell, including `LockColor` (the
+  default on tiles created via the Tile Palette); a script-driven per-cell
+  `SetColor()` override made outside Play Mode looked correct in the Editor
+  but didn't reliably survive into a fresh Play session, reverting to the
+  tile's locked default. **The general rule:** anything that needs to exist
+  as pre-authored starting state belongs on an asset or Inspector field, not
+  written by an Editor-time script call — but changing a Tilemap's color
+  live, *during* actual gameplay, is completely fine and unaffected by this.
+  Non-Tilemap placeholders (player, towers, etc.) still just use a normal
+  `SpriteRenderer.color` field, which was never affected either.
 - **Stats carry doc-section comments** (`§6`, `§7.3`, …) so numbers can be
   traced back to the design doc.
 - The design doc's roadmap after the slice is summarized at the end of
