@@ -294,7 +294,7 @@ MonoBehaviour:
   structureDamage: 3
   attackInterval: 1.5
   currencyDropAmount: 3
-  currencyDropPrefab: {fileID: 0}
+  currencyDropPrefab: {fileID: 3243315779689519296, guid: e4e3d487b0afe71499f391e47e6f2a52, type: 3}
   structureLayers:
     serializedVersion: 2
     m_Bits: 768
