@@ -51,6 +51,26 @@ stand.)
   own baked-in color, and assign them to that level's `MapGenerator` Ground/
   Wall/Gate Tile fields instead. One `CastleMapGenerator` instance per level/
   scene, each pointing at its own themed tile set.
+- **Changing the map size** (larger or smaller than 40×30). This one *does*
+  need a code change, unlike the two above — `Columns`/`Rows` are
+  `public const int` in `GridMath.cs`, compile-time constants shared globally
+  by everything that touches grid coordinates (`CastleMapGenerator`,
+  `TileRef`'s bounds-checking, `WaveSpawner`'s fallback spawn point,
+  `BuildModeController`'s placement bounds check). Two different asks here,
+  worth telling apart:
+  - **Resize this one map** (still just a single fixed size): edit the two
+    constants in `GridMath.cs`, then update `CastleMapGenerator`'s wall/gate
+    region coordinates (`A1`–`B30` etc. are hand-typed to the current 40×30
+    bounds per doc §3.2/§3.3), the King/Player spawn positions, and the Main
+    Camera's starting position/size from Guide 01/02 — all manual but
+    mechanical.
+  - **Different grid sizes per campaign level** (design doc §3.4 explicitly
+    anticipates "grid size" varying by level) — a real refactor: `Columns`/
+    `Rows` would need to stop being global `const`s and become per-level data
+    instead (e.g. fields on `CastleMapGenerator`, with `GridMath`'s methods
+    taking columns/rows as parameters rather than reading static consts).
+    Worth doing once actual campaign levels/the Map Builder are being built,
+    not speculatively before then.
 
 ## Conventions (for future work — human or Claude)
 
