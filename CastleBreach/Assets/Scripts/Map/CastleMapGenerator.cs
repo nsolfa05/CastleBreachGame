@@ -1,6 +1,10 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+#if UNITY_EDITOR
+using UnityEditor;
+using UnityEditor.SceneManagement;
+#endif
 
 /// <summary>
 /// Generates the starting castle map from design doc §3.2–3.3:
@@ -83,6 +87,20 @@ public class CastleMapGenerator : MonoBehaviour
 
         Debug.Log($"Castle map generated: {GridMath.Columns}x{GridMath.Rows} tiles, " +
                   $"{wallRegions.Count} wall regions, {gateRegions.Count} gates.");
+
+#if UNITY_EDITOR
+        // Painting tile colors via script doesn't reliably mark the scene as
+        // having unsaved changes on its own — without this, the colors can
+        // look correct in the Editor but silently fail to persist through a
+        // save or a Play Mode session, reverting to the tiles' default color.
+        if (!Application.isPlaying)
+        {
+            EditorUtility.SetDirty(groundTilemap);
+            EditorUtility.SetDirty(wallTilemap);
+            EditorUtility.SetDirty(gateTilemap);
+            EditorSceneManager.MarkSceneDirty(gameObject.scene);
+        }
+#endif
     }
 
     private void SetTile(Tilemap map, Vector2Int tile, TileBase tileAsset, Color color)
