@@ -59,12 +59,14 @@ public class BuildModeController : MonoBehaviour
             return;
         }
 
-        // Snap the footprint so its top-left tile is the tile under the cursor.
+        // Snap the footprint's CENTER to the grid — for an even-sized footprint
+        // (2x2) that lands on a grid intersection, so the cursor sits between
+        // the four covered tiles rather than pinned to one tile's corner.
         Vector3 mouseWorld = Camera.main.ScreenToWorldPoint(mouse.position.ReadValue());
-        Vector2Int cornerTile = GridMath.WorldToTile(mouseWorld);
-        Vector2 center = FootprintCenterWorld(cornerTile);
+        Vector2 center = new Vector2(SnapAxis(mouseWorld.x, footprint.x), SnapAxis(mouseWorld.y, footprint.y));
         ghost.transform.position = center;
 
+        Vector2Int cornerTile = TopLeftCornerTile(center);
         bool valid = IsPlacementValid(cornerTile, center);
         bool affordable = gm.Gold >= towerCost;
         ghost.color = (valid && affordable) ? validColor : invalidColor;
@@ -90,12 +92,25 @@ public class BuildModeController : MonoBehaviour
         ghost.gameObject.SetActive(false);
     }
 
-    private Vector2 FootprintCenterWorld(Vector2Int cornerTile)
+    /// <summary>
+    /// Snaps one world axis to the nearest valid footprint-center position:
+    /// an even footprint size centers on a grid intersection (a whole
+    /// number), an odd footprint size centers on a tile's own center
+    /// (a half-integer) — e.g. a future 1x1 Pike Tower would center on
+    /// whatever tile the cursor is over, same as before this change.
+    /// </summary>
+    private static float SnapAxis(float mouseCoord, int footprintSize) =>
+        footprintSize % 2 == 0 ? Mathf.Round(mouseCoord) : Mathf.Floor(mouseCoord) + 0.5f;
+
+    /// <summary>Doc-space tile at the footprint's top-left corner, derived from its snapped world center.</summary>
+    private Vector2Int TopLeftCornerTile(Vector2 center)
     {
-        Vector2 cornerCenter = GridMath.TileCenterWorld(cornerTile);
-        // Doc rows grow downward, so extra rows extend toward smaller world y.
-        return new Vector2(cornerCenter.x + (footprint.x - 1) * 0.5f,
-                           cornerCenter.y - (footprint.y - 1) * 0.5f);
+        // Doc "top" is toward larger world Y (row 0 = top), so the top-left
+        // corner of the footprint's bounding box is (min X, max Y). Nudge
+        // slightly inward so we sample inside that tile, not exactly on its edge.
+        Vector2 topLeftWorld = new Vector2(center.x - footprint.x * 0.5f + 0.01f,
+                                           center.y + footprint.y * 0.5f - 0.01f);
+        return GridMath.WorldToTile(topLeftWorld);
     }
 
     private bool IsPlacementValid(Vector2Int cornerTile, Vector2 center)
