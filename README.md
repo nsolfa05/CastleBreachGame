@@ -51,6 +51,17 @@ stand.)
   own baked-in color, and assign them to that level's `MapGenerator` Ground/
   Wall/Gate Tile fields instead. One `CastleMapGenerator` instance per level/
   scene, each pointing at its own themed tile set.
+- **Tile Weight Rule (design doc §7.1)** — monsters should stack up to a
+  combined weight of 6 per tile (most monsters weigh 2, Cyclops weighs 6/
+  fills the tile alone) and get pushed aside past that cap, rather than
+  overlapping or physically colliding; the player always counts as weight 6,
+  so nothing can ever share the player's tile. Not implemented yet — the
+  vertical slice's zombies just bump off each other via ordinary
+  Rigidbody2D/Collider2D physics, which Guide 03's "disable Enemy × Enemy
+  collision" tip works around cosmetically but doesn't actually replace.
+  Natural time to build this for real: once more monster types with varying
+  weights exist (§7.3), since a single monster type can't really exercise
+  the stacking cap.
 - **Per-level map data — grid size, King spawn position, and immovable
   obstacles (rocks).** Design doc §3.4 explicitly groups these three
   together: *"Later maps will vary: king spawn position, grid size, starting
