@@ -4,13 +4,16 @@ using UnityEngine.Tilemaps;
 
 /// <summary>
 /// Vertical-slice version of the placement flow (design doc §10.3), without
-/// the Defense Hut menu yet: press B to enter build mode. A translucent ghost
-/// — a live clone of the tower prefab, so it's always the right size/shape —
-/// follows the mouse, snapped to the grid (green = valid & affordable,
-/// red = not). Left-click places a real tower and pays for it; build mode
-/// stays active so you can place several in a row. Right-click, Esc, or B
-/// again exits. The Defense Hut UI will drive this same flow later (its menu
-/// click becomes the "enter build mode" trigger that B stands in for now).
+/// the Defense Hut menu yet.
+///
+/// Flow: press B to pick up an Archer Tower — a translucent 2x2 ghost (a live
+/// clone of the tower prefab, so it's always the right size/shape) appears and
+/// follows the mouse, snapped to the grid (green = valid & affordable, red =
+/// not). Left-click places a real tower and pays for it; you keep carrying the
+/// ghost so you can place several in a row. Right-click, Esc, or B again puts
+/// the tower down / exits. The Defense Hut UI will drive this same flow later
+/// (its menu click becomes the "pick up the tower" trigger that B stands in
+/// for now).
 ///
 /// The ghost is generated FROM the tower prefab at runtime and tinted — the
 /// real prefab is never modified, so placed towers always keep their own
@@ -33,8 +36,12 @@ public class BuildModeController : MonoBehaviour
     [SerializeField] private LayerMask blockingLayers;
 
     [Header("Ghost preview tint [Placeholder]")]
-    [SerializeField] private Color validColor = new Color(0f, 1f, 0f, 0.4f);
-    [SerializeField] private Color invalidColor = new Color(1f, 0f, 0f, 0.4f);
+    [Tooltip("Opaque enough to see over any ground color; the green/red still reads as a tint over the tower shape.")]
+    [SerializeField] private Color validColor = new Color(0.35f, 1f, 0.35f, 0.7f);
+    [SerializeField] private Color invalidColor = new Color(1f, 0.3f, 0.3f, 0.7f);
+
+    [Tooltip("Sorting order for the ghost — high so it always draws above the map, towers and characters.")]
+    [SerializeField] private int ghostSortingOrder = 100;
 
     private bool building;
     // Named 'ghostInstance' (not 'ghost') on purpose: an earlier version had a
@@ -88,7 +95,7 @@ public class BuildModeController : MonoBehaviour
             // Place the real tower — a clean clone of the prefab, full color,
             // scripts and colliders enabled. Nothing here touches its color.
             Instantiate(towerPrefab, center, Quaternion.identity);
-            // Stay in build mode so several towers can be placed in a row.
+            // Keep carrying the ghost so several towers can be placed in a row.
         }
     }
 
@@ -117,6 +124,8 @@ public class BuildModeController : MonoBehaviour
             body.simulated = false;                   // no physics
 
         ghostRenderers = ghostInstance.GetComponentsInChildren<SpriteRenderer>();
+        foreach (var renderer in ghostRenderers)
+            renderer.sortingOrder = ghostSortingOrder; // always draw on top so it's never hidden
     }
 
     private void StopBuilding()

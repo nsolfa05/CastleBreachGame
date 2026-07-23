@@ -33,21 +33,33 @@ zombie, and later every tower.
 1. Right-click the `King` object → **Create Empty**, name it **`HealthBar`**.
    Set its **Position** to `0, 1.3, 0` (just above the King's head).
 2. Right-click `HealthBar` → **2D Object → Sprites → Square**, name it
-   **`Background`**: Scale `1, 0.15, 1`, Color near-black, **Order in Layer `30`**.
+   **`Background`**: Color near-black, **Order in Layer `30`**. Leave its Scale
+   at `1,1,1` — the script sizes it for you (see the note below).
 3. Right-click `HealthBar` → **2D Object → Sprites → Square**, name it **`Fill`**:
-   leave Scale alone (the script controls it), Color bright green,
-   **Order in Layer `31`**.
+   Color bright green, **Order in Layer `31`**. Leave its Scale at `1,1,1` too.
 4. Select `HealthBar` → **Add Component → Health Bar** (our script). Wire:
    - **Health** ← drag the `King` object in (it finds its Health component)
+   - **Background** ← drag the `Background` child in
    - **Fill** ← drag the `Fill` child in
-   - **Bar Width** `1`, **Fill Height** `0.12` (defaults)
+   - **Bar Width** `1`, **Bar Height** `0.15` — this is the ONE place that sets
+     the bar's size (see the note below).
 5. Make it a prefab: create a folder `Assets/Prefabs`, then **drag the `HealthBar`
    object from the Hierarchy into that folder** in the Project panel. The
    Hierarchy entry turns blue — it's now an instance of the prefab.
 
+> **How to size a health bar (read this — it's a common confusion):** the
+> script scales **both** the Background and the Fill from its **Bar Width** /
+> **Bar Height** fields, every frame. So set the size there and **nowhere
+> else** — do **not** set the Background's or Fill's own Transform Scale by
+> hand, because the script overwrites them. (Earlier the Background was scaled
+> by hand while the Fill was scaled by the script, which is why bars looked
+> mismatched from each other.) Want a wider King bar than a zombie bar? Change
+> **Bar Width** on that instance's HealthBar component — that's it.
+
 > Note: the **Health** reference is wired per instance (each bar watches a
 > different owner), so you'll re-drag that one field whenever you add a bar to a
-> new object. The look (sizes/colors) lives in the prefab.
+> new object. The look (bar size/colors) lives in the prefab; per-instance
+> tweaks like a longer King bar are just overrides of Bar Width / Bar Height.
 
 ## Step 3 — The GameManager
 
