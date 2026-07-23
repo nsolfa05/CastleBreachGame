@@ -51,6 +51,51 @@ stand.)
   own baked-in color, and assign them to that level's `MapGenerator` Ground/
   Wall/Gate Tile fields instead. One `CastleMapGenerator` instance per level/
   scene, each pointing at its own themed tile set.
+- **Tile Weight Rule (design doc §7.1)** — monsters should stack up to a
+  combined weight of 6 per tile (most monsters weigh 2, Cyclops weighs 6/
+  fills the tile alone) and get pushed aside past that cap, rather than
+  overlapping or physically colliding; the player always counts as weight 6,
+  so nothing can ever share the player's tile. Not implemented yet — the
+  vertical slice's zombies just bump off each other via ordinary
+  Rigidbody2D/Collider2D physics, which Guide 03's "disable Enemy × Enemy
+  collision" tip works around cosmetically but doesn't actually replace.
+  Natural time to build this for real: once more monster types with varying
+  weights exist (§7.3), since a single monster type can't really exercise
+  the stacking cap.
+- **Per-level map data — grid size, King spawn position, and immovable
+  obstacles (rocks).** Design doc §3.4 explicitly groups these three
+  together: *"Later maps will vary: king spawn position, grid size, starting
+  walls/buildings, and immovable obstacles (e.g., rocks)."* Worth designing
+  as one coherent thing when the time comes, not three separate patches —
+  notes on each:
+  - **Grid size** — the one with a real code cost. `Columns`/`Rows` are
+    `public const int` in `GridMath.cs`, compile-time constants shared
+    globally by everything touching grid coordinates
+    (`CastleMapGenerator`, `TileRef`'s bounds-checking, `WaveSpawner`'s
+    fallback spawn point, `BuildModeController`'s placement bounds check). A
+    one-off resize of *this* map is just editing those two constants plus
+    updating the hand-typed wall/gate region coordinates, King/Player spawn
+    positions, and Main Camera framing to match. *Per-level* varying sizes
+    is a bigger refactor: `Columns`/`Rows` would need to become per-level
+    instance data (e.g. fields on `CastleMapGenerator`) instead of global
+    consts, with `GridMath`'s methods taking them as parameters.
+  - **King spawn position** — currently just the King GameObject's hand-set
+    Transform position (Guide 03: `20, 15, 0`, map center). If each campaign
+    level ends up as its own Scene, this already works with zero code
+    changes — just place the King wherever that level needs. If levels
+    instead load from shared data (matching the Map Builder plan in §10.5),
+    King spawn position should become a field in that level data, with
+    whatever loads the level moving the King there at runtime.
+  - **Immovable obstacles (rocks)** — mechanically simple, since it's the
+    same trick walls already use: a Tilemap Collider 2D physically blocks
+    both the player and monsters via ordinary Rigidbody2D collision (there's
+    no pathfinding yet — monsters move in a straight line per `ZombieAI` and
+    just get physically stopped by anything solid, same as they are by
+    walls today). Difference from walls: rocks are permanent, unbreakable
+    level terrain with no HP, not a player-purchased structure (§6). Cleanest
+    fit: its own Tilemap layer + Tile asset + an `obstacleRegions` list on
+    `CastleMapGenerator`, mirroring the existing `wallRegions`/`gateRegions`
+    pattern exactly.
 
 ## Conventions (for future work — human or Claude)
 
