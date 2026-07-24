@@ -187,9 +187,15 @@ public class MonsterAI : MonoBehaviour
     /// <summary>
     /// Full target selection, in strict priority order (no distance-based
     /// tiebreak between them — each rule either applies or it doesn't):
-    /// 1. Structure-priority — unconditional, always wins outright when
-    ///    active, beating both the player AND the King. Cyclops's original
-    ///    behavior, unaffected by anything else here.
+    /// 1a. Structure-priority hard cutoff — unconditional, always wins
+    ///     outright when a structure is within Structure Priority Range,
+    ///     beating both the player AND the King. Cyclops's original
+    ///     behavior, unaffected by anything else here.
+    /// 1b. Structure-priority RATIO — for a structure farther out than the
+    ///     hard cutoff (but still within Structure Notice Radius), still
+    ///     prefer it over the King if the King is disproportionately much
+    ///     farther away (Structure Far King Ratio). Also beats the player,
+    ///     same as 1a — it's the same rule, just relative instead of fixed.
     /// 2. King-priority — only ever a tiebreaker against CHASING THE PLAYER.
     ///    If a structure already won above, or the base choice wasn't the
     ///    player anyway, this never comes into play.
@@ -199,10 +205,25 @@ public class MonsterAI : MonoBehaviour
     {
         Transform baseTarget = PickTarget(gm);
 
-        if (definition.prioritizesStructures && definition.structurePriorityRange > 0f)
+        if (definition.prioritizesStructures)
         {
-            var nearestStructure = NearestStructureWithin(definition.structurePriorityRange);
-            if (nearestStructure != null) return nearestStructure;
+            if (definition.structurePriorityRange > 0f)
+            {
+                var closeStructure = NearestStructureWithin(definition.structurePriorityRange);
+                if (closeStructure != null) return closeStructure;
+            }
+
+            if (definition.structureFarKingRatio > 0f && definition.structureNoticeRadius > 0f && gm.King != null)
+            {
+                var noticedStructure = NearestStructureWithin(definition.structureNoticeRadius);
+                if (noticedStructure != null)
+                {
+                    float structureDistance = DistanceToTarget(noticedStructure);
+                    float kingDistance = DistanceToTarget(gm.King);
+                    if (kingDistance >= structureDistance * definition.structureFarKingRatio)
+                        return noticedStructure;
+                }
+            }
         }
 
         if (baseTarget == gm.Player && gm.King != null && definition.kingPriorityRange > 0f &&

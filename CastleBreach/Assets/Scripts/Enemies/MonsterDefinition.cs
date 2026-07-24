@@ -53,7 +53,12 @@ public class MonsterDefinition : ScriptableObject
     public float kingPriorityRange = 0f;
     [Tooltip("Attacks structures within Structure Priority Range before anything else (player OR King) — Cyclops uses this, but it's usable on any monster.")]
     public bool prioritizesStructures = false;
+    [Tooltip("Hard cutoff: always prioritize a structure within this many tiles, no comparison needed.")]
     public float structurePriorityRange = 0f;
+    [Tooltip("Beyond Structure Priority Range, still prefer a structure over the King if the King is at least this many TIMES farther away than the structure (e.g. 3 = a tower at 3 tiles beats a King at 12+ tiles). 0 = off — only the hard cutoff above applies.")]
+    public float structureFarKingRatio = 0f;
+    [Tooltip("Max distance (tiles) at which a structure can even be considered for the Far-King-Ratio comparison — a structure beyond this is never a candidate no matter how favorable the ratio. Only matters if Structure Far King Ratio > 0.")]
+    public float structureNoticeRadius = 10f;
     [Tooltip("Skeleton: how many times it revives after dying (1 = two lives total).")]
     public int extraLives = 0;
     [Tooltip("Skeleton: seconds spent as an invulnerable bone pile before reviving.")]
