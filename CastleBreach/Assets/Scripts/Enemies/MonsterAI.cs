@@ -185,47 +185,29 @@ public class MonsterAI : MonoBehaviour
     }
 
     /// <summary>
-    /// Full target selection: the base choice (PickTarget) can be overridden
-    /// by two independent proximity rules — being near the King, or being
-    /// near a structure. King-proximity only ever competes with "chasing the
-    /// player" (if the base choice was already the King, there's nothing to
-    /// change); structure-proximity keeps its original unconditional
-    /// behavior (beats the player OR the King, same as Cyclops always did).
-    /// If both proximity rules trigger at once, whichever candidate is
-    /// physically closer wins.
+    /// Full target selection, in strict priority order (no distance-based
+    /// tiebreak between them — each rule either applies or it doesn't):
+    /// 1. Structure-priority — unconditional, always wins outright when
+    ///    active, beating both the player AND the King. Cyclops's original
+    ///    behavior, unaffected by anything else here.
+    /// 2. King-priority — only ever a tiebreaker against CHASING THE PLAYER.
+    ///    If a structure already won above, or the base choice wasn't the
+    ///    player anyway, this never comes into play.
+    /// 3. The base choice (PickTarget): player if in range, else the King.
     /// </summary>
     private Transform ChooseTarget(GameManager gm)
     {
         Transform baseTarget = PickTarget(gm);
 
-        Transform kingCandidate = null;
-        float kingDistance = float.MaxValue;
-        if (baseTarget == gm.Player && gm.King != null && definition.kingPriorityRange > 0f)
-        {
-            float distance = DistanceToTarget(gm.King);
-            if (distance <= definition.kingPriorityRange)
-            {
-                kingCandidate = gm.King;
-                kingDistance = distance;
-            }
-        }
-
-        Transform structureCandidate = null;
-        float structureDistance = float.MaxValue;
         if (definition.prioritizesStructures && definition.structurePriorityRange > 0f)
         {
-            var nearest = NearestStructureWithin(definition.structurePriorityRange);
-            if (nearest != null)
-            {
-                structureCandidate = nearest;
-                structureDistance = DistanceToTarget(nearest);
-            }
+            var nearestStructure = NearestStructureWithin(definition.structurePriorityRange);
+            if (nearestStructure != null) return nearestStructure;
         }
 
-        if (kingCandidate != null && structureCandidate != null)
-            return kingDistance <= structureDistance ? kingCandidate : structureCandidate;
-        if (structureCandidate != null) return structureCandidate;
-        if (kingCandidate != null) return kingCandidate;
+        if (baseTarget == gm.Player && gm.King != null && definition.kingPriorityRange > 0f &&
+            DistanceToTarget(gm.King) <= definition.kingPriorityRange)
+            return gm.King;
 
         return baseTarget;
     }
