@@ -44,6 +44,9 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("Width of the ahead-check — roughly your own body's radius.")]
     [SerializeField] private float avoidanceProbeRadius = 0.3f;
 
+    [Tooltip("Actual physics velocity below this (units/sec) counts as \"stuck\" — used to detect a monster that's committed to attacking a structure but is physically blocked (e.g. trapped behind another monster) from ever reaching it.")]
+    [SerializeField] private float stuckVelocityThreshold = 0.15f;
+
     /// <summary>Fired exactly once, when the monster is permanently dead
     /// (a Skeleton's first death does NOT fire this — it revives).</summary>
     public event Action<MonsterAI> Killed;
@@ -60,7 +63,7 @@ public class MonsterAI : MonoBehaviour
     private float avoidSide; // -1 or +1, fixed per instance so avoidance doesn't flicker sides
     private int enemyLayerMask;
     private float lastAttackedPlayerTime = float.NegativeInfinity;
-    private bool wasPrioritizingStructure; // sticky per-frame: true while already committed to a structure target
+    private Transform committedStructureTarget; // non-null while already committed to attacking a specific structure
 
     /// <summary>Called by the WaveSpawner right after Instantiate, before the first frame.</summary>
     public void SetDefinition(MonsterDefinition newDefinition) => definition = newDefinition;
@@ -192,10 +195,15 @@ public class MonsterAI : MonoBehaviour
     /// 0. Recent-player-combat guard — if this monster attacked, or was
     ///    attacked by, the player within Recent Player Combat Window
     ///    seconds, structure-priority is skipped entirely this frame (both
-    ///    tiers below), keeping it engaged with the player. NOT retroactive:
-    ///    if the monster was ALREADY committed to a structure target as of
-    ///    last frame (wasPrioritizingStructure), this guard doesn't apply —
-    ///    getting hit mid-structure-attack doesn't pull it back off.
+    ///    tiers below), keeping it engaged with the player. NOT retroactive
+    ///    in general: if the monster was ALREADY committed to a specific
+    ///    structure target (committedStructureTarget), this guard normally
+    ///    doesn't apply — getting hit mid-structure-attack doesn't pull it
+    ///    back off. EXCEPTION: if it's also STUCK — physically blocked
+    ///    (e.g. trapped behind another monster) from ever reaching that
+    ///    committed structure, so it isn't actually accomplishing anything
+    ///    by staying committed — the guard applies anyway, since there's no
+    ///    real cost to switching to the player it can actually reach.
     /// 1a. Structure-priority hard cutoff — unconditional, always wins
     ///     outright when a structure is within Structure Priority Range,
     ///     beating both the player AND the King. Cyclops's original
@@ -217,7 +225,17 @@ public class MonsterAI : MonoBehaviour
     {
         Transform baseTarget = PickTarget(gm);
 
-        bool structureBlockedByRecentCombat = !wasPrioritizingStructure && HasRecentPlayerCombat();
+        // "Stuck" = still committed to a structure, still outside attack
+        // range of it (so not just successfully pressed up against it and
+        // attacking), but actual physics velocity is near zero — meaning
+        // something else (typically another monster) is blocking the way
+        // and no progress is actually being made.
+        bool isStuckOnCommittedStructure = committedStructureTarget != null &&
+            rb.linearVelocity.sqrMagnitude < stuckVelocityThreshold * stuckVelocityThreshold &&
+            DistanceToTarget(committedStructureTarget) > definition.attackRange;
+
+        bool structureBlockedByRecentCombat = HasRecentPlayerCombat() &&
+            (committedStructureTarget == null || isStuckOnCommittedStructure);
 
         if (definition.prioritizesStructures && !structureBlockedByRecentCombat)
         {
@@ -226,7 +244,7 @@ public class MonsterAI : MonoBehaviour
                 var closeStructure = NearestStructureWithin(definition.structurePriorityRange);
                 if (closeStructure != null)
                 {
-                    wasPrioritizingStructure = true;
+                    committedStructureTarget = closeStructure;
                     return closeStructure;
                 }
             }
@@ -241,14 +259,14 @@ public class MonsterAI : MonoBehaviour
                     float kingDistance = DistanceToTarget(gm.King);
                     if (kingDistance >= structureDistance * definition.structureFarKingRatio)
                     {
-                        wasPrioritizingStructure = true;
+                        committedStructureTarget = noticedStructure;
                         return noticedStructure;
                     }
                 }
             }
         }
 
-        wasPrioritizingStructure = false;
+        committedStructureTarget = null;
 
         if (baseTarget == gm.Player && gm.King != null && definition.kingPriorityRange > 0f &&
             DistanceToTarget(gm.King) <= definition.kingPriorityRange)
