@@ -194,8 +194,11 @@ public class MonsterAI : MonoBehaviour
     /// 1b. Structure-priority RATIO — for a structure farther out than the
     ///     hard cutoff (but still within Structure Notice Radius), still
     ///     prefer it over the King if the King is disproportionately much
-    ///     farther away (Structure Far King Ratio). Also beats the player,
-    ///     same as 1a — it's the same rule, just relative instead of fixed.
+    ///     farther away (Structure Far King Ratio). Unlike 1a, this ONLY
+    ///     competes with heading to the King — it's meant to answer "should
+    ///     I detour from the King toward a farther structure," not to pull a
+    ///     monster off a player it's actively chasing. If the base choice is
+    ///     already the player, this tier is skipped entirely.
     /// 2. King-priority — only ever a tiebreaker against CHASING THE PLAYER.
     ///    If a structure already won above, or the base choice wasn't the
     ///    player anyway, this never comes into play.
@@ -213,7 +216,8 @@ public class MonsterAI : MonoBehaviour
                 if (closeStructure != null) return closeStructure;
             }
 
-            if (definition.structureFarKingRatio > 0f && definition.structureNoticeRadius > 0f && gm.King != null)
+            if (baseTarget != gm.Player &&
+                definition.structureFarKingRatio > 0f && definition.structureNoticeRadius > 0f && gm.King != null)
             {
                 var noticedStructure = NearestStructureWithin(definition.structureNoticeRadius);
                 if (noticedStructure != null)
