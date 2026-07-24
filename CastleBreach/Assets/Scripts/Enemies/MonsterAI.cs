@@ -37,6 +37,13 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("The tinted body renderer. Leave empty to use the SpriteRenderer on this object.")]
     [SerializeField] private SpriteRenderer body;
 
+    [Header("Crowd avoidance (shared behavior, not per-monster-type data)")]
+    [Tooltip("How far ahead to check for another monster directly blocking the path, in tiles.")]
+    [SerializeField] private float avoidanceLookAhead = 0.6f;
+
+    [Tooltip("Width of the ahead-check — roughly your own body's radius.")]
+    [SerializeField] private float avoidanceProbeRadius = 0.3f;
+
     /// <summary>Fired exactly once, when the monster is permanently dead
     /// (a Skeleton's first death does NOT fire this — it revives).</summary>
     public event Action<MonsterAI> Killed;
@@ -50,6 +57,8 @@ public class MonsterAI : MonoBehaviour
     private int livesRemaining;
     private bool bonePileActive;
     private Vector3 activeScale;
+    private float avoidSide; // -1 or +1, fixed per instance so avoidance doesn't flicker sides
+    private int enemyLayerMask;
 
     /// <summary>Called by the WaveSpawner right after Instantiate, before the first frame.</summary>
     public void SetDefinition(MonsterDefinition newDefinition) => definition = newDefinition;
@@ -61,6 +70,8 @@ public class MonsterAI : MonoBehaviour
         myCollider = GetComponent<Collider2D>();
         health.Died += OnDied;
         if (body == null) body = GetComponent<SpriteRenderer>();
+        avoidSide = UnityEngine.Random.value < 0.5f ? -1f : 1f;
+        enemyLayerMask = 1 << gameObject.layer;
     }
 
     /// <summary>
@@ -132,9 +143,42 @@ public class MonsterAI : MonoBehaviour
             }
             else
             {
-                rb.linearVelocity = ((Vector2)(target.position - transform.position)).normalized * definition.moveSpeed;
+                Vector2 approachPoint = ApproachPoint(target);
+                Vector2 desiredDirection = (approachPoint - (Vector2)transform.position).normalized;
+                rb.linearVelocity = SteerAroundNeighbors(desiredDirection) * definition.moveSpeed;
             }
         }
+    }
+
+    /// <summary>
+    /// The point THIS monster should walk toward — the closest point on the
+    /// target's own collider surface to its current position, not the
+    /// target's center. Monsters approaching from different angles then
+    /// naturally head to different points around a big target's perimeter
+    /// instead of all converging on the exact same spot and piling up.
+    /// </summary>
+    private Vector2 ApproachPoint(Transform target)
+    {
+        var targetCollider = target.GetComponentInParent<Collider2D>();
+        return targetCollider != null ? targetCollider.ClosestPoint(transform.position) : (Vector2)target.position;
+    }
+
+    /// <summary>
+    /// If another monster is directly ahead within a short look-ahead
+    /// distance, blend in a sideways nudge so this monster curves around it
+    /// instead of walking straight into its back — the fix for monsters
+    /// forming a single-file line behind whoever reached the target first.
+    /// The side (left/right) is fixed per instance so it doesn't flicker.
+    /// </summary>
+    private Vector2 SteerAroundNeighbors(Vector2 desiredDirection)
+    {
+        var hit = Physics2D.CircleCast(transform.position, avoidanceProbeRadius, desiredDirection,
+                                       avoidanceLookAhead, enemyLayerMask);
+        if (hit.collider == null || hit.collider.gameObject == gameObject)
+            return desiredDirection;
+
+        Vector2 perpendicular = new Vector2(-desiredDirection.y, desiredDirection.x) * avoidSide;
+        return (desiredDirection + perpendicular).normalized;
     }
 
     /// <summary>
