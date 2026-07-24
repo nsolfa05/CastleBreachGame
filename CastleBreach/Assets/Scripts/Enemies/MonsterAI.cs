@@ -126,28 +126,31 @@ public class MonsterAI : MonoBehaviour
             return;
         }
 
-        float distance = DistanceToTarget(target);
-        if (distance <= definition.attackRange)
+        // Attack Range only decides whether a hit can land right now — it is
+        // NOT how close a monster is willing to get. A monster keeps trying
+        // to advance every frame regardless of whether it's already in
+        // range; physical collision (not this check) is what actually stops
+        // it once there's nowhere left to go. This lets Attack Range stay a
+        // real gameplay stat (matching the design doc's numbers) instead of
+        // secretly doubling as "how close before it gives up approaching."
+        float distanceToTarget = DistanceToTarget(target);
+        if (distanceToTarget <= definition.attackRange)
         {
-            rb.linearVelocity = Vector2.zero;
             TryAttack(target, gm);
         }
         else
         {
-            // A structure within reach (blocking the path) gets attacked first.
+            // Not yet close enough to the real target — but if a structure
+            // is literally blocking the direct path, hit that instead of
+            // trying to walk through it.
             var blocking = NearestStructureWithin(definition.attackRange);
             if (blocking != null)
-            {
-                rb.linearVelocity = Vector2.zero;
                 TryAttack(blocking, gm);
-            }
-            else
-            {
-                Vector2 approachPoint = ApproachPoint(target);
-                Vector2 desiredDirection = (approachPoint - (Vector2)transform.position).normalized;
-                rb.linearVelocity = SteerAroundNeighbors(desiredDirection) * definition.moveSpeed;
-            }
         }
+
+        Vector2 approachPoint = ApproachPoint(target);
+        Vector2 desiredDirection = (approachPoint - (Vector2)transform.position).normalized;
+        rb.linearVelocity = SteerAroundNeighbors(desiredDirection) * definition.moveSpeed;
     }
 
     /// <summary>

@@ -28,8 +28,8 @@ public class MonsterDefinition : ScriptableObject
     public float playerTargetRange = 6f;
     [Tooltip("Seconds between attacks.")]
     public float attackInterval = 1.5f;
-    [Tooltip("How much open space (in tiles) is still allowed between this monster's body and its target's body before it stops and attacks — NOT center-to-center distance, so it means the same thing regardless of target size. Small values (~0.15) mean it presses right up against its target before attacking, which lets multiple monsters pack in tightly around a big target.")]
-    public float attackRange = 0.15f;
+    [Tooltip("How much open space (in tiles) is allowed between this monster's body and its target's body for a hit to land — an edge-to-edge gap, not center-to-center, so it means the same thing regardless of target size (design doc §7.3, e.g. Zombie: 1). This does NOT control how close a monster tries to get — it always keeps advancing as far as physical space allows regardless of this value; it only decides whether an attack can currently land.")]
+    public float attackRange = 1f;
 
     [Header("Attacking structures (§7.3)")]
     public float structureDamage = 3f;
