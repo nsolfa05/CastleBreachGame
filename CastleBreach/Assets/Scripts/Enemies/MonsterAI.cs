@@ -12,7 +12,10 @@ using UnityEngine;
 /// when they come within the definition's target range; attack whatever is
 /// in reach, including structures blocking the path. Specials handled here:
 /// - targetsOnlyKing / praiseTowerLureRange (Goblin)
-/// - prioritizesStructures within a radius (Cyclops)
+/// - kingPriorityRange: beats chasing the player if the King is this close
+///   (any monster, not just one type — see ChooseTarget)
+/// - prioritizesStructures within a radius (Cyclops; also usable on any
+///   monster) — beats BOTH the player and the King unconditionally
 /// - extraLives + invulnerable bone-pile revive (Skeleton)
 ///
 /// NOTE: movement is still straight-line. Real pathfinding around
@@ -104,15 +107,7 @@ public class MonsterAI : MonoBehaviour
             return;
         }
 
-        Transform target = PickTarget(gm);
-
-        // Cyclops rule: any structure within its priority radius outranks
-        // whatever it was otherwise heading for.
-        if (definition.prioritizesStructures && definition.structurePriorityRange > 0f)
-        {
-            var priority = NearestStructureWithin(definition.structurePriorityRange);
-            if (priority != null) target = priority;
-        }
+        Transform target = ChooseTarget(gm);
 
         if (target == null)
         {
@@ -140,6 +135,52 @@ public class MonsterAI : MonoBehaviour
                 rb.linearVelocity = ((Vector2)(target.position - transform.position)).normalized * definition.moveSpeed;
             }
         }
+    }
+
+    /// <summary>
+    /// Full target selection: the base choice (PickTarget) can be overridden
+    /// by two independent proximity rules — being near the King, or being
+    /// near a structure. King-proximity only ever competes with "chasing the
+    /// player" (if the base choice was already the King, there's nothing to
+    /// change); structure-proximity keeps its original unconditional
+    /// behavior (beats the player OR the King, same as Cyclops always did).
+    /// If both proximity rules trigger at once, whichever candidate is
+    /// physically closer wins.
+    /// </summary>
+    private Transform ChooseTarget(GameManager gm)
+    {
+        Transform baseTarget = PickTarget(gm);
+
+        Transform kingCandidate = null;
+        float kingDistance = float.MaxValue;
+        if (baseTarget == gm.Player && gm.King != null && definition.kingPriorityRange > 0f)
+        {
+            float distance = DistanceToTarget(gm.King);
+            if (distance <= definition.kingPriorityRange)
+            {
+                kingCandidate = gm.King;
+                kingDistance = distance;
+            }
+        }
+
+        Transform structureCandidate = null;
+        float structureDistance = float.MaxValue;
+        if (definition.prioritizesStructures && definition.structurePriorityRange > 0f)
+        {
+            var nearest = NearestStructureWithin(definition.structurePriorityRange);
+            if (nearest != null)
+            {
+                structureCandidate = nearest;
+                structureDistance = DistanceToTarget(nearest);
+            }
+        }
+
+        if (kingCandidate != null && structureCandidate != null)
+            return kingDistance <= structureDistance ? kingCandidate : structureCandidate;
+        if (structureCandidate != null) return structureCandidate;
+        if (kingCandidate != null) return kingCandidate;
+
+        return baseTarget;
     }
 
     private Transform PickTarget(GameManager gm)

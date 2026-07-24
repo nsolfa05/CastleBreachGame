@@ -49,7 +49,9 @@ public class MonsterDefinition : ScriptableObject
     public float praiseTowerLureRange = 0f;
     [Tooltip("Goblin: can pass through player-built Gate structures (used once walls/gates exist).")]
     public bool passesThroughGates = false;
-    [Tooltip("Cyclops: attacks structures within Structure Priority Range before anything else.")]
+    [Tooltip("If the King is within this many tiles, target the King instead of chasing the player, even if the player is also in range. 0 = off (King stays fallback-only, the original behavior). Usable on ANY monster, not just one type.")]
+    public float kingPriorityRange = 0f;
+    [Tooltip("Attacks structures within Structure Priority Range before anything else (player OR King) — Cyclops uses this, but it's usable on any monster.")]
     public bool prioritizesStructures = false;
     public float structurePriorityRange = 0f;
     [Tooltip("Skeleton: how many times it revives after dying (1 = two lives total).")]
