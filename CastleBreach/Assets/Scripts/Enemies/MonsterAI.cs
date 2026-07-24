@@ -268,8 +268,18 @@ public class MonsterAI : MonoBehaviour
 
         committedStructureTarget = null;
 
+        // Recent player combat also holds off King-Priority, not just
+        // structure-priority — otherwise a monster standing right at the
+        // King's doorstep (well within King Priority Range, as most monsters
+        // converging there will be) would get yanked back to the King every
+        // frame even while it's actively fighting the player who's hitting
+        // it. King-Priority has no "commitment" state of its own (it's a
+        // fresh distance check every frame, not a sticky target the way
+        // structure-priority is), so this is a plain suppression — no
+        // stuck-check or non-retroactive exception needed here.
         if (baseTarget == gm.Player && gm.King != null && definition.kingPriorityRange > 0f &&
-            DistanceToTarget(gm.King) <= definition.kingPriorityRange)
+            DistanceToTarget(gm.King) <= definition.kingPriorityRange &&
+            !HasRecentPlayerCombat())
             return gm.King;
 
         return baseTarget;
