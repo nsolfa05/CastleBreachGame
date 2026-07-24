@@ -53,9 +53,12 @@ public class MonsterAI : MonoBehaviour
 
     public MonsterDefinition Definition => definition;
 
+    private enum TelegraphPhase { Idle, Winding, Cooldown }
+
     private Rigidbody2D rb;
     private Health health;
     private Collider2D myCollider;
+    private TelegraphedAreaAttack telegraph;
     private float nextAttackTime;
     private int livesRemaining;
     private bool bonePileActive;
@@ -64,6 +67,9 @@ public class MonsterAI : MonoBehaviour
     private int enemyLayerMask;
     private float lastAttackedPlayerTime = float.NegativeInfinity;
     private Transform committedStructureTarget; // non-null while already committed to attacking a specific structure
+    private TelegraphPhase telegraphPhase = TelegraphPhase.Idle;
+    private float telegraphPhaseEndTime;
+    private Vector2 lockedBoxCenter;
 
     /// <summary>Called by the WaveSpawner right after Instantiate, before the first frame.</summary>
     public void SetDefinition(MonsterDefinition newDefinition) => definition = newDefinition;
@@ -73,6 +79,7 @@ public class MonsterAI : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         health = GetComponent<Health>();
         myCollider = GetComponent<Collider2D>();
+        telegraph = GetComponent<TelegraphedAreaAttack>();
         health.Died += OnDied;
         if (body == null) body = GetComponent<SpriteRenderer>();
         avoidSide = UnityEngine.Random.value < 0.5f ? -1f : 1f;
@@ -128,6 +135,13 @@ public class MonsterAI : MonoBehaviour
         if (target == null)
         {
             rb.linearVelocity = Vector2.zero;
+            if (telegraph != null && telegraphPhase == TelegraphPhase.Winding) { telegraph.Cancel(); telegraphPhase = TelegraphPhase.Idle; }
+            return;
+        }
+
+        if (definition.usesTelegraphedAreaAttack)
+        {
+            UpdateTelegraphedAttack(gm, target);
             return;
         }
 
@@ -153,9 +167,75 @@ public class MonsterAI : MonoBehaviour
                 TryAttack(blocking, gm);
         }
 
+        MoveToward(target);
+    }
+
+    private void MoveToward(Transform target)
+    {
         Vector2 approachPoint = ApproachPoint(target);
         Vector2 desiredDirection = (approachPoint - (Vector2)transform.position).normalized;
         rb.linearVelocity = SteerAroundNeighbors(desiredDirection) * definition.moveSpeed;
+    }
+
+    /// <summary>
+    /// Telegraphed box attack (Cyclops §7.3): wind up (telegraph) → slam →
+    /// cooldown → repeat. The box is aimed at and LOCKED over the target's
+    /// position when the wind-up starts, so the target can dodge out of it.
+    /// The slam damages everything caught inside the box.
+    /// </summary>
+    private void UpdateTelegraphedAttack(GameManager gm, Transform target)
+    {
+        switch (telegraphPhase)
+        {
+            case TelegraphPhase.Idle:
+                if (DistanceToTarget(target) <= definition.attackRange)
+                {
+                    lockedBoxCenter = target.position; // aim + lock here
+                    telegraph?.BeginTelegraph(lockedBoxCenter, definition.attackBoxSize,
+                        definition.telegraphTime, definition.telegraphBaseColor, definition.telegraphFillColor);
+                    telegraphPhase = TelegraphPhase.Winding;
+                    telegraphPhaseEndTime = Time.time + definition.telegraphTime;
+                    rb.linearVelocity = Vector2.zero;
+                }
+                else
+                {
+                    MoveToward(target); // not in range yet — approach
+                }
+                break;
+
+            case TelegraphPhase.Winding:
+                rb.linearVelocity = Vector2.zero; // committed, stands still while winding up
+                if (Time.time >= telegraphPhaseEndTime)
+                {
+                    Slam(gm);
+                    telegraph?.TriggerSlam(definition.slamColor, definition.slamFlashSeconds);
+                    telegraphPhase = TelegraphPhase.Cooldown;
+                    telegraphPhaseEndTime = Time.time + definition.attackInterval;
+                }
+                break;
+
+            case TelegraphPhase.Cooldown:
+                MoveToward(target); // free to reposition between attacks
+                if (Time.time >= telegraphPhaseEndTime)
+                    telegraphPhase = TelegraphPhase.Idle;
+                break;
+        }
+    }
+
+    /// <summary>The slam: damage every non-monster Health inside the locked box once.</summary>
+    private void Slam(GameManager gm)
+    {
+        var hits = Physics2D.OverlapBoxAll(lockedBoxCenter, definition.attackBoxSize, 0f);
+        var damaged = new System.Collections.Generic.HashSet<Health>();
+        foreach (var hit in hits)
+        {
+            if (hit.GetComponentInParent<MonsterAI>() != null) continue; // never hit other monsters (or self)
+            var targetHealth = hit.GetComponentInParent<Health>();
+            if (targetHealth == null || !damaged.Add(targetHealth)) continue;
+
+            if (gm != null && targetHealth == gm.PlayerHealth) lastAttackedPlayerTime = Time.time;
+            targetHealth.TakeDamage(DamageForHealth(targetHealth, hit.transform, gm));
+        }
     }
 
     /// <summary>
@@ -359,7 +439,7 @@ public class MonsterAI : MonoBehaviour
 
         var targetHealth = target.GetComponentInParent<Health>();
         if (targetHealth != null)
-            targetHealth.TakeDamage(DamageFor(target, gm));
+            targetHealth.TakeDamage(DamageForHealth(targetHealth, target, gm));
     }
 
     /// <summary>
@@ -378,12 +458,22 @@ public class MonsterAI : MonoBehaviour
         return false;
     }
 
-    private float DamageFor(Transform target, GameManager gm)
+    /// <summary>
+    /// Damage this monster deals to a given target's Health. Compares against
+    /// the King/Player Health objects (robust whether the hit landed on the
+    /// root or a child collider). The King uses its own Unique King Damage
+    /// when enabled — a replacement, not a bonus — so a monster can hurt the
+    /// King more or less than it hurts the player or structures.
+    /// </summary>
+    private float DamageForHealth(Health targetHealth, Transform hitTransform, GameManager gm)
     {
-        if (gm != null && (target == gm.Player || target == gm.King))
+        if (gm != null && targetHealth == gm.KingHealth)
+            return definition.useUniqueKingDamage ? definition.kingDamage : definition.playerDamage;
+
+        if (gm != null && targetHealth == gm.PlayerHealth)
             return definition.playerDamage;
 
-        if (definition.praiseTowerDamage > 0f && target.GetComponentInParent<PraiseTheKingTower>() != null)
+        if (definition.praiseTowerDamage > 0f && hitTransform.GetComponentInParent<PraiseTheKingTower>() != null)
             return definition.praiseTowerDamage;
 
         return definition.structureDamage;

@@ -22,8 +22,12 @@ public class MonsterDefinition : ScriptableObject
     public float maxHealth = 10f;
 
     [Header("Attacking the player / King (§7.3)")]
-    [Tooltip("Damage per hit vs the player AND the King.")]
+    [Tooltip("Damage per hit vs the player (and the King too, unless Use Unique King Damage is checked below).")]
     public float playerDamage = 3f;
+    [Tooltip("If checked, the King takes King Damage instead of Player Damage (does NOT stack — it replaces). For when a monster should hurt the King more or less than the player/structures.")]
+    public bool useUniqueKingDamage = false;
+    [Tooltip("Damage per hit vs the King specifically. Only used when Use Unique King Damage is checked.")]
+    public float kingDamage = 3f;
     [Tooltip("Chases the player when they are within this many tiles. 0 = never targets the player (Goblin).")]
     public float playerTargetRange = 6f;
     [Tooltip("Seconds between attacks.")]
@@ -66,4 +70,20 @@ public class MonsterDefinition : ScriptableObject
     [Tooltip("Skeleton: seconds spent as an invulnerable bone pile before reviving.")]
     public float reviveDelaySeconds = 6f;
     public Color bonePileColor = new Color(0.90f, 0.90f, 0.85f);
+
+    [Header("Telegraphed area attack (Cyclops §7.3)")]
+    [Tooltip("Cyclops: instead of an instant hit, wind up a telegraphed box attack that damages EVERYTHING inside it (player, King, structures) when it lands. Needs a Telegraphed Area Attack component on the Monster prefab for the visuals.")]
+    public bool usesTelegraphedAreaAttack = false;
+    [Tooltip("Attack box size in tiles (width, depth). Design doc Cyclops: 2x2.")]
+    public Vector2 attackBoxSize = new Vector2(2f, 2f);
+    [Tooltip("Seconds of wind-up before the slam lands — the telegraph 'charge up' time. Editable.")]
+    public float telegraphTime = 1.5f;
+    [Tooltip("The base box shown for the whole wind-up — the attack AREA. Placeholder: transparent gray.")]
+    public Color telegraphBaseColor = new Color(0.5f, 0.5f, 0.5f, 0.25f);
+    [Tooltip("The darker box that fills in over the wind-up time — the 'charging' indicator. Placeholder: darker transparent gray.")]
+    public Color telegraphFillColor = new Color(0.15f, 0.15f, 0.15f, 0.4f);
+    [Tooltip("Flashed at the moment of impact — the actual hit. Placeholder: transparent black.")]
+    public Color slamColor = new Color(0f, 0f, 0f, 0.55f);
+    [Tooltip("How long the impact box stays visible, in seconds.")]
+    public float slamFlashSeconds = 0.2f;
 }
