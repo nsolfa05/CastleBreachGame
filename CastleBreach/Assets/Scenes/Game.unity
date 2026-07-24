@@ -667,9 +667,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a2c7b718c5fd44a4f8b346a67302c460, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BuildModeController
-  towerPrefab: {fileID: 429328228911935939, guid: 3e96f7ce1b0b609459bf810668d26617, type: 3}
-  towerCost: 150
-  footprint: {x: 2, y: 2}
+  buildOptions:
+  - displayName: Archer Tower
+    prefab: {fileID: 429328228911935939, guid: 3e96f7ce1b0b609459bf810668d26617, type: 3}
+    cost: 150
+    footprint: {x: 2, y: 2}
   wallTilemap: {fileID: 528603457}
   gateTilemap: {fileID: 1764802730}
   blockingLayers:
@@ -16544,7 +16546,7 @@ MonoBehaviour:
   waveText: {fileID: 460102107}
   kingHealthText: {fileID: 1130172493}
   messageText: {fileID: 1036979606}
-  waveSpawner: {fileID: 1540292808}
+  waveSpawner: {fileID: 0}
 --- !u!1 &1521064319
 GameObject:
   m_ObjectHideFlags: 0
@@ -16646,7 +16648,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1540292809}
-  - component: {fileID: 1540292808}
+  - component: {fileID: 1540292810}
   m_Layer: 0
   m_Name: WaveSpawner
   m_TagString: Untagged
@@ -16654,35 +16656,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1540292808
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1540292807}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8f9386a6ec52dfc47b5558e61ddf71f0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::WaveSpawner
-  map: {fileID: 228179959}
-  zombiePrefab: {fileID: 1104429485580058561, guid: 32740fb38ccdf9f439b6f8112e02de85, type: 3}
-  delayBeforeFirstWave: 5
-  delayBetweenWaves: 8
-  waves:
-  - name: Wave 1
-    gates: 03000000
-    zombieCount: 4
-    secondsBetweenSpawns: 1.5
-  - name: Wave 2
-    gates: 0300000002000000
-    zombieCount: 6
-    secondsBetweenSpawns: 1.5
-  - name: Wave 3
-    gates: 00000000010000000200000003000000
-    zombieCount: 10
-    secondsBetweenSpawns: 1.5
 --- !u!4 &1540292809
 Transform:
   m_ObjectHideFlags: 0
@@ -16698,6 +16671,64 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1540292810
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1540292807}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8f9386a6ec52dfc47b5558e61ddf71f0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WaveSpawner
+  map: {fileID: 228179959}
+  monsterPrefab: {fileID: 8939975703344095119, guid: 32740fb38ccdf9f439b6f8112e02de85, type: 3}
+  delayBeforeFirstWave: 5
+  delayBetweenWaves: 8
+  waves:
+  - name: Wave 1
+    groups:
+    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
+      count: 4
+      gate: 3
+      secondsBetweenSpawns: 1.5
+      startDelay: 0
+  - name: Wave 2
+    groups:
+    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
+      count: 3
+      gate: 3
+      secondsBetweenSpawns: 1.5
+      startDelay: 0
+    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
+      count: 3
+      gate: 2
+      secondsBetweenSpawns: 1.5
+      startDelay: 0
+  - name: Wave 3
+    groups:
+    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
+      count: 3
+      gate: 0
+      secondsBetweenSpawns: 1.5
+      startDelay: 0
+    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
+      count: 3
+      gate: 1
+      secondsBetweenSpawns: 1.5
+      startDelay: 0
+    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
+      count: 3
+      gate: 2
+      secondsBetweenSpawns: 1.5
+      startDelay: 4
+    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
+      count: 3
+      gate: 3
+      secondsBetweenSpawns: 1.5
+      startDelay: 4
 --- !u!1 &1644238299
 GameObject:
   m_ObjectHideFlags: 0
