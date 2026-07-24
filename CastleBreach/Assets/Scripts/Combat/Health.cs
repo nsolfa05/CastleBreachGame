@@ -17,6 +17,12 @@ public class Health : MonoBehaviour
     /// <summary>While true, TakeDamage does nothing (Skeleton bone pile).</summary>
     public bool Invulnerable { get; set; }
 
+    /// <summary>Time.time of the most recent successful TakeDamage call, for anything that needs "was I hit recently" (e.g. MonsterAI's recent-combat check). Negative infinity until ever hit.</summary>
+    public float LastDamageTime { get; private set; } = float.NegativeInfinity;
+
+    /// <summary>Whether the most recent hit came from the player specifically.</summary>
+    public bool LastDamageFromPlayer { get; private set; }
+
     /// <summary>Fired every time health changes (including healing/reset).</summary>
     public event Action<Health> Damaged;
 
@@ -28,10 +34,12 @@ public class Health : MonoBehaviour
         Current = maxHealth;
     }
 
-    public void TakeDamage(float amount)
+    public void TakeDamage(float amount, bool fromPlayer = false)
     {
         if (IsDead || Invulnerable) return;
         Current = Mathf.Max(0f, Current - amount);
+        LastDamageTime = Time.time;
+        LastDamageFromPlayer = fromPlayer;
         Damaged?.Invoke(this);
         if (Current <= 0f)
             Died?.Invoke(this);

@@ -59,6 +59,8 @@ public class MonsterAI : MonoBehaviour
     private Vector3 activeScale;
     private float avoidSide; // -1 or +1, fixed per instance so avoidance doesn't flicker sides
     private int enemyLayerMask;
+    private float lastAttackedPlayerTime = float.NegativeInfinity;
+    private bool wasPrioritizingStructure; // sticky per-frame: true while already committed to a structure target
 
     /// <summary>Called by the WaveSpawner right after Instantiate, before the first frame.</summary>
     public void SetDefinition(MonsterDefinition newDefinition) => definition = newDefinition;
@@ -187,6 +189,13 @@ public class MonsterAI : MonoBehaviour
     /// <summary>
     /// Full target selection, in strict priority order (no distance-based
     /// tiebreak between them — each rule either applies or it doesn't):
+    /// 0. Recent-player-combat guard — if this monster attacked, or was
+    ///    attacked by, the player within Recent Player Combat Window
+    ///    seconds, structure-priority is skipped entirely this frame (both
+    ///    tiers below), keeping it engaged with the player. NOT retroactive:
+    ///    if the monster was ALREADY committed to a structure target as of
+    ///    last frame (wasPrioritizingStructure), this guard doesn't apply —
+    ///    getting hit mid-structure-attack doesn't pull it back off.
     /// 1a. Structure-priority hard cutoff — unconditional, always wins
     ///     outright when a structure is within Structure Priority Range,
     ///     beating both the player AND the King. Cyclops's original
@@ -208,12 +217,18 @@ public class MonsterAI : MonoBehaviour
     {
         Transform baseTarget = PickTarget(gm);
 
-        if (definition.prioritizesStructures)
+        bool structureBlockedByRecentCombat = !wasPrioritizingStructure && HasRecentPlayerCombat();
+
+        if (definition.prioritizesStructures && !structureBlockedByRecentCombat)
         {
             if (definition.structurePriorityRange > 0f)
             {
                 var closeStructure = NearestStructureWithin(definition.structurePriorityRange);
-                if (closeStructure != null) return closeStructure;
+                if (closeStructure != null)
+                {
+                    wasPrioritizingStructure = true;
+                    return closeStructure;
+                }
             }
 
             if (baseTarget != gm.Player &&
@@ -225,10 +240,15 @@ public class MonsterAI : MonoBehaviour
                     float structureDistance = DistanceToTarget(noticedStructure);
                     float kingDistance = DistanceToTarget(gm.King);
                     if (kingDistance >= structureDistance * definition.structureFarKingRatio)
+                    {
+                        wasPrioritizingStructure = true;
                         return noticedStructure;
+                    }
                 }
             }
         }
+
+        wasPrioritizingStructure = false;
 
         if (baseTarget == gm.Player && gm.King != null && definition.kingPriorityRange > 0f &&
             DistanceToTarget(gm.King) <= definition.kingPriorityRange)
@@ -306,9 +326,28 @@ public class MonsterAI : MonoBehaviour
         if (Time.time < nextAttackTime) return;
         nextAttackTime = Time.time + definition.attackInterval;
 
+        if (gm != null && target == gm.Player)
+            lastAttackedPlayerTime = Time.time;
+
         var targetHealth = target.GetComponentInParent<Health>();
         if (targetHealth != null)
             targetHealth.TakeDamage(DamageFor(target, gm));
+    }
+
+    /// <summary>
+    /// True if this monster attacked the player, or the player attacked it,
+    /// within Recent Player Combat Window seconds. Checked in ChooseTarget to
+    /// keep a monster engaged with the player instead of letting it switch to
+    /// a nearby structure mid-fight.
+    /// </summary>
+    private bool HasRecentPlayerCombat()
+    {
+        float window = definition.recentPlayerCombatWindow;
+        if (window <= 0f) return false;
+
+        if (Time.time - lastAttackedPlayerTime <= window) return true;
+        if (health.LastDamageFromPlayer && Time.time - health.LastDamageTime <= window) return true;
+        return false;
     }
 
     private float DamageFor(Transform target, GameManager gm)

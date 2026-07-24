@@ -59,6 +59,8 @@ public class MonsterDefinition : ScriptableObject
     public float structureFarKingRatio = 0f;
     [Tooltip("Max distance (tiles) at which a structure can even be considered for the Far-King-Ratio comparison — a structure beyond this is never a candidate no matter how favorable the ratio. Only matters if Structure Far King Ratio > 0.")]
     public float structureNoticeRadius = 10f;
+    [Tooltip("If this monster attacked the player, or was attacked BY the player, within this many seconds, it stays engaged with the player instead of switching to a nearby structure (both structure-priority tiers). Does NOT apply retroactively — once already committed to attacking a structure, getting hit doesn't pull it back off. 0 = off.")]
+    public float recentPlayerCombatWindow = 3f;
     [Tooltip("Skeleton: how many times it revives after dying (1 = two lives total).")]
     public int extraLives = 0;
     [Tooltip("Skeleton: seconds spent as an invulnerable bone pile before reviving.")]

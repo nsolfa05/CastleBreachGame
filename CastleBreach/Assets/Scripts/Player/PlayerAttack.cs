@@ -88,7 +88,7 @@ public class PlayerAttack : MonoBehaviour
         {
             var health = hit.GetComponentInParent<Health>();
             if (health != null)
-                health.TakeDamage(damage);
+                health.TakeDamage(damage, fromPlayer: true);
         }
     }
 
