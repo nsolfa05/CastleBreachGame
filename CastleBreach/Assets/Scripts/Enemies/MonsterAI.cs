@@ -42,6 +42,7 @@ public class MonsterAI : MonoBehaviour
 
     private Rigidbody2D rb;
     private Health health;
+    private Collider2D myCollider;
     private float nextAttackTime;
     private int livesRemaining;
     private bool bonePileActive;
@@ -54,8 +55,28 @@ public class MonsterAI : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         health = GetComponent<Health>();
+        myCollider = GetComponent<Collider2D>();
         health.Died += OnDied;
         if (body == null) body = GetComponent<SpriteRenderer>();
+    }
+
+    /// <summary>
+    /// Gap between this monster's collider and the target's collider — NOT
+    /// center-to-center distance. A big target (the King at 1.8x scale, or
+    /// any 2x2 tower) physically stops a monster's collider well outside 1
+    /// world unit from its CENTER, so comparing center-to-center against a
+    /// ~1-tile Attack Range meant monsters could walk up, get physically
+    /// stopped by collision, and STILL never register as "in range" —
+    /// visibly "attacking" while dealing zero damage, forever. Measuring to
+    /// the collider surface instead makes Attack Range mean the same thing
+    /// regardless of how big the target is.
+    /// </summary>
+    private float DistanceToTarget(Transform target)
+    {
+        var targetCollider = target.GetComponentInParent<Collider2D>();
+        if (myCollider != null && targetCollider != null)
+            return myCollider.Distance(targetCollider).distance;
+        return Vector2.Distance(transform.position, target.position);
     }
 
     private void Start()
@@ -99,7 +120,7 @@ public class MonsterAI : MonoBehaviour
             return;
         }
 
-        float distance = Vector2.Distance(transform.position, target.position);
+        float distance = DistanceToTarget(target);
         if (distance <= definition.attackRange)
         {
             rb.linearVelocity = Vector2.zero;
