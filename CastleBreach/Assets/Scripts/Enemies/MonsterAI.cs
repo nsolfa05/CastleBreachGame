@@ -217,17 +217,30 @@ public class MonsterAI : MonoBehaviour
         return gm.King;
     }
 
+    /// <summary>
+    /// Nearest structure whose collider-to-collider GAP (not center distance,
+    /// same edge-to-edge measure as DistanceToTarget) is within radius.
+    /// Query a generously wide circle first (cheap broad-phase, still
+    /// center-based but only used to shortlist candidates), then rank by the
+    /// real edge distance so this agrees with the main attack-range check —
+    /// otherwise a monster could think a big structure is "blocking" long
+    /// before it's actually within its real attack range, or vice versa.
+    /// </summary>
     private Transform NearestStructureWithin(float radius)
     {
-        var hits = Physics2D.OverlapCircleAll(transform.position, radius, structureLayers);
+        float queryRadius = radius + 3f; // margin generous enough to catch a 2x2 structure's far edge
+        var hits = Physics2D.OverlapCircleAll(transform.position, queryRadius, structureLayers);
         Transform best = null;
-        float bestSqrDistance = float.MaxValue;
+        float bestDistance = float.MaxValue;
         foreach (var hit in hits)
         {
-            float sqrDistance = ((Vector2)(hit.transform.position - transform.position)).sqrMagnitude;
-            if (sqrDistance < bestSqrDistance)
+            float distance = myCollider != null
+                ? myCollider.Distance(hit).distance
+                : Vector2.Distance(transform.position, hit.transform.position);
+            if (distance > radius) continue;
+            if (distance < bestDistance)
             {
-                bestSqrDistance = sqrDistance;
+                bestDistance = distance;
                 best = hit.transform;
             }
         }
