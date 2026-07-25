@@ -70,6 +70,7 @@ public class MonsterAI : MonoBehaviour
     private TelegraphPhase telegraphPhase = TelegraphPhase.Idle;
     private float telegraphPhaseEndTime;
     private Vector2 lockedBoxCenter;
+    private float currentSpeedScale = 1f; // telegraph-attack movement ramp (1 = full speed, 0 = fully stopped)
 
     /// <summary>Called by the WaveSpawner right after Instantiate, before the first frame.</summary>
     public void SetDefinition(MonsterDefinition newDefinition) => definition = newDefinition;
@@ -170,11 +171,23 @@ public class MonsterAI : MonoBehaviour
         MoveToward(target);
     }
 
-    private void MoveToward(Transform target)
+    private void MoveToward(Transform target, float speedScale = 1f)
     {
         Vector2 approachPoint = ApproachPoint(target);
         Vector2 desiredDirection = (approachPoint - (Vector2)transform.position).normalized;
-        rb.linearVelocity = SteerAroundNeighbors(desiredDirection) * definition.moveSpeed;
+        rb.linearVelocity = SteerAroundNeighbors(desiredDirection) * (definition.moveSpeed * speedScale);
+    }
+
+    /// <summary>
+    /// Eases currentSpeedScale toward targetScale over rampSeconds (0 = snap
+    /// instantly). Used to smoothly decelerate/accelerate the Cyclops around
+    /// its telegraph wind-up instead of a stiff instant stop/start.
+    /// </summary>
+    private void UpdateSpeedScale(float targetScale, float rampSeconds)
+    {
+        if (rampSeconds <= 0f) { currentSpeedScale = targetScale; return; }
+        float rate = 1f / rampSeconds;
+        currentSpeedScale = Mathf.MoveTowards(currentSpeedScale, targetScale, rate * Time.fixedDeltaTime);
     }
 
     /// <summary>
@@ -182,6 +195,15 @@ public class MonsterAI : MonoBehaviour
     /// cooldown → repeat. The box is aimed at and LOCKED over the target's
     /// position when the wind-up starts, so the target can dodge out of it.
     /// The slam damages everything caught inside the box.
+    ///
+    /// Movement ramp: when Pauses During Telegraph is on, currentSpeedScale
+    /// eases from 1→0 over Telegraph Stop Duration as winding begins, and
+    /// 0→1 over Telegraph Resume Duration once cooldown begins — deliberately
+    /// its own timer, independent of Telegraph Time (the visual wind-up) and
+    /// Attack Interval (the cooldown length), so tuning one never distorts
+    /// the others. When the toggle is off, currentSpeedScale is just held at
+    /// 1 and the Cyclops keeps walking normally through the whole attack —
+    /// only the locked box position is affected.
     /// </summary>
     private void UpdateTelegraphedAttack(GameManager gm, Transform target)
     {
@@ -195,16 +217,30 @@ public class MonsterAI : MonoBehaviour
                         definition.telegraphTime, definition.telegraphBaseColor, definition.telegraphFillColor);
                     telegraphPhase = TelegraphPhase.Winding;
                     telegraphPhaseEndTime = Time.time + definition.telegraphTime;
-                    rb.linearVelocity = Vector2.zero;
                 }
                 else
                 {
-                    MoveToward(target); // not in range yet — approach
+                    if (!definition.pausesDuringTelegraph) currentSpeedScale = 1f;
+                    else UpdateSpeedScale(1f, definition.telegraphResumeDuration);
+                    MoveToward(target, currentSpeedScale); // not in range yet — approach
                 }
                 break;
 
             case TelegraphPhase.Winding:
-                rb.linearVelocity = Vector2.zero; // committed, stands still while winding up
+                if (!definition.pausesDuringTelegraph)
+                {
+                    currentSpeedScale = 1f;
+                    MoveToward(target, currentSpeedScale); // keeps walking; only the box is locked
+                }
+                else
+                {
+                    UpdateSpeedScale(0f, definition.telegraphStopDuration);
+                    if (currentSpeedScale > 0.001f)
+                        MoveToward(target, currentSpeedScale);
+                    else
+                        rb.linearVelocity = Vector2.zero;
+                }
+
                 if (Time.time >= telegraphPhaseEndTime)
                 {
                     Slam(gm);
@@ -215,7 +251,9 @@ public class MonsterAI : MonoBehaviour
                 break;
 
             case TelegraphPhase.Cooldown:
-                MoveToward(target); // free to reposition between attacks
+                if (!definition.pausesDuringTelegraph) currentSpeedScale = 1f;
+                else UpdateSpeedScale(1f, definition.telegraphResumeDuration);
+                MoveToward(target, currentSpeedScale); // free to reposition between attacks
                 if (Time.time >= telegraphPhaseEndTime)
                     telegraphPhase = TelegraphPhase.Idle;
                 break;

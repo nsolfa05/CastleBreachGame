@@ -110,4 +110,10 @@ public class MonsterDefinition : ScriptableObject
     public Color slamColor = new Color(0f, 0f, 0f, 0.55f);
     [Tooltip("How long the impact box stays visible, in seconds.")]
     public float slamFlashSeconds = 0.2f;
+    [Tooltip("If checked, movement eases to a full stop once the telegraph wind-up begins (and eases back up to speed once the cooldown starts). If unchecked, the monster keeps walking normally through the whole attack — only the locked box position is affected.")]
+    public bool pausesDuringTelegraph = true;
+    [Tooltip("Seconds to decelerate to a stop when the wind-up begins. 0 = instant stop. Only used when Pauses During Telegraph is checked.")]
+    public float telegraphStopDuration = 0.2f;
+    [Tooltip("Seconds to accelerate back to normal move speed once the cooldown (post-slam) begins. 0 = instant resume. Only used when Pauses During Telegraph is checked.")]
+    public float telegraphResumeDuration = 0.3f;
 }

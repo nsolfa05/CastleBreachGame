@@ -9,6 +9,10 @@
 
 Both are driven by editable fields, all placeholder art.
 
+**Update (Step 7 below):** the telegraph attack now also has an editable
+pause/ramp — whether the Cyclops eases to a stop when it starts winding up,
+and how fast it stops and gets moving again.
+
 ---
 
 ## Step 1 — Pull
@@ -87,6 +91,47 @@ each one lands.
 
 `Unique King damage toggle and Cyclops telegraphed area attack`
 
+## Step 7 — Telegraph pause/ramp (pull again for this part)
+
+**Pull** again if you haven't already. Open `Assets/Monsters/Cyclops` — under
+**Special: Cyclops — telegraphed area attack** there are three new fields
+right after **Slam Flash Seconds**:
+
+- **Pauses During Telegraph** — checkbox, **on** by default. When checked,
+  the Cyclops eases to a stop as the wind-up begins and eases back up to
+  speed once the slam lands and cooldown starts. When unchecked, it just
+  keeps walking normally through the *entire* attack (wind-up and cooldown)
+  — the box still locks in place and still lands on schedule, only the
+  movement pause is skipped.
+- **Telegraph Stop Duration** — seconds to decelerate to a full stop once
+  winding begins. `0` = instant stop (the old hard-stop behavior). Default
+  `0.2`. Only matters if Pauses During Telegraph is checked.
+- **Telegraph Resume Duration** — seconds to accelerate back to full move
+  speed once cooldown begins (right after the slam). `0` = instant resume.
+  Default `0.3`. Only matters if Pauses During Telegraph is checked.
+
+These are deliberately their own timers, separate from **Telegraph Time**
+(how long the box takes to fill in) and **Attack Interval** (the cooldown
+between slams) — so tuning how fast the Cyclops brakes/accelerates never
+throws off your dodge-window or attack-cadence tuning.
+
+### Playtest
+
+- Raise **Telegraph Stop Duration** to `1.5` or so and watch the Cyclops
+  visibly grind to a halt over that time instead of snapping to a stop the
+  instant it starts winding up.
+- Raise **Telegraph Resume Duration** the same way and watch it gradually
+  pick back up to speed after the slam, instead of instantly resuming.
+- Uncheck **Pauses During Telegraph** entirely — the Cyclops keeps walking
+  right through the wind-up and cooldown; the gray/black boxes still appear
+  and land on the locked spot exactly as before.
+- Set both durations to `0` to confirm you get the original instant
+  stop/start behavior back.
+
+## Step 8 — Commit
+
+`Cyclops telegraph pause toggle with tunable stop/resume ramp`
+
 ---
 
 ## ✅ Checkpoint
@@ -96,4 +141,7 @@ each one lands.
 - [ ] Cyclops winds up a filling gray box, then a black slam
 - [ ] Dodging out of the box during wind-up avoids the hit
 - [ ] The slam damages the player, King, and structures caught inside it
+- [ ] Pauses During Telegraph checked: Cyclops eases to a stop, then eases
+      back up to speed, using the two new duration fields
+- [ ] Pauses During Telegraph unchecked: Cyclops keeps walking the whole time
 - [ ] Committed & pushed
