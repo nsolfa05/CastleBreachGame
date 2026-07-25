@@ -126,7 +126,7 @@ public class MonsterAI : MonoBehaviour
         var gm = GameManager.Instance;
         if (definition == null || bonePileActive || gm == null || gm.State != GameState.Playing)
         {
-            rb.linearVelocity = Vector2.zero;
+            if (rb.simulated) rb.linearVelocity = Vector2.zero; // avoid warning while a bone pile has physics off
             return;
         }
 
@@ -304,6 +304,21 @@ public class MonsterAI : MonoBehaviour
     private Transform ChooseTarget(GameManager gm)
     {
         Transform baseTarget = PickTarget(gm);
+        bool recentCombat = HasRecentPlayerCombat();
+
+        bool kingInPriorityRange = gm.King != null && definition.kingPriorityRange > 0f &&
+            DistanceToTarget(gm.King) <= definition.kingPriorityRange;
+
+        // King-over-structures override: if enabled and the King is within
+        // King Priority Range, the King beats structure-priority entirely.
+        // Still yields to recent player combat UNLESS the monster is already
+        // essentially on the King (within Keep Target range).
+        if (definition.kingPriorityBeatsStructures && kingInPriorityRange &&
+            !(recentCombat && !WithinKeepRange(gm.King)))
+        {
+            committedStructureTarget = null;
+            return gm.King;
+        }
 
         // "Stuck" = still committed to a structure, still outside attack
         // range of it (so not just successfully pressed up against it and
@@ -314,15 +329,20 @@ public class MonsterAI : MonoBehaviour
             rb.linearVelocity.sqrMagnitude < stuckVelocityThreshold * stuckVelocityThreshold &&
             DistanceToTarget(committedStructureTarget) > definition.attackRange;
 
-        bool structureBlockedByRecentCombat = HasRecentPlayerCombat() &&
+        // Recent combat pulls the monster to the player instead of a
+        // structure — but NOT if it's already committed (and not stuck), and
+        // NOT if it's within Keep Target range of that structure (see below,
+        // checked per-candidate since it needs the specific structure).
+        bool recentCombatOverridesStructure = recentCombat &&
             (committedStructureTarget == null || isStuckOnCommittedStructure);
 
-        if (definition.prioritizesStructures && !structureBlockedByRecentCombat)
+        if (definition.prioritizesStructures)
         {
             if (definition.structurePriorityRange > 0f)
             {
                 var closeStructure = NearestStructureWithin(definition.structurePriorityRange);
-                if (closeStructure != null)
+                if (closeStructure != null &&
+                    !(recentCombatOverridesStructure && !WithinKeepRange(closeStructure)))
                 {
                     committedStructureTarget = closeStructure;
                     return closeStructure;
@@ -333,7 +353,8 @@ public class MonsterAI : MonoBehaviour
                 definition.structureFarKingRatio > 0f && definition.structureNoticeRadius > 0f && gm.King != null)
             {
                 var noticedStructure = NearestStructureWithin(definition.structureNoticeRadius);
-                if (noticedStructure != null)
+                if (noticedStructure != null &&
+                    !(recentCombatOverridesStructure && !WithinKeepRange(noticedStructure)))
                 {
                     float structureDistance = DistanceToTarget(noticedStructure);
                     float kingDistance = DistanceToTarget(gm.King);
@@ -348,22 +369,26 @@ public class MonsterAI : MonoBehaviour
 
         committedStructureTarget = null;
 
-        // Recent player combat also holds off King-Priority, not just
-        // structure-priority — otherwise a monster standing right at the
-        // King's doorstep (well within King Priority Range, as most monsters
-        // converging there will be) would get yanked back to the King every
-        // frame even while it's actively fighting the player who's hitting
-        // it. King-Priority has no "commitment" state of its own (it's a
-        // fresh distance check every frame, not a sticky target the way
-        // structure-priority is), so this is a plain suppression — no
-        // stuck-check or non-retroactive exception needed here.
-        if (baseTarget == gm.Player && gm.King != null && definition.kingPriorityRange > 0f &&
-            DistanceToTarget(gm.King) <= definition.kingPriorityRange &&
-            !HasRecentPlayerCombat())
+        // King-Priority (vs chasing the player): also holds off during recent
+        // player combat — otherwise a monster at the King's doorstep would get
+        // yanked back to the King every frame even while actively fighting the
+        // player hitting it. Exception: if it's within Keep Target range of the
+        // King, it ignores the player aggro and stays on the King.
+        if (baseTarget == gm.Player && kingInPriorityRange &&
+            !(recentCombat && !WithinKeepRange(gm.King)))
             return gm.King;
 
         return baseTarget;
     }
+
+    /// <summary>
+    /// True if this monster is within Keep Target Within Range tiles (edge to
+    /// edge) of the given target — used so recent-player-combat aggro can't
+    /// pull a monster off a King/structure it's essentially already on.
+    /// </summary>
+    private bool WithinKeepRange(Transform target) =>
+        definition.keepTargetWithinRange > 0f && target != null &&
+        DistanceToTarget(target) <= definition.keepTargetWithinRange;
 
     private Transform PickTarget(GameManager gm)
     {
@@ -504,12 +529,18 @@ public class MonsterAI : MonoBehaviour
     {
         bonePileActive = true;
         health.Invulnerable = true;
-        rb.linearVelocity = Vector2.zero;
 
-        // Invisible to towers/the player's sword while piled (their target
-        // searches go through colliders), and visibly squashed + recolored.
+        // Freeze physics entirely: rb.simulated = false zeroes its velocity,
+        // stops it being shoved by other monsters, AND removes it from
+        // physics queries so towers/the sword don't target the pile. This is
+        // what actually keeps it from drifting/creeping while "invulnerable".
+        rb.simulated = false;
         foreach (var col in GetComponentsInChildren<Collider2D>())
             col.enabled = false;
+
+        // Hide the health bar while piled (otherwise a 0-width sliver lingers),
+        // and show the squashed, recolored bone pile.
+        SetHealthBarsVisible(false);
         if (body != null) body.color = definition.bonePileColor;
         transform.localScale = new Vector3(activeScale.x, activeScale.y * 0.35f, activeScale.z);
 
@@ -519,8 +550,16 @@ public class MonsterAI : MonoBehaviour
         if (body != null) body.color = definition.bodyColor;
         foreach (var col in GetComponentsInChildren<Collider2D>())
             col.enabled = true;
+        rb.simulated = true;
         health.ResetToFull();
         health.Invulnerable = false;
+        SetHealthBarsVisible(true);
         bonePileActive = false;
+    }
+
+    private void SetHealthBarsVisible(bool visible)
+    {
+        foreach (var bar in GetComponentsInChildren<HealthBar>(true))
+            bar.gameObject.SetActive(visible);
     }
 }
