@@ -6,6 +6,11 @@
 smashes structures first). Thanks to Guide 07, this whole guide is *creating
 four asset files and typing numbers* — no code, no new prefabs.
 
+**Note:** the Cyclops table below no longer has a "Prioritizes Structures"
+checkbox — that toggle was removed in Guide 12 (structure targeting rework)
+as redundant. Setting **Structure Priority Range** to a nonzero value is now
+enough on its own to turn structure-priority on.
+
 ---
 
 ## Step 1 — Pull
@@ -80,7 +85,6 @@ matching the doc.)*
 | Structure Damage | **15** |
 | Currency Drop | **15** |
 | Tile Weight | **6** |
-| Prioritizes Structures | **✓** |
 | Structure Priority Range | **6** |
 
 > Doc notes we're simplifying for now: the Cyclops's fancy 2.5s "lock-on
