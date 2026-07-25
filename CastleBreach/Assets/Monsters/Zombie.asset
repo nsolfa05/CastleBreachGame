@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8d2685796e08d7a4d9571ec84bcb3d43, type: 3}
+  m_Name: Zombie
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterDefinition
+  displayName: Zombie
+  bodyColor: {r: 0.15110515, g: 0.30817598, b: 0.11920012, a: 1}
+  bodyScale: 0.9
+  moveSpeed: 2
+  maxHealth: 10
+  playerDamage: 3
+  playerTargetRange: 5
+  attackInterval: 1.5
+  attackRange: 0.5
+  structureDamage: 3
+  praiseTowerDamage: 0
+  currencyDrop: 3
+  tileWeight: 2
+  targetsOnlyKing: 0
+  praiseTowerLureRange: 0
+  passesThroughGates: 0
+  kingPriorityRange: 2
+  prioritizesStructures: 1
+  structurePriorityRange: 2
+  structureFarKingRatio: 3
+  structureNoticeRadius: 10
+  recentPlayerCombatWindow: 5
+  extraLives: 0
+  reviveDelaySeconds: 6
+  bonePileColor: {r: 0.9, g: 0.9, b: 0.85, a: 1}
