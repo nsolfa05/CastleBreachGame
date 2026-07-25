@@ -14,12 +14,16 @@ using UnityEngine;
 /// - targetsOnlyKing / praiseTowerLureRange (Goblin)
 /// - kingPriorityRange: beats chasing the player if the King is this close
 ///   (any monster, not just one type — see ChooseTarget)
-/// - prioritizesStructures within a radius (Cyclops; also usable on any
-///   monster) — beats BOTH the player and the King unconditionally
+/// - Structure Priority Range / Structure Interest Range / Structure Near
+///   King Range (Cyclops; also usable on any monster) — see ChooseTarget
 /// - extraLives + invulnerable bone-pile revive (Skeleton)
 ///
 /// NOTE: movement is still straight-line. Real pathfinding around
-/// player-built wall mazes is the walls/pathfinding phase.
+/// player-built wall mazes is the walls/pathfinding phase — DistanceBetween
+/// below is the single choke point to swap for real path length once that
+/// lands, so every distance-based targeting rule (including the King-
+/// progress check in Structure Interest Range) becomes pathfinding-aware
+/// with no other changes needed.
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(Health))]
@@ -57,7 +61,6 @@ public class MonsterAI : MonoBehaviour
 
     private Rigidbody2D rb;
     private Health health;
-    private Collider2D myCollider;
     private TelegraphedAreaAttack telegraph;
     private float nextAttackTime;
     private int livesRemaining;
@@ -79,7 +82,6 @@ public class MonsterAI : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         health = GetComponent<Health>();
-        myCollider = GetComponent<Collider2D>();
         telegraph = GetComponent<TelegraphedAreaAttack>();
         health.Died += OnDied;
         if (body == null) body = GetComponent<SpriteRenderer>();
@@ -98,12 +100,31 @@ public class MonsterAI : MonoBehaviour
     /// the collider surface instead makes Attack Range mean the same thing
     /// regardless of how big the target is.
     /// </summary>
-    private float DistanceToTarget(Transform target)
+    private float DistanceToTarget(Transform target) => DistanceBetween(transform, target);
+
+    /// <summary>
+    /// Edge-to-edge distance between any two colliders (falls back to raw
+    /// transform distance if either side lacks a Collider2D). This is the
+    /// ONE place every distance-based targeting decision measures "how far
+    /// apart are these two things" — currently straight-line, since there's
+    /// nothing to route around yet (movement is still straight-line, per the
+    /// class note above). When real pathfinding (walls/gates, §7.1) lands,
+    /// swap this body for actual path length and every rule built on it —
+    /// attack range, Structure Priority/Interest Range, Structure Near King
+    /// Range, the King-progress check inside Structure Interest Range — all
+    /// automatically become pathfinding-aware with no other changes needed.
+    /// In particular, that's what makes the King-progress check correctly
+    /// react to a broken wall: once a shortcut opens, any structure along
+    /// the new shortest route recalculates as closer-to-the-King and starts
+    /// qualifying again, with zero logic changes required elsewhere.
+    /// </summary>
+    private static float DistanceBetween(Transform a, Transform b)
     {
-        var targetCollider = target.GetComponentInParent<Collider2D>();
-        if (myCollider != null && targetCollider != null)
-            return myCollider.Distance(targetCollider).distance;
-        return Vector2.Distance(transform.position, target.position);
+        var colliderA = a.GetComponentInParent<Collider2D>();
+        var colliderB = b.GetComponentInParent<Collider2D>();
+        if (colliderA != null && colliderB != null)
+            return colliderA.Distance(colliderB).distance;
+        return Vector2.Distance(a.position, b.position);
     }
 
     private void Start()
@@ -322,18 +343,20 @@ public class MonsterAI : MonoBehaviour
     ///    committed structure, so it isn't actually accomplishing anything
     ///    by staying committed — the guard applies anyway, since there's no
     ///    real cost to switching to the player it can actually reach.
-    /// 1a. Structure-priority hard cutoff — unconditional, always wins
-    ///     outright when a structure is within Structure Priority Range,
-    ///     beating both the player AND the King. Cyclops's original
-    ///     behavior, unaffected by anything else here.
-    /// 1b. Structure-priority RATIO — for a structure farther out than the
-    ///     hard cutoff (but still within Structure Notice Radius), still
-    ///     prefer it over the King if the King is disproportionately much
-    ///     farther away (Structure Far King Ratio). Unlike 1a, this ONLY
-    ///     competes with heading to the King — it's meant to answer "should
-    ///     I detour from the King toward a farther structure," not to pull a
-    ///     monster off a player it's actively chasing. If the base choice is
-    ///     already the player, this tier is skipped entirely.
+    /// 1a. Structure Priority Range (hard cutoff) — unconditional, always
+    ///     wins outright when a structure is within range, beating both the
+    ///     player AND the King. Cyclops's original behavior, unaffected by
+    ///     anything else here.
+    /// 1b. Structure Interest Range — a softer pull: prefer a structure over
+    ///     heading to the King, but this ONLY ever competes with heading to
+    ///     the King — if the base choice is already the player, this tier is
+    ///     skipped entirely, no exceptions. The candidate must also be
+    ///     closer to the King than this monster currently is (DistanceBetween),
+    ///     so a detour can only ever be a step TOWARD the King, never
+    ///     sideways or backward around the map.
+    /// Both structure tiers also skip any candidate within Structure Near
+    /// King Range of the King — too close to the King to bother attacking,
+    /// go for the King directly instead.
     /// 2. King-priority — only ever a tiebreaker against CHASING THE PLAYER.
     ///    If a structure already won above, or the base choice wasn't the
     ///    player anyway, this never comes into play.
@@ -374,33 +397,29 @@ public class MonsterAI : MonoBehaviour
         bool recentCombatOverridesStructure = recentCombat &&
             (committedStructureTarget == null || isStuckOnCommittedStructure);
 
-        if (definition.prioritizesStructures)
+        if (definition.structurePriorityRange > 0f)
         {
-            if (definition.structurePriorityRange > 0f)
+            var closeStructure = NearestStructureWithin(definition.structurePriorityRange);
+            if (closeStructure != null && !IsNearKing(closeStructure, gm) &&
+                !(recentCombatOverridesStructure && !WithinKeepRange(closeStructure)))
             {
-                var closeStructure = NearestStructureWithin(definition.structurePriorityRange);
-                if (closeStructure != null &&
-                    !(recentCombatOverridesStructure && !WithinKeepRange(closeStructure)))
-                {
-                    committedStructureTarget = closeStructure;
-                    return closeStructure;
-                }
+                committedStructureTarget = closeStructure;
+                return closeStructure;
             }
+        }
 
-            if (baseTarget != gm.Player &&
-                definition.structureFarKingRatio > 0f && definition.structureNoticeRadius > 0f && gm.King != null)
+        if (baseTarget != gm.Player && definition.structureInterestRange > 0f && gm.King != null)
+        {
+            var nearbyStructure = NearestStructureWithin(definition.structureInterestRange);
+            if (nearbyStructure != null && !IsNearKing(nearbyStructure, gm) &&
+                !(recentCombatOverridesStructure && !WithinKeepRange(nearbyStructure)))
             {
-                var noticedStructure = NearestStructureWithin(definition.structureNoticeRadius);
-                if (noticedStructure != null &&
-                    !(recentCombatOverridesStructure && !WithinKeepRange(noticedStructure)))
+                float structureDistanceToKing = DistanceBetween(nearbyStructure, gm.King);
+                float monsterDistanceToKing = DistanceToTarget(gm.King);
+                if (structureDistanceToKing < monsterDistanceToKing)
                 {
-                    float structureDistance = DistanceToTarget(noticedStructure);
-                    float kingDistance = DistanceToTarget(gm.King);
-                    if (kingDistance >= structureDistance * definition.structureFarKingRatio)
-                    {
-                        committedStructureTarget = noticedStructure;
-                        return noticedStructure;
-                    }
+                    committedStructureTarget = nearbyStructure;
+                    return nearbyStructure;
                 }
             }
         }
@@ -427,6 +446,16 @@ public class MonsterAI : MonoBehaviour
     private bool WithinKeepRange(Transform target) =>
         definition.keepTargetWithinRange > 0f && target != null &&
         DistanceToTarget(target) <= definition.keepTargetWithinRange;
+
+    /// <summary>
+    /// True if the given structure is within Structure Near King Range of
+    /// the King — used so a monster doesn't bother attacking something
+    /// built right at the King's doorstep and goes straight for the King
+    /// instead.
+    /// </summary>
+    private bool IsNearKing(Transform structure, GameManager gm) =>
+        definition.structureNearKingRange > 0f && gm.King != null &&
+        DistanceBetween(structure, gm.King) <= definition.structureNearKingRange;
 
     private Transform PickTarget(GameManager gm)
     {
@@ -479,9 +508,7 @@ public class MonsterAI : MonoBehaviour
         float bestDistance = float.MaxValue;
         foreach (var hit in hits)
         {
-            float distance = myCollider != null
-                ? myCollider.Distance(hit).distance
-                : Vector2.Distance(transform.position, hit.transform.position);
+            float distance = DistanceBetween(transform, hit.transform);
             if (distance > radius) continue;
             if (distance < bestDistance)
             {
@@ -524,14 +551,14 @@ public class MonsterAI : MonoBehaviour
     /// <summary>
     /// Damage this monster deals to a given target's Health. Compares against
     /// the King/Player Health objects (robust whether the hit landed on the
-    /// root or a child collider). The King uses its own Unique King Damage
-    /// when enabled — a replacement, not a bonus — so a monster can hurt the
+    /// root or a child collider). King Damage is its own value — always
+    /// used, never a fallback to Player Damage — so a monster can hurt the
     /// King more or less than it hurts the player or structures.
     /// </summary>
     private float DamageForHealth(Health targetHealth, Transform hitTransform, GameManager gm)
     {
         if (gm != null && targetHealth == gm.KingHealth)
-            return definition.useUniqueKingDamage ? definition.kingDamage : definition.playerDamage;
+            return definition.kingDamage;
 
         if (gm != null && targetHealth == gm.PlayerHealth)
             return definition.playerDamage;

@@ -73,6 +73,18 @@ variety (weights differ per monster) and Phase 3's build-mode selection.*
 - **Tile Weight Rule (§7.1)** — stacking cap of 6 per tile, push-aside
   behavior, player always counts as a full tile. (Tracked in README deferred
   notes; single-monster stacking couldn't test this before Phase 2.)
+- **Route `MonsterAI.DistanceBetween(a, b)` through real path length.** This
+  private static helper (added in the targeting-tuning pass) is the single
+  choke point every distance-based targeting rule already calls through —
+  attack range, Structure Priority/Interest Range, Structure Near King
+  Range, and specifically the "closer to the King than I am" progress check
+  inside Structure Interest Range (the guard against monsters looping around
+  the map's perimeter forever without ever closing distance on the King).
+  Swap its body for actual A* path length here and every one of those rules
+  becomes pathfinding-aware automatically — no other code changes needed. In
+  particular, this is what makes a broken wall opening a new shortest route
+  correctly pull monsters onto structures along that new path, even ones
+  that weren't "on the way" under straight-line distance before.
 
 ## Phase 5 — Shop huts & player upgrades (§3.6 + §5)
 

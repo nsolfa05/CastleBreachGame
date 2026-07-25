@@ -29,11 +29,9 @@ public class MonsterDefinition : ScriptableObject
 
     // ─────────────────────────────────────────────────────────────
     [Header("Damage dealt (§7.3)")]
-    [Tooltip("Damage per hit vs the player (and the King too, unless Use Unique King Damage is checked).")]
+    [Tooltip("Damage per hit vs the player.")]
     public float playerDamage = 3f;
-    [Tooltip("If checked, the King takes King Damage instead of Player Damage (does NOT stack — it replaces). For when a monster should hurt the King more or less than the player/structures.")]
-    public bool useUniqueKingDamage = false;
-    [Tooltip("Damage per hit vs the King specifically. Only used when Use Unique King Damage is checked.")]
+    [Tooltip("Damage per hit vs the King — its own value, always used (never falls back to or stacks with Player Damage). Set it equal to Player Damage for a monster that should hit the King the same as the player.")]
     public float kingDamage = 3f;
     [Tooltip("Damage per hit vs player-built structures.")]
     public float structureDamage = 3f;
@@ -60,14 +58,12 @@ public class MonsterDefinition : ScriptableObject
 
     // ─────────────────────────────────────────────────────────────
     [Header("Targeting — structures")]
-    [Tooltip("Attacks structures within Structure Priority Range before anything else (player OR King) — Cyclops uses this, but it's usable on any monster.")]
-    public bool prioritizesStructures = false;
-    [Tooltip("Hard cutoff: always prioritize a structure within this many tiles, no comparison needed.")]
+    [Tooltip("Hard cutoff: always prioritize a structure within this many tiles, no comparison needed — beats the player too (the only escape valve is Recent Player Combat Window, and only before this monster has already committed to a specific structure) and beats the King unconditionally. Cyclops uses this, but it's usable on any monster. 0 = off.")]
     public float structurePriorityRange = 0f;
-    [Tooltip("Beyond Structure Priority Range, still prefer a structure over the King if the King is at least this many TIMES farther away than the structure (e.g. 3 = a tower at 3 tiles beats a King at 12+ tiles). 0 = off — only the hard cutoff above applies.")]
-    public float structureFarKingRatio = 0f;
-    [Tooltip("Max distance (tiles) at which a structure can even be considered for the Far-King-Ratio comparison — a structure beyond this is never a candidate no matter how favorable the ratio. Only matters if Structure Far King Ratio > 0.")]
-    public float structureNoticeRadius = 10f;
+    [Tooltip("Softer than Structure Priority Range: within this many tiles, still prefer a structure over trekking to the King — but NEVER over actively chasing the player (this tier is skipped entirely whenever the player is already the target, no exceptions). The candidate structure must also be closer to the King than this monster currently is, so it can never get lured sideways or backward away from the King. 0 = off.")]
+    public float structureInterestRange = 0f;
+    [Tooltip("If a structure this monster would otherwise target (from either range above) is within this many tiles of the King, skip it and go straight for the King instead — for structures built defensively close to the King, where attacking them isn't worth ignoring the real target. 0 = off.")]
+    public float structureNearKingRange = 0f;
     [Tooltip("If this monster attacked the player, or was attacked BY the player, within this many seconds, it stays engaged with the player instead of switching to a nearby structure. Does NOT apply retroactively — once already committed to attacking a structure, getting hit doesn't pull it back off (unless it's stuck and can't reach that structure). 0 = off.")]
     public float recentPlayerCombatWindow = 3f;
 

@@ -19,14 +19,13 @@ public class MonsterDefinitionEditor : Editor
         if (def.usesTelegraphedAreaAttack) cycle += def.telegraphTime; // wind-up counts against throughput
         cycle = Mathf.Max(0.0001f, cycle);
 
-        float kingDamage = def.useUniqueKingDamage ? def.kingDamage : def.playerDamage;
         float praiseDamage = def.praiseTowerDamage > 0f ? def.praiseTowerDamage : def.structureDamage;
 
         string summary =
             $"Estimated DPS  (damage ÷ {cycle:0.##}s cycle" +
             (def.usesTelegraphedAreaAttack ? ", incl. telegraph wind-up)" : ")") + "\n" +
             $"    vs Player:        {def.playerDamage / cycle:0.#} / s\n" +
-            $"    vs King:          {kingDamage / cycle:0.#} / s\n" +
+            $"    vs King:          {def.kingDamage / cycle:0.#} / s\n" +
             $"    vs Structure:     {def.structureDamage / cycle:0.#} / s\n" +
             $"    vs Praise Tower:  {praiseDamage / cycle:0.#} / s";
 

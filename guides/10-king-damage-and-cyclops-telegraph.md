@@ -13,6 +13,12 @@ Both are driven by editable fields, all placeholder art.
 pause/ramp — whether the Cyclops eases to a stop when it starts winding up,
 and how fast it stops and gets moving again.
 
+**Superseded (see `guides/12-structure-targeting-rework.md`):** Step 2's
+**Use Unique King Damage** checkbox has since been removed — **King Damage**
+is now always its own always-used value, no toggle needed. Read Step 2
+below for the original context, but follow Guide 12 for the current
+behavior.
+
 ---
 
 ## Step 1 — Pull
