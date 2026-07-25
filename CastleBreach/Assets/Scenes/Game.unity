@@ -639,7 +639,7 @@ MonoBehaviour:
   playerHealth: {fileID: 196378517}
   king: {fileID: 631245342}
   kingHealth: {fileID: 631245341}
-  startingGold: 200
+  startingGold: 250
 --- !u!4 &501334487
 Transform:
   m_ObjectHideFlags: 0
@@ -16702,33 +16702,35 @@ MonoBehaviour:
       gate: 3
       secondsBetweenSpawns: 1.5
       startDelay: 0
-    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
-      count: 3
+    - monster: {fileID: 11400000, guid: c94e2fded8995494bb0911dd4134546d, type: 2}
+      count: 2
       gate: 2
       secondsBetweenSpawns: 1.5
       startDelay: 0
   - name: Wave 3
     groups:
-    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
-      count: 3
+    - monster: {fileID: 11400000, guid: e2c3b47bb8e834141ac0dc05e9471702, type: 2}
+      count: 4
       gate: 0
       secondsBetweenSpawns: 1.5
       startDelay: 0
-    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
+    - monster: {fileID: 11400000, guid: 2cab6bf5d4ed17e4c8eb6503ef87f39f, type: 2}
       count: 3
       gate: 1
       secondsBetweenSpawns: 1.5
-      startDelay: 0
-    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
-      count: 3
-      gate: 2
-      secondsBetweenSpawns: 1.5
-      startDelay: 4
-    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
-      count: 3
+      startDelay: 5
+  - name: Wave 4
+    groups:
+    - monster: {fileID: 11400000, guid: ebe78c4417feeb041bb110c22eac59c7, type: 2}
+      count: 1
       gate: 3
       secondsBetweenSpawns: 1.5
-      startDelay: 4
+      startDelay: 0
+    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
+      count: 4
+      gate: 3
+      secondsBetweenSpawns: 1.5
+      startDelay: 3
 --- !u!1 &1644238299
 GameObject:
   m_ObjectHideFlags: 0

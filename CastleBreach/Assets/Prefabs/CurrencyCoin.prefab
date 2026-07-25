@@ -143,6 +143,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CurrencyDrop
   value: 3
-  despawnSeconds: 8
+  despawnSeconds: 10
   bobAmplitude: 0.12
   bobSpeed: 3
