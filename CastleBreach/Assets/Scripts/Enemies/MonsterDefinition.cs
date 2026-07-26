@@ -37,6 +37,8 @@ public class MonsterDefinition : ScriptableObject
     public float structureDamage = 3f;
     [Tooltip("Goblin hits the Praise the King Tower harder (doc: 4 vs its normal 2). 0 = same as Structure Damage.")]
     public float praiseTowerDamage = 0f;
+    [Tooltip("Damage per hit vs player-built Walls and Gates specifically. 0 = same as Structure Damage. Separate from Structure Damage so a monster can be tuned to chew through a maze faster or slower than it fights a tower.")]
+    public float wallDamage = 0f;
 
     // ─────────────────────────────────────────────────────────────
     [Header("Attack timing & reach")]

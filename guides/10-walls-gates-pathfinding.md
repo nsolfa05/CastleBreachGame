@@ -17,6 +17,14 @@ smashing whatever is sealing them in.
 > physics. On open ground with nothing in the way, movement is identical to
 > before this guide.
 
+> **Update — two fixes if you already built Wall/Gate from an earlier pull:**
+> playtesting turned up (1) anything sliding along a row of Wall pieces could
+> catch on the seam between them, worst at corners, and (2) Gate was
+> physically solid to the player too, not just other monsters. Both are fixed
+> in Steps 3-4 below (Edge Radius, and Is Trigger on Gate) — go back into your
+> existing prefabs and apply those two changes, no need to rebuild them from
+> scratch.
+
 ---
 
 ## Step 1 — Pull
@@ -58,7 +66,8 @@ movement, so if something looks wrong later, check this first).
    - **Sprite Renderer → Order in Layer**: `19` (the structure layer order)
    - **Layer** (top-right of the Inspector): **Structure**
 3. **Add Component** each of:
-   - **Box Collider 2D**
+   - **Box Collider 2D** → set **Edge Radius** to **`0.05`** (see the callout
+     below — don't skip this one)
    - **Health** → **Max Health** `40`
    - **Destroy When Dead**
    - **Barrier** → leave **Is Gate** *unchecked*
@@ -75,6 +84,16 @@ movement, so if something looks wrong later, check this first).
 > would be pointless. A Barrier only ever becomes a target when there's no
 > route at all.
 
+> **Why Edge Radius matters:** place several Wall pieces in a row and each one
+> is still a separate collider — even lined up perfectly, Unity's 2D physics
+> has a known quirk where something sliding along a row of adjacent square
+> colliders can catch on the seam between two of them, like an invisible lip
+> exactly where one piece ends and the next begins. Worst at corners, since
+> that's where several seams meet in one spot. Edge Radius rounds the
+> collider's corners just enough that anything sliding past glides over the
+> seam instead of snagging on it. `0.05` is small enough not to visibly change
+> the wall's shape.
+
 ## Step 4 — Build the Gate prefab
 
 1. In `Assets/Prefabs`, select **`Wall`**, **Ctrl+D** to duplicate, rename the
@@ -83,12 +102,26 @@ movement, so if something looks wrong later, check this first).
    - **Sprite Renderer → Color**: wooden brown (clearly different from Wall)
    - **Health → Max Health**: `25` (a door is flimsier than a wall)
    - **Barrier → Is Gate**: **check it**
+   - **Box Collider 2D → Is Trigger**: **check it** — see the callout below,
+     this one's important, not optional
 3. Exit Prefab Mode.
 
-That single checkbox is the whole Goblin rule: any monster whose definition has
-**Passes Through Gates** ticked routes straight through a Gate as if it were
-open ground. Your `Goblin` asset already has that ticked from Guide 08 — no
-change needed there.
+That **Is Gate** checkbox is the whole Goblin rule: any monster whose
+definition has **Passes Through Gates** ticked routes straight through a Gate
+as if it were open ground. Your `Goblin` asset already has that ticked from
+Guide 08 — no change needed there.
+
+> **Why Is Trigger matters:** routing decides *which monsters* treat a Gate as
+> open ground, but that's only ever a pathfinding decision — it doesn't touch
+> Unity's actual physics collision, which was still treating the Gate as
+> solid to everyone, player included. Physics has no way to single out "let
+> the Goblin through but not the Zombie" on its own (every monster shares the
+> same Enemy layer), so instead of fighting that, Gate simply isn't solid to
+> *anyone* — nothing physically blocks against it. What actually stops an
+> ordinary monster from walking through is that its own route never leads it
+> onto that tile in the first place; only the player and Passes-Through-Gates
+> monsters ever have a reason to. Damage still works normally against a
+> trigger — attacks are a distance check, not a physics collision.
 
 ## Step 5 — Register both in build mode
 
@@ -108,6 +141,15 @@ them, and tune from there. Walls want to be cheap enough to build a lot of.)
    This is the exact step that silently ate a chunk of Guide 08 and Guide 09
    earlier; the Editor and Play Mode both look correct without it because the
    change is live in memory.
+
+## Step 5.5 — Wall Damage (automatic)
+
+Every monster definition has a new **Wall Damage** field (Damage dealt
+header), `0` by default meaning "same as Structure Damage." Set it on any
+monster to make it chew through your mazes faster or slower than it fights a
+tower — independent numbers, since a monster you want to be scary against
+towers doesn't have to also be scary against walls, or vice versa. The DPS box
+at the top of each monster's Inspector now shows a **vs Wall/Gate** line too.
 
 ## Step 6 — Playtest
 
@@ -132,10 +174,17 @@ draw a long line by clicking along it).
 - **Nothing built = nothing changed:** with an empty field, monsters should
   behave exactly as they did before this guide — straight at their target, same
   crowding.
+- **No more catching:** walk the player right up against a long wall line,
+  then move along it past a corner — should slide smoothly with no snagging.
+  Send a group of monsters down a corridor with a corner and watch them round
+  it without piling up stuck.
+- **Wall Damage:** set it to something high on a test monster and confirm
+  walls break noticeably faster than before, without changing how fast that
+  monster fights a tower.
 
 ## Step 7 — Commit
 
-`Phase 4: walls, gates and pathfinding`
+`Phase 4: walls, gates, pathfinding, and Wall Damage`
 
 Then **push**, and confirm on github.com that the new prefabs actually landed.
 
@@ -145,13 +194,16 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 
 - [ ] PathGrid object exists, Wall Tilemap wired, Blocking Layers = Structure + King (not Enemy)
 - [ ] Wall and Gate prefabs exist with Health, Destroy When Dead, and Barrier
-- [ ] Gate has Is Gate checked; Wall does not
+- [ ] Wall and Gate's Box Collider 2D both have Edge Radius `0.05`
+- [ ] Gate has Is Gate checked and Is Trigger checked; Wall has neither
 - [ ] Both registered in Build Options (hotkeys 5 and 6)
 - [ ] Monsters route around walls instead of pressing into them
 - [ ] Monsters never attack walls while any route exists
 - [ ] Fully sealing the King makes them break through the seal
 - [ ] Breaking a hole makes them immediately re-route through it
-- [ ] Goblins walk through Gates; other monsters don't
+- [ ] Goblins AND the player walk through Gates; other monsters don't
+- [ ] Standing pressed against a wall, then trying to move along it, doesn't get you stuck
+- [ ] DPS box shows a vs Wall/Gate line on monster definitions
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)
 
 ---

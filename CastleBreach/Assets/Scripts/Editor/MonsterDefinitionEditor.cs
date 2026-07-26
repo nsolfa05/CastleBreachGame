@@ -20,6 +20,7 @@ public class MonsterDefinitionEditor : Editor
         cycle = Mathf.Max(0.0001f, cycle);
 
         float praiseDamage = def.praiseTowerDamage > 0f ? def.praiseTowerDamage : def.structureDamage;
+        float wallDamage = def.wallDamage > 0f ? def.wallDamage : def.structureDamage;
 
         string summary =
             $"Estimated DPS  (damage ÷ {cycle:0.##}s cycle" +
@@ -27,7 +28,8 @@ public class MonsterDefinitionEditor : Editor
             $"    vs Player:        {def.playerDamage / cycle:0.#} / s\n" +
             $"    vs King:          {def.kingDamage / cycle:0.#} / s\n" +
             $"    vs Structure:     {def.structureDamage / cycle:0.#} / s\n" +
-            $"    vs Praise Tower:  {praiseDamage / cycle:0.#} / s";
+            $"    vs Praise Tower:  {praiseDamage / cycle:0.#} / s\n" +
+            $"    vs Wall/Gate:     {wallDamage / cycle:0.#} / s";
 
         EditorGUILayout.HelpBox(summary, MessageType.Info);
         EditorGUILayout.Space();

@@ -687,6 +687,9 @@ public class MonsterAI : MonoBehaviour
         if (gm != null && targetHealth == gm.PlayerHealth)
             return definition.playerDamage;
 
+        if (definition.wallDamage > 0f && hitTransform.GetComponentInParent<Barrier>() != null)
+            return definition.wallDamage;
+
         if (definition.praiseTowerDamage > 0f && hitTransform.GetComponentInParent<PraiseTheKingTower>() != null)
             return definition.praiseTowerDamage;
 
