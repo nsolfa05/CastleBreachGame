@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 2448794267683610823}
   - component: {fileID: 281034773021259325}
   m_Layer: 0
-  m_Name: Arrow
+  m_Name: CatapultStone
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -28,8 +28,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 5, y: 5, z: 0}
-  m_LocalScale: {x: 0.15, y: 0.15, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.1}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -83,7 +83,7 @@ SpriteRenderer:
   m_SortingOrder: 25
   m_MaskInteraction: 0
   m_Sprite: {fileID: -2413806693520163455, guid: a86470a33a6bf42c4b3595704624658b, type: 3}
-  m_Color: {r: 0.6289307, g: 0.6289307, b: 0.6289307, a: 1}
+  m_Color: {r: 0.15723258, g: 0.15723258, b: 0.15723258, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -105,5 +105,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 54176c5e27ff75b4988a67d7ce8f139e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Projectile
-  speed: 12
+  speed: 4
   hitDistance: 0.2
+  impactMarkSprite: {fileID: -2413806693520163455, guid: 572c6ce757ef43340b82f198b239eccb, type: 3}
+  impactMarkColor: {r: 0.44654083, g: 0.30707404, b: 0.17833544, a: 0.55}
+  impactMarkDiameter: 0
+  impactMarkSeconds: 1
+  impactMarkSortingOrder: 4

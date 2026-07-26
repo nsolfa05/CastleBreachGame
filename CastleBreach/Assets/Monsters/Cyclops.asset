@@ -12,30 +12,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8d2685796e08d7a4d9571ec84bcb3d43, type: 3}
   m_Name: Cyclops
   m_EditorClassIdentifier: Assembly-CSharp::MonsterDefinition
-  displayName: Zombie
+  displayName: Cyclops
   bodyColor: {r: 0.46540874, g: 0.26197535, b: 0.39848986, a: 1}
   bodyScale: 1.7
-  moveSpeed: 1
+  moveSpeed: 1.2
   maxHealth: 50
   playerDamage: 8
-  useUniqueKingDamage: 0
-  kingDamage: 3
-  playerTargetRange: 2
-  attackInterval: 2
-  attackRange: 2
+  kingDamage: 12
   structureDamage: 15
   praiseTowerDamage: 0
+  attackInterval: 1.8
+  attackRange: 1.8
+  playerTargetRange: 3.5
+  kingPriorityRange: 0
+  kingPriorityBeatsStructures: 0
+  keepTargetWithinRange: 1
+  structurePriorityRange: 6
+  structureInterestRange: 0
+  structureNearKingRange: 0
+  recentPlayerCombatWindow: 3
   currencyDrop: 15
   tileWeight: 6
   targetsOnlyKing: 0
   praiseTowerLureRange: 0
   passesThroughGates: 0
-  kingPriorityRange: 0
-  prioritizesStructures: 1
-  structurePriorityRange: 6
-  structureFarKingRatio: 6
-  structureNoticeRadius: 10
-  recentPlayerCombatWindow: 3
   extraLives: 0
   reviveDelaySeconds: 6
   bonePileColor: {r: 0.9, g: 0.9, b: 0.85, a: 1}
@@ -45,4 +45,7 @@ MonoBehaviour:
   telegraphBaseColor: {r: 0.5, g: 0.5, b: 0.5, a: 0.25}
   telegraphFillColor: {r: 0.24528301, g: 0.24528301, b: 0.24528301, a: 0.4}
   slamColor: {r: 0, g: 0, b: 0, a: 0.55}
-  slamFlashSeconds: 0.2
+  slamFlashSeconds: 0.4
+  pausesDuringTelegraph: 1
+  telegraphStopDuration: 0.2
+  telegraphResumeDuration: 0.3

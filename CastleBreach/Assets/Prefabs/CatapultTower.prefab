@@ -16,7 +16,7 @@ GameObject:
   - component: {fileID: 1703788829805547141}
   - component: {fileID: 9061568783268892403}
   m_Layer: 8
-  m_Name: ArcherTower
+  m_Name: CatapultTower
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -88,7 +88,7 @@ SpriteRenderer:
   m_SortingOrder: 19
   m_MaskInteraction: 0
   m_Sprite: {fileID: 7482667652216324306, guid: 311925a002f4447b3a28927169b83ea6, type: 3}
-  m_Color: {r: 0.47798735, g: 0.29643485, b: 0.11874521, a: 1}
+  m_Color: {r: 0.45911938, g: 0.39487153, b: 0.33062366, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -156,7 +156,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e9fa1ac4217b12a4bb8cc9f85d5df2a9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Health
-  maxHealth: 40
+  maxHealth: 30
 --- !u!114 &3270510258044784801
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -182,15 +182,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ArcherTower
   damage: 4
-  secondsBetweenShots: 1
-  range: 6
-  minRange: 0
-  splashRadius: 0
+  secondsBetweenShots: 5.5
+  range: 8
+  minRange: 3
+  splashRadius: 1.5
   enemyLayers:
     serializedVersion: 2
     m_Bits: 128
   targeting: 1
-  projectilePrefab: {fileID: 281034773021259325, guid: 06d7a197b1cceb1449b133af9854aac5, type: 3}
+  projectilePrefab: {fileID: 281034773021259325, guid: 15d19c4c747e2584f89e9ac6db89f1c8, type: 3}
   firePoint: {fileID: 0}
 --- !u!114 &9061568783268892403
 MonoBehaviour:

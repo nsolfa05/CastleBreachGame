@@ -18,22 +18,34 @@ MonoBehaviour:
   moveSpeed: 5
   maxHealth: 6
   playerDamage: 1
-  playerTargetRange: 0
+  kingDamage: 3
+  structureDamage: 2
+  praiseTowerDamage: 5
   attackInterval: 1
   attackRange: 0.4
-  structureDamage: 2
-  praiseTowerDamage: 0
+  playerTargetRange: 0
+  kingPriorityRange: 4
+  kingPriorityBeatsStructures: 0
+  keepTargetWithinRange: 0.9
+  structurePriorityRange: 0
+  structureInterestRange: 0
+  structureNearKingRange: 0
+  recentPlayerCombatWindow: 3
   currencyDrop: 2
   tileWeight: 2
   targetsOnlyKing: 1
   praiseTowerLureRange: 4
   passesThroughGates: 1
-  kingPriorityRange: 4
-  prioritizesStructures: 0
-  structurePriorityRange: 0
-  structureFarKingRatio: 0
-  structureNoticeRadius: 10
-  recentPlayerCombatWindow: 3
   extraLives: 0
   reviveDelaySeconds: 6
   bonePileColor: {r: 0.9, g: 0.9, b: 0.85, a: 1}
+  usesTelegraphedAreaAttack: 0
+  attackBoxSize: {x: 2, y: 2}
+  telegraphTime: 1.5
+  telegraphBaseColor: {r: 0.5, g: 0.5, b: 0.5, a: 0.25}
+  telegraphFillColor: {r: 0.15, g: 0.15, b: 0.15, a: 0.4}
+  slamColor: {r: 0, g: 0, b: 0, a: 0.55}
+  slamFlashSeconds: 0.2
+  pausesDuringTelegraph: 1
+  telegraphStopDuration: 0.2
+  telegraphResumeDuration: 0.3

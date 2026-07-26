@@ -672,6 +672,18 @@ MonoBehaviour:
     prefab: {fileID: 429328228911935939, guid: 3e96f7ce1b0b609459bf810668d26617, type: 3}
     cost: 150
     footprint: {x: 2, y: 2}
+  - displayName: Pike Tower
+    prefab: {fileID: 429328228911935939, guid: e727478a73edfc944b6066a85069eae6, type: 3}
+    cost: 80
+    footprint: {x: 1, y: 1}
+  - displayName: Cataput Tower
+    prefab: {fileID: 429328228911935939, guid: 090cc049b6242ff4bb3e519572f2bdba, type: 3}
+    cost: 200
+    footprint: {x: 2, y: 2}
+  - displayName: Praise The King Tower
+    prefab: {fileID: 5318507820628708666, guid: 32c1f71a7e7219b4ea9105c7b4dcef0f, type: 3}
+    cost: 120
+    footprint: {x: 2, y: 2}
   wallTilemap: {fileID: 528603457}
   gateTilemap: {fileID: 1764802730}
   blockingLayers:
@@ -16731,6 +16743,50 @@ MonoBehaviour:
       gate: 3
       secondsBetweenSpawns: 1.5
       startDelay: 3
+  - name: Wave 5
+    groups:
+    - monster: {fileID: 11400000, guid: e2c3b47bb8e834141ac0dc05e9471702, type: 2}
+      count: 3
+      gate: 3
+      secondsBetweenSpawns: 1.5
+      startDelay: 0
+    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
+      count: 4
+      gate: 2
+      secondsBetweenSpawns: 1.5
+      startDelay: 8
+    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
+      count: 4
+      gate: 2
+      secondsBetweenSpawns: 1.5
+      startDelay: 5
+    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
+      count: 5
+      gate: 0
+      secondsBetweenSpawns: 1.5
+      startDelay: 8
+  - name: Wave 5
+    groups:
+    - monster: {fileID: 11400000, guid: e2c3b47bb8e834141ac0dc05e9471702, type: 2}
+      count: 10
+      gate: 1
+      secondsBetweenSpawns: 1.5
+      startDelay: 0
+    - monster: {fileID: 11400000, guid: ebe78c4417feeb041bb110c22eac59c7, type: 2}
+      count: 1
+      gate: 2
+      secondsBetweenSpawns: 1.5
+      startDelay: 12
+    - monster: {fileID: 11400000, guid: c94e2fded8995494bb0911dd4134546d, type: 2}
+      count: 3
+      gate: 2
+      secondsBetweenSpawns: 1.5
+      startDelay: 2
+    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
+      count: 12
+      gate: 0
+      secondsBetweenSpawns: 1.5
+      startDelay: 12
 --- !u!1 &1644238299
 GameObject:
   m_ObjectHideFlags: 0

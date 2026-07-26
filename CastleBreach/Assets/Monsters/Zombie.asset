@@ -15,25 +15,37 @@ MonoBehaviour:
   displayName: Zombie
   bodyColor: {r: 0.15110515, g: 0.30817598, b: 0.11920012, a: 1}
   bodyScale: 0.9
-  moveSpeed: 2
+  moveSpeed: 2.2
   maxHealth: 10
   playerDamage: 3
-  playerTargetRange: 5
-  attackInterval: 1.5
-  attackRange: 0.5
+  kingDamage: 3
   structureDamage: 3
   praiseTowerDamage: 0
+  attackInterval: 1.8
+  attackRange: 0.5
+  playerTargetRange: 5
+  kingPriorityRange: 1.8
+  kingPriorityBeatsStructures: 1
+  keepTargetWithinRange: 0.9
+  structurePriorityRange: 2
+  structureInterestRange: 5
+  structureNearKingRange: 0
+  recentPlayerCombatWindow: 5
   currencyDrop: 3
   tileWeight: 2
   targetsOnlyKing: 0
   praiseTowerLureRange: 0
   passesThroughGates: 0
-  kingPriorityRange: 2
-  prioritizesStructures: 1
-  structurePriorityRange: 2
-  structureFarKingRatio: 3
-  structureNoticeRadius: 10
-  recentPlayerCombatWindow: 5
   extraLives: 0
   reviveDelaySeconds: 6
   bonePileColor: {r: 0.9, g: 0.9, b: 0.85, a: 1}
+  usesTelegraphedAreaAttack: 0
+  attackBoxSize: {x: 2, y: 2}
+  telegraphTime: 1.5
+  telegraphBaseColor: {r: 0.5, g: 0.5, b: 0.5, a: 0.25}
+  telegraphFillColor: {r: 0.15, g: 0.15, b: 0.15, a: 0.4}
+  slamColor: {r: 0, g: 0, b: 0, a: 0.55}
+  slamFlashSeconds: 0.2
+  pausesDuringTelegraph: 1
+  telegraphStopDuration: 0.2
+  telegraphResumeDuration: 0.3
