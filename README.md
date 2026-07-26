@@ -131,6 +131,20 @@ that, ask Claude for Phase 4 (walls, gates, pathfinding, tile weight).
 - **Placeholder policy (doc §1):** every visual is a tinted white Square/Circle
   sprite; sizes, timings and stats are Inspector fields — swapping in real art
   or tuning numbers must never require code changes.
+- **Zero-value fields:** a numeric field that treats `0` as special always
+  means one of two different things, and the field's Tooltip must say
+  explicitly which one — never leave a bare "0 = ..." without saying what
+  kind of default it is:
+  - **Off** — the feature/behavior is disabled entirely (most range and
+    window fields: King Priority Range, Keep Target Within Range, Structure
+    Priority/Interest Range, Structure Near King Range, Recent Player
+    Combat Window, Splash Radius, etc.).
+  - **Auto** — not disabled, just automatically computed from another
+    field instead of a fixed number (e.g. Impact Mark Diameter: `0` means
+    match 2× Splash Radius, not "no mark").
+  When adding a new field like this, say directly in the Tooltip whether
+  `0` turns the thing off or just switches it to an automatic value tied to
+  something else.
 - **Tile colors live on the Tile asset itself** (`GroundTile`/`WallTile`/
   `GateTile`'s own `Color` field), not on `CastleMapGenerator` or applied
   per-cell via script. Reason (hard-won): `Tilemap.SetTile()` applies the
