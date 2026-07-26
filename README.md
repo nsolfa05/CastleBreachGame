@@ -8,7 +8,7 @@ of any other project.
 
 | Path | What it is |
 |---|---|
-| `guides/` | Ordered, click-by-click beginner guides (00 → 05). **Start at `guides/00-unity-setup.md`.** |
+| `guides/` | Ordered, click-by-click beginner guides (00 → 13). **Start at `guides/00-unity-setup.md`.** |
 | `unity-scripts/` | The vertical slice's C# code, staged for import. Guide 00 moves it into the Unity project (`CastleBreach/Assets/Scripts`), after which this folder is deleted — the code's permanent home is inside the project. |
 | `CastleBreach/` | The Unity project itself. Created on the designer's machine by Unity Hub in Guide 00 (Unity 6 LTS, Universal 2D template), then committed. `.gitignore` here already excludes `Library/`, `Temp/`, logs, and IDE files. |
 
@@ -26,13 +26,30 @@ of any other project.
 - [x] Guide 04 — currency & HUD
 - [x] Guide 05 — archer tower & build mode → **vertical slice complete**
 - [x] Guide 06 — tower range circle
-- [ ] Guide 07 — Phase 1: monster stats as ScriptableObjects (code pushed)
-- [ ] Guide 08 — Phase 2: full monster roster (code pushed)
-- [ ] Guide 09 — Phase 3: pike / catapult / praise-the-king towers (code pushed)
+- [x] Guide 07 — Phase 1: monster stats as ScriptableObjects (Zombie converted)
+- [ ] Guide 08 — Phase 2: full monster roster (code pushed; **only the
+      Zombie asset has actually been created so far** — Goblin, Skeleton,
+      and Cyclops still need to be made in the Editor before their systems
+      can be played)
+- [x] Guide 09 — Phase 3: pike tower, catapult, praise-the-king tower
+- [ ] Guide 10 — King damage & Cyclops telegraph attack, incl. the
+      pause/stop/resume ramp (code pushed; blocked on the Cyclops asset —
+      see Guide 08 above)
+- [x] Guide 11 — targeting tuning: DPS readout, skeleton bone-pile fix,
+      King-priority-beats-structures, Keep Target Within Range
+- [x] Guide 12 — structure targeting reworked: King-damage/Prioritizes-
+      Structures toggles removed, Structure Far King Ratio replaced by
+      Structure Interest Range (with a King-progress guard against
+      perimeter-looping), new Structure Near King Range
+- [ ] Guide 13 — Catapult impact mark: placeholder splash-radius circle at
+      the landing point (code pushed)
 
-**Next up:** the full build order is in [`ROADMAP.md`](ROADMAP.md). Phases
-1–3 are code-complete — work through guides 07 → 08 → 09, then ask Claude
-for Phase 4 (walls, gates, pathfinding, tile weight).
+**Next up:** the full build order is in [`ROADMAP.md`](ROADMAP.md). Core
+Phase 1–3 systems are code-complete and playtested on the Zombie; the main
+remaining Editor work is creating the rest of the monster roster (Goblin,
+Skeleton, Cyclops — Guide 08), wiring the Cyclops's telegraph component
+(Guide 10), and wiring the Catapult's impact-mark sprite (Guide 13). After
+that, ask Claude for Phase 4 (walls, gates, pathfinding, tile weight).
 
 ## Deferred — noted for later
 
@@ -108,8 +125,9 @@ for Phase 4 (walls, gates, pathfinding, tile weight).
   (0,0). Doc coordinates ("A1".."AN30", row 1 at the top) are parsed by
   `TileRef`; all conversions go through `GridMath`. Never hand-convert.
 - **Layers:** 6 Player, 7 Enemy, 8 Structure, 9 King.
-- **Sprite sort orders:** map 0–2, coins 15, structures 19, characters 20–21,
-  projectiles 25, health bars 30–31, placement ghost 40.
+- **Sprite sort orders:** map 0–2, ground-effect markers 4–7 (Catapult
+  impact mark 4; Cyclops telegraph boxes 5–7), coins 15, structures 19,
+  characters 20–21, projectiles 25, health bars 30–31, placement ghost 40.
 - **Placeholder policy (doc §1):** every visual is a tinted white Square/Circle
   sprite; sizes, timings and stats are Inspector fields — swapping in real art
   or tuning numbers must never require code changes.
@@ -130,3 +148,10 @@ for Phase 4 (walls, gates, pathfinding, tile weight).
   traced back to the design doc.
 - The design doc's roadmap after the slice is summarized at the end of
   `guides/05-archer-tower-and-build-mode.md`.
+- **All monster distance math** (attack range, structure priority/interest,
+  Structure Near King Range, the King-progress guard) runs through one
+  helper, `MonsterAI.DistanceBetween(a, b)` — straight-line today, since
+  there's no pathfinding yet. That's the single place to swap in real path
+  length once Phase 4 lands; see `ROADMAP.md`'s Phase 4 section for exactly
+  what depends on it (in particular, the guard against monsters looping the
+  map's perimeter instead of reaching the King).
