@@ -142,6 +142,9 @@ public class BuildModeController : MonoBehaviour
             // inactive would otherwise spawn silent, invisible clones).
             var placed = Instantiate(option.prefab, center, Quaternion.identity);
             placed.SetActive(true);
+            // A new structure can seal a route — refresh routing immediately so
+            // monsters react to the wall the moment it goes down.
+            if (PathGrid.Instance != null) PathGrid.Instance.MarkDirty();
             // Keep carrying the ghost so several can be placed in a row.
         }
     }

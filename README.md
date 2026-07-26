@@ -45,11 +45,17 @@ of any other project.
       impact mark. Everything in it is now confirmed pushed and correctly
       wired, including the Cyclops telegraph and Catapult impact mark
       pieces that were blocked pending Guide 09.
+- [ ] Guide 10 — Phase 4: Walls, Gates & real pathfinding (code pushed).
+      Monsters route around player-built mazes via `Core/PathGrid.cs` and
+      break through only when no route exists. Editor work pending: add the
+      PathGrid object, build the Wall and Gate prefabs, register them in
+      Build Options.
 
-**Next up:** the full build order is in [`ROADMAP.md`](ROADMAP.md). Phases
-1–3 and Guide 9.5's edits are all code-complete, pushed, and confirmed in
-the Editor. Ask Claude for Phase 4 (walls, gates, pathfinding, tile weight)
-whenever ready to start it.
+**Next up:** the full build order is in [`ROADMAP.md`](ROADMAP.md). Work
+through Guide 10, then ask Claude for Phase 5 (shop huts & player upgrades).
+Note that Phase 4's Tile Weight Rule was deliberately skipped — the current
+physical crowding between monsters is the preferred feel, and routing was
+built so it stays untouched.
 
 ## Deferred — noted for later
 
@@ -177,10 +183,23 @@ whenever ready to start it.
   touches the scene, save the project first, then check GitHub Desktop's
   Changes tab actually lists what you expect before committing** — new
   files showing up there confirms the save actually took.
-- **All monster distance math** (attack range, structure priority/interest,
-  Structure Near King Range, the King-progress guard) runs through one
-  helper, `MonsterAI.DistanceBetween(a, b)` — straight-line today, since
-  there's no pathfinding yet. That's the single place to swap in real path
-  length once Phase 4 lands; see `ROADMAP.md`'s Phase 4 section for exactly
-  what depends on it (in particular, the guard against monsters looping the
-  map's perimeter instead of reaching the King).
+- **Two separate senses of "distance", kept apart on purpose.**
+  `MonsterAI.DistanceBetween(a, b)` is straight-line edge-to-edge and backs
+  every targeting *range* (attack range, the structure priority / interest /
+  near-King ranges). `PathGrid` is route length and backs *movement*. Routing
+  deliberately did not take over the ranges: they're "how far away is this"
+  questions asked many times per frame and tuned against straight-line values.
+  See `ROADMAP.md`'s Phase 4 section for the one rule that genuinely wants
+  route length, and the cheap way to give it that.
+- **Routing knows about static obstacles only — never other monsters.**
+  `PathGrid`'s blocking layers are Structure and King, deliberately not Enemy.
+  Monsters crowding, bumping and pushing past each other is plain physics plus
+  `MonsterAI.SteerAroundNeighbors`, and it's the preferred feel — don't "fix"
+  it by teaching routing about monsters, and note this is also why the doc's
+  Tile Weight Rule (§7.1) remains unbuilt.
+- **Player-built Walls/Gates carry a `Barrier` component**, and that is what
+  separates "a wall to route around" from "a building worth attacking".
+  Barriers are excluded from all discretionary structure targeting; they only
+  ever become a target when routing reports no route exists at all (§6). Any
+  future monster meant to smash walls on sight opts back in — it should not
+  change that rule for everyone.

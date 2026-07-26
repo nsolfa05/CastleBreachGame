@@ -79,8 +79,13 @@ public class MonsterDefinition : ScriptableObject
     public bool targetsOnlyKing = false;
     [Tooltip("Goblin: if a Praise the King Tower is within this many tiles, target it instead of the King. 0 = off.")]
     public float praiseTowerLureRange = 0f;
-    [Tooltip("Goblin: can pass through player-built Gate structures (used once walls/gates exist).")]
+    [Tooltip("Goblin: can pass through player-built Gate structures — routes straight through them instead of around, and never needs to break one.")]
     public bool passesThroughGates = false;
+
+    // ─────────────────────────────────────────────────────────────
+    [Header("Movement — walls & gates (§6)")]
+    [Tooltip("Flying: routes straight over player-built Walls and Gates as if they weren't there, so it never gets maze'd and never needs to break one. Still blocked by towers, the King, and the castle's own border walls. Off for every current monster — here for a future flying type.")]
+    public bool fliesOverBarriers = false;
 
     // ─────────────────────────────────────────────────────────────
     [Header("Special: Skeleton")]

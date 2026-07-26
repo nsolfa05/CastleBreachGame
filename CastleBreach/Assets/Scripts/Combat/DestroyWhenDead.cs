@@ -10,6 +10,13 @@ public class DestroyWhenDead : MonoBehaviour
 {
     private void Awake()
     {
-        GetComponent<Health>().Died += _ => Destroy(gameObject);
+        GetComponent<Health>().Died += _ =>
+        {
+            Destroy(gameObject);
+            // This structure may have been the only thing sealing a route —
+            // refresh routing now rather than leaving monsters attacking thin
+            // air until the next routine rescan.
+            if (PathGrid.Instance != null) PathGrid.Instance.MarkDirty();
+        };
     }
 }

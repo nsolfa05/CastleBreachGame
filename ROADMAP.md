@@ -64,31 +64,53 @@ Goblin's targeting rule from Phase 2.*
    Defense Hut menu arrives in Phase 5), and structure stats likely move to a
    `StructureDefinition` ScriptableObject mirroring Phase 1.
 
-## Phase 4 — Walls, Gates & real pathfinding (§6 + §7.1)
+## Phase 4 — Walls, Gates & real pathfinding (§6 + §7.1) ✅ code / guide 10
 
 *The hardest core-gameplay chunk, isolated on purpose. Needs Phase 2's monster
-variety (weights differ per monster) and Phase 3's build-mode selection.*
+variety and Phase 3's build-mode selection.*
 
-- Player-built **Wall** (1×1, blocks everything) and **Gate** (blocks monsters
-  except Goblin; player passes).
-- **Grid pathfinding** (A*) replacing straight-line movement — monsters route
-  around player-built mazes, and break walls when no path exists ("breakable
-  if no path around it", §6).
-- **Tile Weight Rule (§7.1)** — stacking cap of 6 per tile, push-aside
-  behavior, player always counts as a full tile. (Tracked in README deferred
-  notes; single-monster stacking couldn't test this before Phase 2.)
-- **Route `MonsterAI.DistanceBetween(a, b)` through real path length.** This
-  private static helper (added in the targeting-tuning pass) is the single
-  choke point every distance-based targeting rule already calls through —
-  attack range, Structure Priority/Interest Range, Structure Near King
-  Range, and specifically the "closer to the King than I am" progress check
-  inside Structure Interest Range (the guard against monsters looping around
-  the map's perimeter forever without ever closing distance on the King).
-  Swap its body for actual A* path length here and every one of those rules
-  becomes pathfinding-aware automatically — no other code changes needed. In
-  particular, this is what makes a broken wall opening a new shortest route
-  correctly pull monsters onto structures along that new path, even ones
-  that weren't "on the way" under straight-line distance before.
+- ✅ Player-built **Wall** (1×1, blocks everything) and **Gate** (blocks
+  monsters except Goblin; player passes). Both are ordinary structures plus a
+  `Barrier` component, which is what routing reads to tell a wall from a
+  building.
+- ✅ **Grid routing** (`Core/PathGrid.cs`) replacing straight-line movement —
+  monsters route around player-built mazes, and break through when no route
+  exists ("breakable if no path around it", §6). Notes on the design:
+  - Obstacles come from a **physics scan** of the blocking layers, not from
+    structures registering themselves, so any future structure type blocks
+    correctly with no extra wiring and the grid can't silently disagree with
+    actual physics.
+  - **BFS, not A\***, because the same sweep that answers "is there a route"
+    also produces the whole reachable region — which is exactly what the
+    break-through fallback needs. At 40×30 the cost is irrelevant; swapping in
+    A* for the reached case is a contained change inside `Solve()` if maps ever
+    get big enough to care.
+  - The break-through target is always chosen from the **boundary of the
+    reachable region**, so breaking it always opens ground the monster couldn't
+    otherwise get to. Currently the *nearest* such obstacle; the smarter
+    version (simulate removing each candidate, keep whichever most shortens the
+    route) drops in at the same spot, flagged in code.
+  - Barriers are excluded from all *discretionary* structure targeting, so
+    monsters never chew on a corridor they're merely walking through.
+- ⬜ **A monster that attacks walls on sight** — a siege type that targets
+  barriers proactively rather than only when trapped. Deliberately not built:
+  it wants its own definition flag opting back into barrier targeting, not a
+  change to the no-route-exists rule.
+- ⬜ **Tile Weight Rule (§7.1)** — stacking cap of 6 per tile, push-aside
+  behavior, player always counts as a full tile. **Deliberately deferred**: the
+  current physical crowding is the preferred feel, and routing was built to
+  leave it alone (monsters are not obstacles to each other). Revisit only if
+  the doc's stacking behavior is actually wanted over that.
+- ⬜ **Route length for the King-progress guard.** `MonsterAI.DistanceBetween`
+  stays straight-line on purpose — see its own comment. Every targeting *range*
+  is a "how far away" question, called many times per frame, tuned against
+  straight-line values; routing them all would be an expensive silent retune.
+  The one rule that genuinely wants route length is the King-progress guard
+  inside Structure Interest Range, where a structure just the other side of a
+  wall can read as closer-to-the-King than it is to walk to. Cheap to do
+  properly when wanted: one breadth-first sweep outward *from the King* per
+  movement class, refreshed only when `PathGrid.Version` changes, yields route
+  distance for every tile at once.
 
 ## Phase 5 — Shop huts & player upgrades (§3.6 + §5)
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -18,12 +19,19 @@ using UnityEngine;
 ///   King Range (Cyclops; also usable on any monster) — see ChooseTarget
 /// - extraLives + invulnerable bone-pile revive (Skeleton)
 ///
-/// NOTE: movement is still straight-line. Real pathfinding around
-/// player-built wall mazes is the walls/pathfinding phase — DistanceBetween
-/// below is the single choke point to swap for real path length once that
-/// lands, so every distance-based targeting rule (including the King-
-/// progress check in Structure Interest Range) becomes pathfinding-aware
-/// with no other changes needed.
+/// MOVEMENT: routes around player-built mazes via PathGrid (§6) — see
+/// ResolveNavigation and SteeringPoint. With nothing in the way the result is
+/// identical to the straight-line movement this used before, and crowding
+/// between monsters is still pure physics + SteerAroundNeighbors; routing only
+/// ever accounts for static obstacles, never for other monsters.
+///
+/// NOTE: the targeting RANGES below (attack range, the structure priority /
+/// interest / near-King ranges) still measure straight-line distance via
+/// DistanceBetween, not route length. That is deliberate — they are all
+/// "how far away is this" questions, they are called many times per frame,
+/// and their current values were tuned against straight-line distance.
+/// Switching them to route length is a real behavior change to make on
+/// purpose, not a side effect of pathfinding existing; see ROADMAP.
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(Health))]
@@ -51,6 +59,10 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("Actual physics velocity below this (units/sec) counts as \"stuck\" — used to detect a monster that's committed to attacking a structure but is physically blocked (e.g. trapped behind another monster) from ever reaching it.")]
     [SerializeField] private float stuckVelocityThreshold = 0.15f;
 
+    [Header("Routing around walls (shared behavior, not per-monster-type data)")]
+    [Tooltip("Seconds between route recalculations. A route is also recalculated immediately whenever the target changes or something is built/destroyed, so this only paces the routine refresh that tracks a moving target.")]
+    [SerializeField] private float repathInterval = 0.5f;
+
     /// <summary>Fired exactly once, when the monster is permanently dead
     /// (a Skeleton's first death does NOT fire this — it revives).</summary>
     public event Action<MonsterAI> Killed;
@@ -74,6 +86,17 @@ public class MonsterAI : MonoBehaviour
     private float telegraphPhaseEndTime;
     private Vector2 lockedBoxCenter;
     private float currentSpeedScale = 1f; // telegraph-attack movement ramp (1 = full speed, 0 = fully stopped)
+
+    // Routing state (Phase 4). The path is a list of tiles to walk; blockedByStructure
+    // is set when every route to the real target is sealed and something has to be
+    // broken to get through.
+    private readonly List<Vector2Int> path = new List<Vector2Int>();
+    private int pathIndex;
+    private int pathGridVersion = -1;
+    private Transform pathTarget;
+    private Vector2Int pathGoalTile;
+    private float nextRepathTime;
+    private Transform blockedByStructure;
 
     /// <summary>Called by the WaveSpawner right after Instantiate, before the first frame.</summary>
     public void SetDefinition(MonsterDefinition newDefinition) => definition = newDefinition;
@@ -104,19 +127,21 @@ public class MonsterAI : MonoBehaviour
 
     /// <summary>
     /// Edge-to-edge distance between any two colliders (falls back to raw
-    /// transform distance if either side lacks a Collider2D). This is the
-    /// ONE place every distance-based targeting decision measures "how far
-    /// apart are these two things" — currently straight-line, since there's
-    /// nothing to route around yet (movement is still straight-line, per the
-    /// class note above). When real pathfinding (walls/gates, §7.1) lands,
-    /// swap this body for actual path length and every rule built on it —
-    /// attack range, Structure Priority/Interest Range, Structure Near King
-    /// Range, the King-progress check inside Structure Interest Range — all
-    /// automatically become pathfinding-aware with no other changes needed.
-    /// In particular, that's what makes the King-progress check correctly
-    /// react to a broken wall: once a shortcut opens, any structure along
-    /// the new shortest route recalculates as closer-to-the-King and starts
-    /// qualifying again, with zero logic changes required elsewhere.
+    /// transform distance if either side lacks a Collider2D). This is the ONE
+    /// place every distance-based targeting decision measures "how far apart
+    /// are these two things", and it is straight-line by design.
+    ///
+    /// Routing (PathGrid) deliberately did NOT take this over. Doing so would
+    /// mean a graph search behind every attack-range and priority-range check,
+    /// many times per frame per monster, and would silently retune every
+    /// existing range value from "as the crow flies" to "as the monster walks".
+    /// The one rule with a real appetite for route length is the King-progress
+    /// guard inside Structure Interest Range (a structure the far side of a
+    /// wall can read as closer-to-the-King than it is to walk to). Upgrading
+    /// just that one is cheap — a shared breadth-first sweep out from the King
+    /// per movement class, refreshed only when PathGrid.Version changes, gives
+    /// route distance for every tile at once — and is tracked in ROADMAP as its
+    /// own deliberate change rather than folded in here.
     /// </summary>
     private static float DistanceBetween(Transform a, Transform b)
     {
@@ -161,6 +186,13 @@ public class MonsterAI : MonoBehaviour
             return;
         }
 
+        // Route to it around any player-built maze. If every route is sealed,
+        // whatever is doing the sealing becomes the target instead (§6,
+        // "breakable if no path around it") — swapping the target here means
+        // attack range, damage and the telegraph attack below all treat it as
+        // an ordinary target with no special-casing of their own.
+        target = ResolveNavigation(target);
+
         if (definition.usesTelegraphedAreaAttack)
         {
             UpdateTelegraphedAttack(gm, target);
@@ -194,9 +226,89 @@ public class MonsterAI : MonoBehaviour
 
     private void MoveToward(Transform target, float speedScale = 1f)
     {
-        Vector2 approachPoint = ApproachPoint(target);
-        Vector2 desiredDirection = (approachPoint - (Vector2)transform.position).normalized;
+        Vector2 steeringPoint = SteeringPoint(target);
+        Vector2 desiredDirection = (steeringPoint - (Vector2)transform.position).normalized;
         rb.linearVelocity = SteerAroundNeighbors(desiredDirection) * (definition.moveSpeed * speedScale);
+    }
+
+    /// <summary>
+    /// The point to actually steer at this frame — the next corner of the
+    /// route, or the target itself when it's in plain sight.
+    ///
+    /// The line-of-sight check first is what keeps open ground feeling
+    /// identical to before pathfinding existed: with nothing in the way a
+    /// monster heads straight for the target's nearest surface point (so the
+    /// crowd-spreading in ApproachPoint still works), and only walks the
+    /// tile-by-tile route when something is genuinely between them.
+    /// </summary>
+    private Vector2 SteeringPoint(Transform target)
+    {
+        Vector2 approachPoint = ApproachPoint(target);
+        var grid = PathGrid.Instance;
+        if (grid == null || path.Count == 0) return approachPoint;
+
+        // In plain sight — head straight for it. The route is kept rather than
+        // discarded so it's still there the instant something comes between
+        // them again (getting shoved back behind a corner, a wall going up)
+        // instead of straight-lining into a wall until the next recalculation.
+        if (grid.HasClearLine(transform.position, approachPoint, definition, target))
+            return approachPoint;
+
+        // Advance past waypoints already reached. Stopping one short of the end
+        // keeps a waypoint to steer at until the target itself comes into
+        // sight, which the check above then takes over for the final approach.
+        while (pathIndex < path.Count - 1 &&
+               ((Vector2)transform.position - GridMath.TileCenterWorld(path[pathIndex])).sqrMagnitude < 0.36f)
+            pathIndex++;
+
+        if (pathIndex >= path.Count) return approachPoint;
+        return GridMath.TileCenterWorld(path[pathIndex]);
+    }
+
+    /// <summary>
+    /// Keeps this monster's route to its target current, and answers the one
+    /// question routing exists to answer: can it actually get there?
+    ///
+    /// Returns the target unchanged when a route exists. When every route is
+    /// sealed, returns the obstacle that has to be broken to open one — see
+    /// PathGrid.Solve for why that obstacle is always genuinely part of the
+    /// seal rather than just something standing nearby.
+    ///
+    /// Searches are rate-limited two ways: each monster only re-routes when
+    /// something relevant changed (target, target's tile, or the obstacle
+    /// layout) or its interval elapses, and PathGrid caps how many monsters may
+    /// search in the same frame. A monster over that cap simply keeps walking
+    /// its existing route.
+    /// </summary>
+    private Transform ResolveNavigation(Transform target)
+    {
+        var grid = PathGrid.Instance;
+        if (grid == null) return target; // no routing in the scene — straight-line, as before
+
+        // A structure being broken through can die mid-approach.
+        if (blockedByStructure == null || !blockedByStructure.gameObject.activeInHierarchy)
+            blockedByStructure = null;
+
+        Vector2Int goalTile = GridMath.WorldToTile(target.position);
+        bool stale = pathTarget != target ||
+                     pathGridVersion != grid.Version ||
+                     goalTile != pathGoalTile ||
+                     Time.time >= nextRepathTime;
+
+        if (stale && grid.TryBeginSearch())
+        {
+            pathTarget = target;
+            pathGridVersion = grid.Version;
+            pathGoalTile = goalTile;
+            nextRepathTime = Time.time + repathInterval;
+            pathIndex = 0;
+
+            var outcome = grid.Solve(GridMath.WorldToTile(transform.position), goalTile,
+                                     definition, target, path, out Transform blocker);
+            blockedByStructure = outcome == PathGrid.PathOutcome.MustBreak ? blocker : null;
+        }
+
+        return blockedByStructure != null ? blockedByStructure : target;
     }
 
     /// <summary>
@@ -499,6 +611,17 @@ public class MonsterAI : MonoBehaviour
     /// real edge distance so this agrees with the main attack-range check —
     /// otherwise a monster could think a big structure is "blocking" long
     /// before it's actually within its real attack range, or vice versa.
+    ///
+    /// Player-built Walls and Gates (anything with a Barrier component) are
+    /// deliberately NOT candidates here. This feeds every DISCRETIONARY reason
+    /// to attack a structure — the priority/interest ranges, and the
+    /// "something's in my way" check — and barriers are exactly the thing a
+    /// monster is supposed to route around rather than attack. Letting them in
+    /// would have monsters grinding down the sides of a corridor simply for
+    /// walking through it, which would make mazes pointless. A barrier only
+    /// ever becomes a target through the no-route-exists fallback (§6,
+    /// "breakable if no path around it"). A future monster designed to smash
+    /// walls on sight would opt back in here rather than change that rule.
     /// </summary>
     private Transform NearestStructureWithin(float radius)
     {
@@ -508,6 +631,7 @@ public class MonsterAI : MonoBehaviour
         float bestDistance = float.MaxValue;
         foreach (var hit in hits)
         {
+            if (hit.GetComponentInParent<Barrier>() != null) continue;
             float distance = DistanceBetween(transform, hit.transform);
             if (distance > radius) continue;
             if (distance < bestDistance)
