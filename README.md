@@ -28,35 +28,28 @@ of any other project.
 - [x] Guide 06 — tower range circle
 - [x] Guide 07 — Phase 1: monster stats as ScriptableObjects (Zombie converted)
 - [x] Guide 08 — Phase 2: full monster roster — all five assets confirmed
-      pushed (Zombie, Armored Zombie, Skeleton, Goblin, Cyclops). Minor
-      leftover: Cyclops's Display Name field still reads "Zombie" (never
-      actually set) — harmless, just cosmetic, easy one-field fix.
-- [ ] Guide 09 — Phase 3: pike tower, catapult, praise-the-king tower —
-      **not yet in the repo.** No `PikeTower`/`CatapultTower`/
-      `CatapultStone`/`PraiseTheKingTower` prefabs exist, and
-      `BuildModeController`'s Build Options list still only has the Archer
-      Tower. The Editor work exists locally but the commit/push hasn't
-      actually landed on GitHub yet — this exact gap has now happened more
-      than once this project (see the Conventions note below on
-      confirming a push actually went through).
-- [ ] Guide 9.5 (edits) — `guides/09.5-playtesting-edits.md`, playtesting-
+      pushed and correctly configured (Zombie, Armored Zombie, Skeleton,
+      Goblin, Cyclops).
+- [x] Guide 09 — Phase 3: pike tower, catapult, praise-the-king tower —
+      confirmed pushed: all four prefabs exist and `BuildModeController`'s
+      Build Options list has all four entries, correctly wired. (Minor
+      cosmetic typo: the Catapult's display name reads "Cataput Tower".)
+- [x] Guide 9.5 (edits) — `guides/09.5-playtesting-edits.md`, playtesting-
       driven refinements layered on top of Guides 8/9 (consolidates what
-      used to be separate Guides 10-13): King Damage as its own field, the
-      Cyclops telegraph attack + pause/ramp, DPS readout, inspector reorg,
+      used to be separate Guides 10-13, plus the Tower DPS readout added
+      after): King Damage as its own field, the Cyclops telegraph attack +
+      pause/ramp, DPS readout (monsters and towers), inspector reorg,
       skeleton bone-pile fix, King-Priority/Keep-Target-Within-Range knobs,
       the structure-targeting rework (Structure Interest/Near-King Range +
       King-progress guard against perimeter-looping), and the Catapult
-      impact mark. The Zombie-only pieces (DPS readout, skeleton fix,
-      targeting knobs, structure-targeting rework) are playtested and
-      confirmed working; the Cyclops telegraph and Catapult impact mark
-      pieces are blocked until Guide 09 actually reaches the repo.
+      impact mark. Everything in it is now confirmed pushed and correctly
+      wired, including the Cyclops telegraph and Catapult impact mark
+      pieces that were blocked pending Guide 09.
 
-**Next up:** the full build order is in [`ROADMAP.md`](ROADMAP.md). Core
-Phase 1–3 systems are code-complete; the immediate blocker is getting Guide
-09's structures actually pushed to GitHub (confirm in GitHub Desktop's
-History tab, and ideally on github.com too), then wiring the Cyclops's
-telegraph component and the Catapult's impact-mark sprite per Guide 9.5.
-After that, ask Claude for Phase 4 (walls, gates, pathfinding, tile weight).
+**Next up:** the full build order is in [`ROADMAP.md`](ROADMAP.md). Phases
+1–3 and Guide 9.5's edits are all code-complete, pushed, and confirmed in
+the Editor. Ask Claude for Phase 4 (walls, gates, pathfinding, tile weight)
+whenever ready to start it.
 
 ## Deferred — noted for later
 
@@ -169,15 +162,21 @@ After that, ask Claude for Phase 4 (walls, gates, pathfinding, tile weight).
   traced back to the design doc.
 - The design doc's roadmap after the slice is summarized at the end of
   `guides/05-archer-tower-and-build-mode.md`.
-- **Confirm a push actually landed on GitHub before considering a guide's
-  "Commit" step done.** New files (ScriptableObject assets, prefabs) have
-  silently failed to make it from the local Unity project to `main` more
-  than once on this project — the Editor work was real and playtested
-  locally, but the commit/push didn't fully go through, and it wasn't
-  caught until much later (once for the full monster roster, once for
-  Guide 09's tower prefabs). After pushing, check GitHub Desktop's History
-  tab shows the commit, and when in doubt, check the file actually exists
-  on github.com — don't assume a "Commit and push" click succeeded.
+- **Save the Unity project (File → Save Project) before committing —
+  not just Ctrl+S on whatever scene happens to be open.** Root-caused after
+  this bit us twice (the full monster roster, then Guide 09's tower
+  prefabs + `BuildModeController`'s Build Options list all appeared
+  "missing" from git for a while). Scene-level changes — a resized list on
+  a component living in `Game.unity`, like `BuildModeController` or
+  `WaveSpawner` — only get written to the `.unity` file on disk once the
+  scene is explicitly saved. Until then the Editor's Inspector looks
+  correct and Play Mode even works, since it's all live in memory, but the
+  file on disk (and therefore anything git can ever pick up) hasn't
+  changed at all — so a commit right after can look totally normal while
+  silently including none of it. **After finishing a guide step that
+  touches the scene, save the project first, then check GitHub Desktop's
+  Changes tab actually lists what you expect before committing** — new
+  files showing up there confirms the save actually took.
 - **All monster distance math** (attack range, structure priority/interest,
   Structure Near King Range, the King-progress guard) runs through one
   helper, `MonsterAI.DistanceBetween(a, b)` — straight-line today, since
