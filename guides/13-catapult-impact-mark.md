@@ -22,6 +22,10 @@ errors expected.
      (⊙ picker).
    - **Impact Mark Color** — defaults to a muted brown-gray (a "scorched
      ground" placeholder). Editable.
+   - **Impact Mark Diameter** (tiles, `0` = auto) — leave at `0` to
+     automatically match the real blast area (2 × the tower's Splash
+     Radius). Set a specific number instead if you ever want the visual
+     bigger or smaller than the actual damage radius.
    - **Impact Mark Seconds** — how long it stays visible, default `0.4`.
    - **Impact Mark Sorting Order** — default `4`, a ground marker beneath
      structures/characters. Fine as-is.
@@ -50,6 +54,7 @@ errors expected.
 
 - [ ] CatapultStone's Impact Mark Sprite wired to Circle
 - [ ] A circle appears at the Catapult's landing point, sized to Splash Radius
+- [ ] Setting Impact Mark Diameter to a specific value overrides that auto-sizing
 - [ ] It disappears after Impact Mark Seconds
 - [ ] Archer's single-target arrow shows no mark (Splash Radius is 0)
 - [ ] Committed & pushed
