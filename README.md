@@ -8,7 +8,7 @@ of any other project.
 
 | Path | What it is |
 |---|---|
-| `guides/` | Ordered, click-by-click beginner guides (00 → 13). **Start at `guides/00-unity-setup.md`.** |
+| `guides/` | Ordered, click-by-click beginner guides (00 → 09, plus 9.5 for playtesting-driven edits). **Start at `guides/00-unity-setup.md`.** |
 | `unity-scripts/` | The vertical slice's C# code, staged for import. Guide 00 moves it into the Unity project (`CastleBreach/Assets/Scripts`), after which this folder is deleted — the code's permanent home is inside the project. |
 | `CastleBreach/` | The Unity project itself. Created on the designer's machine by Unity Hub in Guide 00 (Unity 6 LTS, Universal 2D template), then committed. `.gitignore` here already excludes `Library/`, `Temp/`, logs, and IDE files. |
 
@@ -27,29 +27,36 @@ of any other project.
 - [x] Guide 05 — archer tower & build mode → **vertical slice complete**
 - [x] Guide 06 — tower range circle
 - [x] Guide 07 — Phase 1: monster stats as ScriptableObjects (Zombie converted)
-- [ ] Guide 08 — Phase 2: full monster roster (code pushed; **only the
-      Zombie asset has actually been created so far** — Goblin, Skeleton,
-      and Cyclops still need to be made in the Editor before their systems
-      can be played)
-- [x] Guide 09 — Phase 3: pike tower, catapult, praise-the-king tower
-- [ ] Guide 10 — King damage & Cyclops telegraph attack, incl. the
-      pause/stop/resume ramp (code pushed; blocked on the Cyclops asset —
-      see Guide 08 above)
-- [x] Guide 11 — targeting tuning: DPS readout, skeleton bone-pile fix,
-      King-priority-beats-structures, Keep Target Within Range
-- [x] Guide 12 — structure targeting reworked: King-damage/Prioritizes-
-      Structures toggles removed, Structure Far King Ratio replaced by
-      Structure Interest Range (with a King-progress guard against
-      perimeter-looping), new Structure Near King Range
-- [ ] Guide 13 — Catapult impact mark: placeholder splash-radius circle at
-      the landing point (code pushed)
+- [x] Guide 08 — Phase 2: full monster roster — all five assets confirmed
+      pushed (Zombie, Armored Zombie, Skeleton, Goblin, Cyclops). Minor
+      leftover: Cyclops's Display Name field still reads "Zombie" (never
+      actually set) — harmless, just cosmetic, easy one-field fix.
+- [ ] Guide 09 — Phase 3: pike tower, catapult, praise-the-king tower —
+      **not yet in the repo.** No `PikeTower`/`CatapultTower`/
+      `CatapultStone`/`PraiseTheKingTower` prefabs exist, and
+      `BuildModeController`'s Build Options list still only has the Archer
+      Tower. The Editor work exists locally but the commit/push hasn't
+      actually landed on GitHub yet — this exact gap has now happened more
+      than once this project (see the Conventions note below on
+      confirming a push actually went through).
+- [ ] Guide 9.5 (edits) — `guides/09.5-playtesting-edits.md`, playtesting-
+      driven refinements layered on top of Guides 8/9 (consolidates what
+      used to be separate Guides 10-13): King Damage as its own field, the
+      Cyclops telegraph attack + pause/ramp, DPS readout, inspector reorg,
+      skeleton bone-pile fix, King-Priority/Keep-Target-Within-Range knobs,
+      the structure-targeting rework (Structure Interest/Near-King Range +
+      King-progress guard against perimeter-looping), and the Catapult
+      impact mark. The Zombie-only pieces (DPS readout, skeleton fix,
+      targeting knobs, structure-targeting rework) are playtested and
+      confirmed working; the Cyclops telegraph and Catapult impact mark
+      pieces are blocked until Guide 09 actually reaches the repo.
 
 **Next up:** the full build order is in [`ROADMAP.md`](ROADMAP.md). Core
-Phase 1–3 systems are code-complete and playtested on the Zombie; the main
-remaining Editor work is creating the rest of the monster roster (Goblin,
-Skeleton, Cyclops — Guide 08), wiring the Cyclops's telegraph component
-(Guide 10), and wiring the Catapult's impact-mark sprite (Guide 13). After
-that, ask Claude for Phase 4 (walls, gates, pathfinding, tile weight).
+Phase 1–3 systems are code-complete; the immediate blocker is getting Guide
+09's structures actually pushed to GitHub (confirm in GitHub Desktop's
+History tab, and ideally on github.com too), then wiring the Cyclops's
+telegraph component and the Catapult's impact-mark sprite per Guide 9.5.
+After that, ask Claude for Phase 4 (walls, gates, pathfinding, tile weight).
 
 ## Deferred — noted for later
 
@@ -162,6 +169,15 @@ that, ask Claude for Phase 4 (walls, gates, pathfinding, tile weight).
   traced back to the design doc.
 - The design doc's roadmap after the slice is summarized at the end of
   `guides/05-archer-tower-and-build-mode.md`.
+- **Confirm a push actually landed on GitHub before considering a guide's
+  "Commit" step done.** New files (ScriptableObject assets, prefabs) have
+  silently failed to make it from the local Unity project to `main` more
+  than once on this project — the Editor work was real and playtested
+  locally, but the commit/push didn't fully go through, and it wasn't
+  caught until much later (once for the full monster roster, once for
+  Guide 09's tower prefabs). After pushing, check GitHub Desktop's History
+  tab shows the commit, and when in doubt, check the file actually exists
+  on github.com — don't assume a "Commit and push" click succeeded.
 - **All monster distance math** (attack range, structure priority/interest,
   Structure Near King Range, the King-progress guard) runs through one
   helper, `MonsterAI.DistanceBetween(a, b)` — straight-line today, since

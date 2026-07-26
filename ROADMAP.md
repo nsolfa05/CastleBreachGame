@@ -13,14 +13,17 @@ playtests; commit + push at every checkpoint.
 
 > **Status:** Phases 1–3 are **code-complete and pushed** — the Editor-side
 > work is written up as guides 07 (foundations), 08 (monster roster), and
-> 09 (easy structures, done in-Editor). Guides 10–13 layered further
-> refinements on top (King damage, Cyclops telegraph + pause/ramp,
-> targeting tuning, the structure-targeting rework, Catapult impact mark) —
-> see README.md's Status section for exactly which are done vs. code-pushed.
-> **Note:** only the Zombie asset has actually been created in the Editor so
-> far — Goblin/Skeleton/Cyclops (guide 08) still need to be made before
-> their systems (King-lure, bone-pile revive, telegraphed slam) can be
-> played. Phase 4 code starts once those are in place and verified.
+> 09 (easy structures). Guide 9.5 layered further playtesting-driven edits
+> on top (King damage, Cyclops telegraph + pause/ramp, targeting tuning,
+> the structure-targeting rework, Catapult impact mark) — see README.md's
+> Status section for exactly what's confirmed done vs. still pending in the
+> Editor. **Note:** Guide 08's full monster roster is confirmed pushed
+> (Zombie, Armored Zombie, Skeleton, Goblin, Cyclops all exist), but Guide
+> 09's structure prefabs (Pike Tower, Catapult, Praise the King Tower) are
+> **not yet in the repo** — this has been a recurring sync gap this
+> project (Editor work done locally, commit/push not actually completing);
+> always confirm a push landed on GitHub before considering a guide done.
+> Phase 4 code starts once Guide 09 is confirmed in and verified.
 
 ## Phase 1 — Foundations: monster stats as ScriptableObjects ✅ code / guide 07
 
