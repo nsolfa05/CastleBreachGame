@@ -17,13 +17,14 @@ smashing whatever is sealing them in.
 > physics. On open ground with nothing in the way, movement is identical to
 > before this guide.
 
-> **Update — two fixes if you already built Wall/Gate from an earlier pull:**
+> **Update — three fixes if you already built Wall/Gate from an earlier pull:**
 > playtesting turned up (1) anything sliding along a row of Wall pieces could
-> catch on the seam between them, worst at corners, and (2) Gate was
-> physically solid to the player too, not just other monsters. Both are fixed
-> in Steps 3-4 below (Edge Radius, and Is Trigger on Gate) — go back into your
-> existing prefabs and apply those two changes, no need to rebuild them from
-> scratch.
+> catch on the seam between them, worst at corners, (2) Gate was physically
+> solid to the player too, not just other monsters, and (3) the castle's own
+> border wall had the exact same seam-catching problem as (1), for a
+> different reason. Fixed in Steps 3-4 (Edge Radius, Is Trigger on Gate) and
+> the new Step 4.5 below (Composite Collider 2D on the border wall) — go back
+> and apply these, no need to rebuild anything from scratch.
 
 ---
 
@@ -123,6 +124,29 @@ Guide 08 — no change needed there.
 > monsters ever have a reason to. Damage still works normally against a
 > trigger — attacks are a distance check, not a physics collision.
 
+## Step 4.5 — Fix the castle's own border wall too
+
+The border wall isn't built from prefabs like your Wall/Gate — it's a single
+Tilemap (from Guide 01) with one **Tilemap Collider 2D** that auto-generates a
+collider shape per occupied tile. That has the same seam-between-tiles problem
+as Step 3, just via a different component, and Tilemap Collider 2D doesn't
+have an Edge Radius field to fix it the same way.
+
+1. In the Hierarchy, find the **`Walls`** Tilemap (child of `Grid`).
+2. **Add Component → Rigidbody 2D** → set **Body Type** to **Static** (it's
+   fixed terrain, it never moves).
+3. **Add Component → Composite Collider 2D**. Leave **Geometry Type** at
+   **Polygons**.
+4. On the existing **Tilemap Collider 2D**, check **Used By Composite**.
+
+> **Why this is better than Edge Radius here:** Composite Collider 2D merges
+> every wall tile's collider into one continuous outline instead of leaving
+> one collider per tile — so there's no seam left at all, not just a rounded
+> one. It's Unity's standard fix for Tilemap collision snagging, and it fits
+> perfectly here since the border wall never breaks apart or changes shape
+> (unlike your player-built Walls, which each need their own destructible
+> Health and can't share one merged collider).
+
 ## Step 5 — Register both in build mode
 
 1. Select **`GameManager`** → **Build Mode Controller** → **Build Options**.
@@ -177,7 +201,8 @@ draw a long line by clicking along it).
 - **No more catching:** walk the player right up against a long wall line,
   then move along it past a corner — should slide smoothly with no snagging.
   Send a group of monsters down a corridor with a corner and watch them round
-  it without piling up stuck.
+  it without piling up stuck. Do the same test pressed against the castle's
+  own outer border wall.
 - **Wall Damage:** set it to something high on a test monster and confirm
   walls break noticeably faster than before, without changing how fast that
   monster fights a tower.
@@ -202,7 +227,9 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] Fully sealing the King makes them break through the seal
 - [ ] Breaking a hole makes them immediately re-route through it
 - [ ] Goblins AND the player walk through Gates; other monsters don't
-- [ ] Standing pressed against a wall, then trying to move along it, doesn't get you stuck
+- [ ] Standing pressed against a Wall, then trying to move along it, doesn't get you stuck
+- [ ] `Walls` Tilemap has Rigidbody 2D (Static) + Composite Collider 2D, and Tilemap Collider 2D → Used By Composite is checked
+- [ ] Standing pressed against the castle's own border wall doesn't get you stuck either
 - [ ] DPS box shows a vs Wall/Gate line on monster definitions
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)
 
