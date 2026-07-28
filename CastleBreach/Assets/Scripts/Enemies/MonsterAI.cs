@@ -89,9 +89,10 @@ public class MonsterAI : MonoBehaviour
     // apart from ordinary monsters — but that's purely a Gate-collision trick,
     // not a "these are different kinds of crowd" distinction, so
     // SteerAroundNeighbors still needs to see every monster regardless of
-    // which of the two layers it landed on. Static: computed once, shared by
-    // every instance, not per-monster state.
-    private static readonly int EnemyCrowdMask = LayerMask.GetMask("Enemy", "GatePasser");
+    // which of the two layers it landed on. Computed in Awake, not as a field
+    // initializer — LayerMask.GetMask calls into Unity's layer system, which
+    // isn't allowed to run before a MonoBehaviour's lifecycle actually starts.
+    private static int EnemyCrowdMask;
     private float lastAttackedPlayerTime = float.NegativeInfinity;
     private Transform committedStructureTarget; // non-null while already committed to attacking a specific structure
     private TelegraphPhase telegraphPhase = TelegraphPhase.Idle;
@@ -121,6 +122,7 @@ public class MonsterAI : MonoBehaviour
         health.Died += OnDied;
         if (body == null) body = GetComponent<SpriteRenderer>();
         avoidSide = UnityEngine.Random.value < 0.5f ? -1f : 1f;
+        EnemyCrowdMask = LayerMask.GetMask("Enemy", "GatePasser");
     }
 
     /// <summary>
