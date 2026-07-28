@@ -17,14 +17,17 @@ smashing whatever is sealing them in.
 > physics. On open ground with nothing in the way, movement is identical to
 > before this guide.
 
-> **Update — three fixes if you already built Wall/Gate from an earlier pull:**
+> **Update — fixes if you already built Wall/Gate from an earlier pull:**
 > playtesting turned up (1) anything sliding along a row of Wall pieces could
-> catch on the seam between them, worst at corners, (2) Gate was physically
-> solid to the player too, not just other monsters, and (3) the castle's own
-> border wall had the exact same seam-catching problem as (1), for a
-> different reason. Fixed in Steps 3-4 (Edge Radius, Is Trigger on Gate) and
-> the new Step 4.5 below (Composite Collider 2D on the border wall) — go back
-> and apply these, no need to rebuild anything from scratch.
+> catch on the seam between them, worst at corners — fixed with Edge Radius,
+> Step 3, (2) the castle's own border wall had the same seam problem for a
+> different reason — fixed with Composite Collider 2D, Step 4.5, and (3) Gate
+> needs a proper physics fix, not just "make it a trigger": that let a
+> tightly packed crowd physically shove an ordinary monster through one,
+> since a trigger has zero resistance regardless of *why* something ends up
+> overlapping it. **Step 4 below now uses two dedicated layers instead** —
+> if you set Gate to Is Trigger from an earlier pull, undo that; Step 4 walks
+> through the replacement.
 
 ---
 
@@ -46,7 +49,8 @@ movement, so if something looks wrong later, check this first).
    - **Wall Tilemap** ← the **Wall** tilemap (the child of `Grid`, the same one
      `CastleMapGenerator` uses). This is the castle's own border wall —
      permanent terrain that can never be broken.
-   - **Blocking Layers** ← tick **Structure** and **King**. **Do NOT tick
+   - **Blocking Layers** ← tick **Structure** and **King** for now — **Gate**
+     joins this list in Step 4d once that layer exists. **Do NOT tick
      Enemy** — that would make monsters try to route around each other
      instead of crowding, which is exactly what we don't want.
 4. Leave the rest at defaults: **Searches Per Frame** `8`, **Rescan Interval**
@@ -97,32 +101,64 @@ movement, so if something looks wrong later, check this first).
 
 ## Step 4 — Build the Gate prefab
 
+The tricky part of Gate isn't the prefab — it's that it needs to be solid to
+most monsters, but not to the player, and not to a Goblin. Unity's physics
+can't express "block this layer except these specific members" (every
+monster shares the Enemy layer), so this uses two dedicated layers instead of
+fighting that: **Gate** collides with ordinary monsters normally (a real solid
+wall, not a trigger — see the callout below for why that matters), but not
+with the player or with anything on a new **GatePasser** layer, which is where
+a Passes-Through-Gates monster gets moved the moment it spawns.
+
+**4a. Create the two layers.** Edit → Project Settings → Tags and Layers →
+Layers. Type into two empty **User Layer** slots:
+- `Gate`
+- `GatePasser`
+
+**4b. Turn off two boxes in the collision matrix.** Edit → Project Settings →
+Physics 2D → scroll to **Layer Collision Matrix**. Find the **Gate** row and
+uncheck its intersection with:
+- **Player**
+- **GatePasser**
+
+Leave every other Gate intersection checked (Enemy especially — that's what
+makes it solid to ordinary monsters).
+
+**4c. Build the prefab.**
+
 1. In `Assets/Prefabs`, select **`Wall`**, **Ctrl+D** to duplicate, rename the
    copy **`Gate`**.
 2. Double-click it (Prefab Mode) and change:
    - **Sprite Renderer → Color**: wooden brown (clearly different from Wall)
    - **Health → Max Health**: `25` (a door is flimsier than a wall)
    - **Barrier → Is Gate**: **check it**
-   - **Box Collider 2D → Is Trigger**: **check it** — see the callout below,
-     this one's important, not optional
+   - **Layer** (top of the Inspector, not the Sorting Layer): change from
+     **Structure** to your new **Gate** layer
+   - **Box Collider 2D → Is Trigger**: leave **unchecked** — Gate should be
+     solid, same as Wall, just on its own layer
 3. Exit Prefab Mode.
 
 That **Is Gate** checkbox is the whole Goblin rule: any monster whose
-definition has **Passes Through Gates** ticked routes straight through a Gate
-as if it were open ground. Your `Goblin` asset already has that ticked from
-Guide 08 — no change needed there.
+definition has **Passes Through Gates** ticked gets moved onto the
+**GatePasser** layer the instant it spawns (that's what Step 4a/4b's layer
+exception is for) and its route treats a Gate as open ground. Your `Goblin`
+asset already has Passes Through Gates ticked from Guide 08 — no change
+needed there.
 
-> **Why Is Trigger matters:** routing decides *which monsters* treat a Gate as
-> open ground, but that's only ever a pathfinding decision — it doesn't touch
-> Unity's actual physics collision, which was still treating the Gate as
-> solid to everyone, player included. Physics has no way to single out "let
-> the Goblin through but not the Zombie" on its own (every monster shares the
-> same Enemy layer), so instead of fighting that, Gate simply isn't solid to
-> *anyone* — nothing physically blocks against it. What actually stops an
-> ordinary monster from walking through is that its own route never leads it
-> onto that tile in the first place; only the player and Passes-Through-Gates
-> monsters ever have a reason to. Damage still works normally against a
-> trigger — attacks are a distance check, not a physics collision.
+**4d. Tell PathGrid about the new layer.** Select the **`PathGrid`** object →
+**Blocking Layers** → tick **Gate** alongside Structure and King. Miss this
+and Gate silently stops counting as an obstacle for routing at all, since it's
+no longer on the Structure layer PathGrid was already watching.
+
+> **Why solid-with-an-exception is better than a trigger here:** a trigger has
+> zero physical resistance no matter *why* something ends up touching it —
+> including a crowd of monsters physically shoving one of their own through
+> it from behind, which can happen since monster-vs-monster collision is
+> fully on in this project. A real solid collider can't be shoved through by
+> crowd pressure the way a trigger can; the layer exception is what lets the
+> player and Passes-Through-Gates monsters ignore that solidity specifically,
+> without weakening it for everyone else. Damage still works normally either
+> way — attacks are a distance check, not a physics collision.
 
 ## Step 4.5 — Fix the castle's own border wall too
 
@@ -175,6 +211,23 @@ tower — independent numbers, since a monster you want to be scary against
 towers doesn't have to also be scary against walls, or vice versa. The DPS box
 at the top of each monster's Inspector now shows a **vs Wall/Gate** line too.
 
+## Step 5.6 — Corner-hugging & crowd fix (automatic)
+
+Two more things fixed in code, nothing to set up:
+
+- **Waypoint Arrival Radius** (new field, Routing header, default `0.25`) —
+  how close a monster must get to a route waypoint before aiming at the next
+  one. It was effectively `0.6` before (hardcoded), which let a monster start
+  swinging toward the next leg of a route well before it had actually rounded
+  a corner, cutting across the inside edge of the wall forming it — worth
+  knowing about if corner-snagging still turns up after Steps 3/4.5, since
+  it's now a number you can tune down further (or up, if monsters ever seem
+  reluctant to advance in a crowd) instead of a bug to report.
+- The crowd-avoidance check now always sees every monster regardless of which
+  of the two layers Step 4 put it on — a Passes-Through-Gates monster moving
+  onto GatePasser was specifically to fool Gate's collider, not to split the
+  crowd into two groups that ignore each other.
+
 ## Step 6 — Playtest
 
 Press **5**, then left-click to lay walls (you keep carrying it, so you can
@@ -195,6 +248,10 @@ draw a long line by clicking along it).
   treat it as a wall (route around, or break it if it's the only way through).
   Send a **Goblin** at it — it should walk straight through without stopping.
   You should be able to walk through it too.
+- **Crowd pressure at a Gate:** funnel a big group of ordinary monsters (no
+  Goblins) toward a Gate so they pile up against it. None should ever end up
+  on the far side — a real solid collider can't be shoved through by a crowd
+  the way the old trigger version could.
 - **Nothing built = nothing changed:** with an empty field, monsters should
   behave exactly as they did before this guide — straight at their target, same
   crowding.
@@ -217,10 +274,12 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 
 ## ✅ Checkpoint
 
-- [ ] PathGrid object exists, Wall Tilemap wired, Blocking Layers = Structure + King (not Enemy)
+- [ ] PathGrid object exists, Wall Tilemap wired, Blocking Layers = Structure + King + **Gate** (not Enemy)
 - [ ] Wall and Gate prefabs exist with Health, Destroy When Dead, and Barrier
 - [ ] Wall and Gate's Box Collider 2D both have Edge Radius `0.05`
-- [ ] Gate has Is Gate checked and Is Trigger checked; Wall has neither
+- [ ] `Gate` and `GatePasser` layers exist (Tags and Layers)
+- [ ] Physics 2D collision matrix: Gate × Player unchecked, Gate × GatePasser unchecked, Gate × Enemy still checked
+- [ ] Gate prefab: Layer = Gate, Is Gate checked, Is Trigger **unchecked**; Wall: Layer = Structure, neither checked
 - [ ] Both registered in Build Options (hotkeys 5 and 6)
 - [ ] Monsters route around walls instead of pressing into them
 - [ ] Monsters never attack walls while any route exists

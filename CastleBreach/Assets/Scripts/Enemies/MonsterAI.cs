@@ -63,6 +63,9 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("Seconds between route recalculations. A route is also recalculated immediately whenever the target changes or something is built/destroyed, so this only paces the routine refresh that tracks a moving target.")]
     [SerializeField] private float repathInterval = 0.5f;
 
+    [Tooltip("How close (tiles) a monster must get to a route waypoint before switching to aim at the next one. Smaller = hugs the intended tile-by-tile path more closely, which matters most at corners: too generous a radius lets a monster start swinging toward the next leg of the route well before it's actually rounded the corner, cutting across the inside edge of the wall forming it. Too small makes it harder to ever count a waypoint as \"reached\" while jostled in a crowd, which can stall progress instead. 0.25 keeps a monster within about a quarter-tile of the intended line.")]
+    [SerializeField] private float waypointArrivalRadius = 0.25f;
+
     /// <summary>Fired exactly once, when the monster is permanently dead
     /// (a Skeleton's first death does NOT fire this — it revives).</summary>
     public event Action<MonsterAI> Killed;
@@ -79,7 +82,16 @@ public class MonsterAI : MonoBehaviour
     private bool bonePileActive;
     private Vector3 activeScale;
     private float avoidSide; // -1 or +1, fixed per instance so avoidance doesn't flicker sides
-    private int enemyLayerMask;
+
+    // Crowd-detection mask covers BOTH monster layers, not just this instance's
+    // own one. A monster with Passes Through Gates gets moved onto the
+    // GatePasser layer at spawn (see Start) so Gate's collider can tell it
+    // apart from ordinary monsters — but that's purely a Gate-collision trick,
+    // not a "these are different kinds of crowd" distinction, so
+    // SteerAroundNeighbors still needs to see every monster regardless of
+    // which of the two layers it landed on. Static: computed once, shared by
+    // every instance, not per-monster state.
+    private static readonly int EnemyCrowdMask = LayerMask.GetMask("Enemy", "GatePasser");
     private float lastAttackedPlayerTime = float.NegativeInfinity;
     private Transform committedStructureTarget; // non-null while already committed to attacking a specific structure
     private TelegraphPhase telegraphPhase = TelegraphPhase.Idle;
@@ -109,7 +121,6 @@ public class MonsterAI : MonoBehaviour
         health.Died += OnDied;
         if (body == null) body = GetComponent<SpriteRenderer>();
         avoidSide = UnityEngine.Random.value < 0.5f ? -1f : 1f;
-        enemyLayerMask = 1 << gameObject.layer;
     }
 
     /// <summary>
@@ -166,6 +177,21 @@ public class MonsterAI : MonoBehaviour
         if (body != null) body.color = definition.bodyColor;
         health.SetMax(definition.maxHealth, refill: true);
         livesRemaining = definition.extraLives;
+
+        // Gate is solid to ordinary monsters (a real physical backstop, so a
+        // crowd pressing against one can never shove someone through it) but
+        // must not be solid to a monster that's allowed through — and physics
+        // layers can't express "block this layer except these specific
+        // members" since every monster otherwise shares Enemy. Moving a
+        // Passes Through Gates monster onto its own GatePasser layer (with a
+        // collision-matrix exception against Gate) sidesteps that instead of
+        // fighting it. EnemyCrowdMask above is what keeps this from also
+        // splitting the crowd into two groups that ignore each other.
+        if (definition.passesThroughGates)
+        {
+            int gatePasserLayer = LayerMask.NameToLayer("GatePasser");
+            if (gatePasserLayer >= 0) gameObject.layer = gatePasserLayer;
+        }
     }
 
     private void FixedUpdate()
@@ -257,8 +283,9 @@ public class MonsterAI : MonoBehaviour
         // Advance past waypoints already reached. Stopping one short of the end
         // keeps a waypoint to steer at until the target itself comes into
         // sight, which the check above then takes over for the final approach.
+        float arrivalSqr = waypointArrivalRadius * waypointArrivalRadius;
         while (pathIndex < path.Count - 1 &&
-               ((Vector2)transform.position - GridMath.TileCenterWorld(path[pathIndex])).sqrMagnitude < 0.36f)
+               ((Vector2)transform.position - GridMath.TileCenterWorld(path[pathIndex])).sqrMagnitude < arrivalSqr)
             pathIndex++;
 
         if (pathIndex >= path.Count) return approachPoint;
@@ -432,7 +459,7 @@ public class MonsterAI : MonoBehaviour
     private Vector2 SteerAroundNeighbors(Vector2 desiredDirection)
     {
         var hit = Physics2D.CircleCast(transform.position, avoidanceProbeRadius, desiredDirection,
-                                       avoidanceLookAhead, enemyLayerMask);
+                                       avoidanceLookAhead, EnemyCrowdMask);
         if (hit.collider == null || hit.collider.gameObject == gameObject)
             return desiredDirection;
 
