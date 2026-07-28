@@ -178,7 +178,9 @@ have an Edge Radius field to fix it the same way.
    fixed terrain, it never moves).
 3. **Add Component → Composite Collider 2D**. Leave **Geometry Type** at
    **Polygons**.
-4. On the existing **Tilemap Collider 2D**, check **Used By Composite**.
+4. On the existing **Tilemap Collider 2D**, set **Composite Operation** to
+   **Merge** (Unity 6 renamed the old "Used By Composite" checkbox to this
+   dropdown — same thing, just pick Merge instead of the default None).
 
 > **Why this is better than Edge Radius here:** Composite Collider 2D merges
 > every wall tile's collider into one continuous outline instead of leaving
@@ -292,7 +294,7 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] Breaking a hole makes them immediately re-route through it
 - [ ] Goblins AND the player walk through Gates; other monsters don't
 - [ ] Standing pressed against a Wall, then trying to move along it, doesn't get you stuck
-- [ ] `Walls` Tilemap has Rigidbody 2D (Static) + Composite Collider 2D, and Tilemap Collider 2D → Used By Composite is checked
+- [ ] `Walls` Tilemap has Rigidbody 2D (Static) + Composite Collider 2D, and Tilemap Collider 2D → Composite Operation is set to Merge
 - [ ] Standing pressed against the castle's own border wall doesn't get you stuck either
 - [ ] DPS box shows a vs Wall/Gate line on monster definitions
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)
