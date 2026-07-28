@@ -116,13 +116,18 @@ Layers. Type into two empty **User Layer** slots:
 - `GatePasser`
 
 **4b. Turn off two boxes in the collision matrix.** Edit → Project Settings →
-Physics 2D → scroll to **Layer Collision Matrix**. Find the **Gate** row and
-uncheck its intersection with:
-- **Player**
-- **GatePasser**
+Physics 2D → **Layer Collision Matrix**. This grid only shows each pair of
+layers **once**, in whichever row comes first in the list — so the two boxes
+you need are in two *different* rows, not both in Gate's:
 
-Leave every other Gate intersection checked (Enemy especially — that's what
-makes it solid to ordinary monsters).
+- In the **Gate** row: uncheck the leftmost box, under the **GatePasser**
+  column.
+- In the **Player** row (higher up the list): uncheck the box under the
+  **Gate** column — that pair lives here instead, since Player comes earlier
+  in the layer list than Gate does.
+
+Leave everything else checked, especially Gate × Enemy — that's what makes
+Gate solid to ordinary monsters.
 
 **4c. Build the prefab.**
 
