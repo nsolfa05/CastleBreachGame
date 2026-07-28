@@ -246,6 +246,17 @@ Two more things fixed in code, nothing to set up:
   touching. It now also checks a margin to each side of the line scaled to
   the monster's Body Scale, so it correctly falls back to its (already
   correct) planned route instead.
+- **Stuck recovery (new fields, Crowd Avoidance header): Stuck Check
+  Interval `0.4`, Stuck Progress Threshold `0.15`, Stuck Escalation Delay
+  `0.8`.** Covers a failure mode none of the fixes above touch: two
+  monsters meeting at a tight pinch point (a corner, a doorway) can end up
+  nudging the same fixed direction forever and simply hold each other in
+  place, since ordinary avoidance never tries anything different no matter
+  how long it's failing. Each monster now actually measures whether it's
+  moving; if it genuinely hasn't for Stuck Escalation Delay, it flips which
+  side it nudges toward and leans harder into it, a little more with each
+  further escalation. Only ever changes behavior for a monster that's
+  measurably not moving — normal movement is unaffected.
 
 ## Step 6 — Playtest
 
@@ -279,6 +290,12 @@ draw a long line by clicking along it).
   Send a group of monsters down a corridor with a corner and watch them round
   it without piling up stuck. Do the same test pressed against the castle's
   own outer border wall.
+- **Two monsters, one tight corner:** the real stress test — send several
+  monsters down a narrow 1-tile corridor with a turn in it, ideally with a
+  gate or dead end nearby that tends to bunch them up. Watch closely at the
+  corner: brief hesitation or a small side-to-side shuffle while several try
+  to round it at once is fine and expected, but nobody should stay frozen
+  there for more than about a second before working free.
 - **Wall Damage:** set it to something high on a test monster and confirm
   walls break noticeably faster than before, without changing how fast that
   monster fights a tower.

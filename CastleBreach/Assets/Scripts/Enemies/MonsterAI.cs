@@ -59,6 +59,15 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("Actual physics velocity below this (units/sec) counts as \"stuck\" — used to detect a monster that's committed to attacking a structure but is physically blocked (e.g. trapped behind another monster) from ever reaching it.")]
     [SerializeField] private float stuckVelocityThreshold = 0.15f;
 
+    [Tooltip("Seconds between checks for whether a monster is actually making progress toward wherever it's steering. Also the minimum time between escalations below, so a fresh escalation gets a full window to work before trying again.")]
+    [SerializeField] private float stuckCheckInterval = 0.4f;
+
+    [Tooltip("Below this much movement (tiles) between checks counts as \"stuck\" this check.")]
+    [SerializeField] private float stuckProgressThreshold = 0.15f;
+
+    [Tooltip("Seconds of continuous stuck checks before avoidance escalates — flips which side this monster nudges toward and leans harder into the nudge. Exists for the case ordinary avoidance can never resolve on its own: two monsters meeting at a pinch point with the same fixed nudge side just hold each other in place forever, since neither ever tries anything different. Escalating breaks that instead of leaving them frozen.")]
+    [SerializeField] private float stuckEscalationDelay = 0.8f;
+
     [Header("Routing around walls (shared behavior, not per-monster-type data)")]
     [Tooltip("Seconds between route recalculations. A route is also recalculated immediately whenever the target changes or something is built/destroyed, so this only paces the routine refresh that tracks a moving target.")]
     [SerializeField] private float repathInterval = 0.5f;
@@ -81,7 +90,11 @@ public class MonsterAI : MonoBehaviour
     private int livesRemaining;
     private bool bonePileActive;
     private Vector3 activeScale;
-    private float avoidSide; // -1 or +1, fixed per instance so avoidance doesn't flicker sides
+    private float avoidSide; // -1 or +1, flips if this monster gets stuck long enough — see UpdateStuckRecovery
+    private float nudgeStrength = 1f; // grows while stuck so the sideways nudge leans harder into breaking free
+    private Vector2 stuckSamplePosition;
+    private float nextStuckCheckTime;
+    private float stuckSeconds;
 
     // Crowd-detection mask covers BOTH monster layers, not just this instance's
     // own one. A monster with Passes Through Gates gets moved onto the
@@ -122,6 +135,7 @@ public class MonsterAI : MonoBehaviour
         health.Died += OnDied;
         if (body == null) body = GetComponent<SpriteRenderer>();
         avoidSide = UnityEngine.Random.value < 0.5f ? -1f : 1f;
+        stuckSamplePosition = transform.position;
         EnemyCrowdMask = LayerMask.GetMask("Enemy", "GatePasser");
     }
 
@@ -254,9 +268,55 @@ public class MonsterAI : MonoBehaviour
 
     private void MoveToward(Transform target, float speedScale = 1f)
     {
+        UpdateStuckRecovery();
         Vector2 steeringPoint = SteeringPoint(target);
         Vector2 desiredDirection = (steeringPoint - (Vector2)transform.position).normalized;
         rb.linearVelocity = SteerAroundNeighbors(desiredDirection) * (definition.moveSpeed * speedScale);
+    }
+
+    /// <summary>
+    /// Notices when this monster genuinely isn't getting anywhere and
+    /// escalates its own avoidance instead of repeating a nudge that's
+    /// already proven not to work.
+    ///
+    /// Ordinary crowd avoidance (SteerAroundNeighbors) is entirely local and
+    /// entirely deterministic: a monster always nudges the same fixed side
+    /// whenever something's ahead of it. That's fine almost all the time, but
+    /// it has one real failure mode — two monsters meeting at a tight pinch
+    /// point (a corner, a doorway) with the same fixed side can hold each
+    /// other in that exact spot forever, since neither one's decision ever
+    /// changes no matter how long it fails. This is what actually breaks that
+    /// deadlock: measured, not assumed — real position is sampled every
+    /// Stuck Check Interval, and only counts as stuck if it genuinely hasn't
+    /// moved. Once stuck for Stuck Escalation Delay, avoidSide flips (trying
+    /// the other side is often enough on its own) and the nudge leans harder
+    /// into whichever side it's currently trying, growing a little more with
+    /// each further escalation so a monster that's especially wedged keeps
+    /// trying progressively harder rather than repeating the same failed
+    /// nudge at the same strength indefinitely. Resets the moment real
+    /// progress is measured, so a monster moving normally is never affected.
+    /// </summary>
+    private void UpdateStuckRecovery()
+    {
+        if (Time.time < nextStuckCheckTime) return;
+        nextStuckCheckTime = Time.time + stuckCheckInterval;
+
+        float progressed = Vector2.Distance(transform.position, stuckSamplePosition);
+        stuckSamplePosition = transform.position;
+
+        if (progressed >= stuckProgressThreshold)
+        {
+            stuckSeconds = 0f;
+            nudgeStrength = 1f;
+            return;
+        }
+
+        stuckSeconds += stuckCheckInterval;
+        if (stuckSeconds < stuckEscalationDelay) return;
+
+        stuckSeconds = 0f;
+        avoidSide = -avoidSide;
+        nudgeStrength = Mathf.Min(nudgeStrength + 0.5f, 3f); // capped so it still yields toward the target eventually, never purely sideways
     }
 
     /// <summary>
@@ -465,7 +525,10 @@ public class MonsterAI : MonoBehaviour
         if (hit.collider == null || hit.collider.gameObject == gameObject)
             return desiredDirection;
 
-        Vector2 perpendicular = new Vector2(-desiredDirection.y, desiredDirection.x) * avoidSide;
+        // nudgeStrength (see UpdateStuckRecovery) leans further into the
+        // perpendicular the longer this monster has genuinely failed to make
+        // progress — 1 in the ordinary case, growing only while actually stuck.
+        Vector2 perpendicular = new Vector2(-desiredDirection.y, desiredDirection.x) * avoidSide * nudgeStrength;
         return (desiredDirection + perpendicular).normalized;
     }
 
