@@ -56,6 +56,15 @@ public class AttackTower : MonoBehaviour
     private float nextShotTime;
     private Transform currentTarget;
 
+    private void Awake()
+    {
+        // Gate-passing monsters (the Goblin) live on the GatePasser layer, not
+        // Enemy — fold it in so towers can still target and splash them. The
+        // same fixed-up mask is what gets handed to each projectile below. See
+        // MonsterLayers.
+        enemyLayers = MonsterLayers.IncludeGatePasser(enemyLayers);
+    }
+
     /// <summary>Attack radius in tiles — read by TowerRangeCircle to size its indicator.</summary>
     public float Range => range;
 

@@ -246,17 +246,52 @@ Two more things fixed in code, nothing to set up:
   touching. It now also checks a margin to each side of the line scaled to
   the monster's Body Scale, so it correctly falls back to its (already
   correct) planned route instead.
-- **Stuck recovery (new fields, Crowd Avoidance header): Stuck Check
+### The stuck-on-walls / stuck-on-each-other rework (automatic)
+
+The corner and crowd sticking that kept coming back is fixed by three changes
+that work together — all in code and the Monster prefab, nothing to set up,
+they arrive when you pull:
+
+- **Monsters now use a round collider instead of a square one.** A square
+  collider has corners that interlock — against a wall's corner, or against
+  another square monster at an angle — and once two corners catch, neither
+  body can slide free. A circle has no corners: it always meets a wall or
+  another monster on a smooth curved surface, so it slides past instead of
+  snagging. This is the single biggest part of the fix; the other two build
+  on it (a body that can't slide is one that no amount of steering frees).
+- **Omnidirectional crowd separation (new fields, Crowd Avoidance header:
+  Separation Radius `0.85`, Separation Strength `0.6`).** The old avoidance
+  only ever looked *straight ahead* — it was blind to a monster pressing in
+  from the side or behind, which is exactly how pile-ups form, so it could
+  never break them. Every monster now feels a gentle push away from *all* its
+  close neighbors at once, strongest from the closest, so a bunched-up knot
+  spreads itself apart from whatever direction it's densest. Separation
+  Strength is how firmly they shove off each other; turn it up if crowds still
+  bunch, down if they refuse to gang up on the same target.
+- **Stuck recovery now pushes along the route (fields unchanged: Stuck Check
   Interval `0.4`, Stuck Progress Threshold `0.15`, Stuck Escalation Delay
-  `0.8`.** Covers a failure mode none of the fixes above touch: two
-  monsters meeting at a tight pinch point (a corner, a doorway) can end up
-  nudging the same fixed direction forever and simply hold each other in
-  place, since ordinary avoidance never tries anything different no matter
-  how long it's failing. Each monster now actually measures whether it's
-  moving; if it genuinely hasn't for Stuck Escalation Delay, it flips which
-  side it nudges toward and leans harder into it, a little more with each
-  further escalation. Only ever changes behavior for a monster that's
-  measurably not moving — normal movement is unaffected.
+  `0.8`).** For the last-resort cases separation can't solve on its own — a
+  body wedged on a wall corner with no neighbor to push off, or two monsters
+  dead-locked in a one-wide doorway where their pushes cancel — each monster
+  measures whether it's actually moving, and if it genuinely hasn't for Stuck
+  Escalation Delay, it leans harder **along its own pathfinding route
+  direction** (the way the grid already knows leads out), with a little
+  side-to-side jitter to slip off whatever it's caught on, escalating a bit
+  more each check until it's free. This is your "push it the way the
+  pathfinding says to go" idea. Only ever changes behavior for a monster
+  that's measurably stuck — normal movement is untouched.
+
+### The Goblin (and any gate-passer) taking no damage — fixed (automatic)
+
+Making the Goblin pass through gates moved it onto the **GatePasser** layer
+(Step 4). The catch: the sword, tower targeting, and tower splash all filter
+for the **Enemy** layer, so anything on GatePasser silently fell through every
+one of them — the Goblin stopped taking sword damage, and would have been
+invisible to towers too. Rather than make you tick a second box on every one
+of those fields, the code now automatically folds GatePasser into any
+"enemy" layer filter, so gate-passers are hit by everything ordinary monsters
+are. Nothing to set up — but if you ever add a new script that filters for the
+Enemy layer, route it through `MonsterLayers.IncludeGatePasser` too.
 
 ## Step 6 — Playtest
 
@@ -296,6 +331,9 @@ draw a long line by clicking along it).
   corner: brief hesitation or a small side-to-side shuffle while several try
   to round it at once is fine and expected, but nobody should stay frozen
   there for more than about a second before working free.
+- **Goblin takes damage again:** send a Goblin at the player and swing at it —
+  it should lose health and die like any other monster. Do the same past an
+  Archer or Pike tower — the tower should target and hit it too.
 - **Wall Damage:** set it to something high on a test monster and confirm
   walls break noticeably faster than before, without changing how fast that
   monster fights a tower.
@@ -318,6 +356,8 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] Gate prefab: Layer = Gate, Is Gate checked, Is Trigger **unchecked**; Wall: Layer = Structure, neither checked
 - [ ] Both registered in Build Options (hotkeys 5 and 6)
 - [ ] Monsters route around walls instead of pressing into them
+- [ ] Monsters round a tight corner / a 1-wide corridor without staying frozen
+- [ ] Goblins take sword damage and are targeted by towers (not invisible on GatePasser)
 - [ ] Monsters never attack walls while any route exists
 - [ ] Fully sealing the King makes them break through the seal
 - [ ] Breaking a hole makes them immediately re-route through it

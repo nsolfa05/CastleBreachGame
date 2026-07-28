@@ -39,6 +39,11 @@ public class PlayerAttack : MonoBehaviour
     {
         if (swingVisual != null)
             swingVisual.enabled = false; // only visible during the swing flash
+
+        // A gate-passing monster (the Goblin) spawns onto the GatePasser layer,
+        // not Enemy — without this the sword's box would filter it out and it
+        // would take no damage. See MonsterLayers.
+        hitLayers = MonsterLayers.IncludeGatePasser(hitLayers);
     }
 
     private void Update()

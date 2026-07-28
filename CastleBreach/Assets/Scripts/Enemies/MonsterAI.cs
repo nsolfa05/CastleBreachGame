@@ -22,8 +22,8 @@ using UnityEngine;
 /// MOVEMENT: routes around player-built mazes via PathGrid (§6) — see
 /// ResolveNavigation and SteeringPoint. With nothing in the way the result is
 /// identical to the straight-line movement this used before, and crowding
-/// between monsters is still pure physics + SteerAroundNeighbors; routing only
-/// ever accounts for static obstacles, never for other monsters.
+/// between monsters is still pure physics + SeparationFromNeighbors; routing
+/// only ever accounts for static obstacles, never for other monsters.
 ///
 /// NOTE: the targeting RANGES below (attack range, the structure priority /
 /// interest / near-King ranges) still measure straight-line distance via
@@ -50,11 +50,11 @@ public class MonsterAI : MonoBehaviour
     [SerializeField] private SpriteRenderer body;
 
     [Header("Crowd avoidance (shared behavior, not per-monster-type data)")]
-    [Tooltip("How far ahead to check for another monster directly blocking the path, in tiles.")]
-    [SerializeField] private float avoidanceLookAhead = 0.6f;
+    [Tooltip("Monsters within this distance (tiles) push each other apart. A little more than one body-width, so neighbors start spreading before they physically wedge together, but small enough that a crowd still packs in around a target. Applied every physics step as an omnidirectional shove — so a neighbor pressing in from the side or behind counts too, not just one directly ahead.")]
+    [SerializeField] private float separationRadius = 0.85f;
 
-    [Tooltip("Width of the ahead-check — roughly your own body's radius.")]
-    [SerializeField] private float avoidanceProbeRadius = 0.3f;
+    [Tooltip("How hard the crowd-separation shove pushes, relative to a monster's own drive toward its target. Higher spreads a crowd more and frees pile-ups faster; too high and monsters can never close on the same target together. ~0.6 keeps them packing in while still sliding off each other instead of interlocking.")]
+    [SerializeField] private float separationStrength = 0.6f;
 
     [Tooltip("Actual physics velocity below this (units/sec) counts as \"stuck\" — used to detect a monster that's committed to attacking a structure but is physically blocked (e.g. trapped behind another monster) from ever reaching it.")]
     [SerializeField] private float stuckVelocityThreshold = 0.15f;
@@ -65,7 +65,7 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("Below this much movement (tiles) between checks counts as \"stuck\" this check.")]
     [SerializeField] private float stuckProgressThreshold = 0.15f;
 
-    [Tooltip("Seconds of continuous stuck checks before avoidance escalates — flips which side this monster nudges toward and leans harder into the nudge. Exists for the case ordinary avoidance can never resolve on its own: two monsters meeting at a pinch point with the same fixed nudge side just hold each other in place forever, since neither ever tries anything different. Escalating breaks that instead of leaving them frozen.")]
+    [Tooltip("Seconds of continuous stuck checks before recovery escalates — the monster starts pushing harder ALONG its known route direction (the pathfinding already knows the way out) with a little sideways jitter to slip off whatever it's caught on. Exists for the cases ordinary crowding can't resolve: a body wedged on a wall corner, or two monsters holding each other in a doorway. Escalating breaks that instead of leaving them frozen.")]
     [SerializeField] private float stuckEscalationDelay = 0.8f;
 
     [Header("Routing around walls (shared behavior, not per-monster-type data)")]
@@ -90,18 +90,22 @@ public class MonsterAI : MonoBehaviour
     private int livesRemaining;
     private bool bonePileActive;
     private Vector3 activeScale;
-    private float avoidSide; // -1 or +1, flips if this monster gets stuck long enough — see UpdateStuckRecovery
-    private float nudgeStrength = 1f; // grows while stuck so the sideways nudge leans harder into breaking free
+    private float avoidSide; // -1 or +1, flips on each stuck escalation to break a symmetric deadlock — see UpdateStuckRecovery
+    private float stuckPush; // 0 normally; grows while genuinely stuck to lean harder along the route direction
     private Vector2 stuckSamplePosition;
     private float nextStuckCheckTime;
     private float stuckSeconds;
+
+    // Reused across every monster so per-frame crowd queries allocate nothing.
+    private static readonly Collider2D[] NeighborBuffer = new Collider2D[16];
+    private ContactFilter2D crowdFilter;
 
     // Crowd-detection mask covers BOTH monster layers, not just this instance's
     // own one. A monster with Passes Through Gates gets moved onto the
     // GatePasser layer at spawn (see Start) so Gate's collider can tell it
     // apart from ordinary monsters — but that's purely a Gate-collision trick,
     // not a "these are different kinds of crowd" distinction, so
-    // SteerAroundNeighbors still needs to see every monster regardless of
+    // SeparationFromNeighbors still needs to see every monster regardless of
     // which of the two layers it landed on. Computed in Awake, not as a field
     // initializer — LayerMask.GetMask calls into Unity's layer system, which
     // isn't allowed to run before a MonoBehaviour's lifecycle actually starts.
@@ -137,6 +141,8 @@ public class MonsterAI : MonoBehaviour
         avoidSide = UnityEngine.Random.value < 0.5f ? -1f : 1f;
         stuckSamplePosition = transform.position;
         EnemyCrowdMask = LayerMask.GetMask("Enemy", "GatePasser");
+        crowdFilter = new ContactFilter2D { useLayerMask = true, useTriggers = false };
+        crowdFilter.SetLayerMask(EnemyCrowdMask);
     }
 
     /// <summary>
@@ -269,32 +275,52 @@ public class MonsterAI : MonoBehaviour
     private void MoveToward(Transform target, float speedScale = 1f)
     {
         UpdateStuckRecovery();
+
         Vector2 steeringPoint = SteeringPoint(target);
-        Vector2 desiredDirection = (steeringPoint - (Vector2)transform.position).normalized;
-        rb.linearVelocity = SteerAroundNeighbors(desiredDirection) * (definition.moveSpeed * speedScale);
+        Vector2 toSteering = steeringPoint - (Vector2)transform.position;
+        Vector2 seekDirection = toSteering.sqrMagnitude > 0.0001f ? toSteering.normalized : Vector2.zero;
+
+        // Drive toward the target/route, plus an omnidirectional shove away from
+        // every crowding neighbor. The shove is what actually breaks a pile-up:
+        // it pushes out of wherever the crowd is densest instead of only
+        // reacting to a single body straight ahead. See SeparationFromNeighbors.
+        Vector2 steer = seekDirection + SeparationFromNeighbors() * separationStrength;
+
+        // While genuinely stuck (UpdateStuckRecovery), lean harder along the
+        // known route direction — the pathfinding already knows the correct way
+        // out, so pushing that way is what frees a monster wedged on a wall
+        // corner. A little sideways jitter (avoidSide, flipped on each
+        // escalation) breaks the symmetry of two monsters holding each other in
+        // a doorway. Capped in UpdateStuckRecovery so it never fully overrides
+        // seeking — the monster keeps trying to reach its target, just harder.
+        if (stuckPush > 0f)
+        {
+            Vector2 sideways = new Vector2(-seekDirection.y, seekDirection.x) * avoidSide;
+            steer += seekDirection * stuckPush + sideways * (stuckPush * 0.5f);
+        }
+
+        steer = steer.sqrMagnitude > 0.0001f ? steer.normalized : seekDirection;
+        rb.linearVelocity = steer * (definition.moveSpeed * speedScale);
     }
 
     /// <summary>
-    /// Notices when this monster genuinely isn't getting anywhere and
-    /// escalates its own avoidance instead of repeating a nudge that's
-    /// already proven not to work.
+    /// Notices when this monster genuinely isn't getting anywhere and pushes it
+    /// along its own known route direction to break free, instead of waiting on
+    /// crowd separation that clearly isn't resolving the situation.
     ///
-    /// Ordinary crowd avoidance (SteerAroundNeighbors) is entirely local and
-    /// entirely deterministic: a monster always nudges the same fixed side
-    /// whenever something's ahead of it. That's fine almost all the time, but
-    /// it has one real failure mode — two monsters meeting at a tight pinch
-    /// point (a corner, a doorway) with the same fixed side can hold each
-    /// other in that exact spot forever, since neither one's decision ever
-    /// changes no matter how long it fails. This is what actually breaks that
-    /// deadlock: measured, not assumed — real position is sampled every
-    /// Stuck Check Interval, and only counts as stuck if it genuinely hasn't
-    /// moved. Once stuck for Stuck Escalation Delay, avoidSide flips (trying
-    /// the other side is often enough on its own) and the nudge leans harder
-    /// into whichever side it's currently trying, growing a little more with
-    /// each further escalation so a monster that's especially wedged keeps
-    /// trying progressively harder rather than repeating the same failed
-    /// nudge at the same strength indefinitely. Resets the moment real
-    /// progress is measured, so a monster moving normally is never affected.
+    /// Separation alone handles ordinary crowding, but two failure modes slip
+    /// past it: a body wedged on a convex wall corner (no neighbor to push off,
+    /// just geometry), and two monsters holding each other in a one-wide
+    /// doorway (their pushes cancel). This is what breaks both — measured, not
+    /// assumed: real position is sampled every Stuck Check Interval and only
+    /// counts as stuck if it genuinely hasn't moved. Once stuck for Stuck
+    /// Escalation Delay, stuckPush grows so MoveToward leans harder ALONG the
+    /// pathfinding direction (the objectively correct way out), and avoidSide
+    /// flips so the small sideways component tries the other way past whatever
+    /// it's caught on. Both escalate a little more each further check, capped so
+    /// the monster never stops actually trying to reach its target. Resets the
+    /// moment real progress is measured, so a monster moving normally is never
+    /// affected.
     /// </summary>
     private void UpdateStuckRecovery()
     {
@@ -307,7 +333,7 @@ public class MonsterAI : MonoBehaviour
         if (progressed >= stuckProgressThreshold)
         {
             stuckSeconds = 0f;
-            nudgeStrength = 1f;
+            stuckPush = 0f;
             return;
         }
 
@@ -315,8 +341,8 @@ public class MonsterAI : MonoBehaviour
         if (stuckSeconds < stuckEscalationDelay) return;
 
         stuckSeconds = 0f;
-        avoidSide = -avoidSide;
-        nudgeStrength = Mathf.Min(nudgeStrength + 0.5f, 3f); // capped so it still yields toward the target eventually, never purely sideways
+        avoidSide = -avoidSide;                          // try slipping past the other way next
+        stuckPush = Mathf.Min(stuckPush + 0.75f, 2.5f);  // capped so seeking the target is never fully overridden
     }
 
     /// <summary>
@@ -512,24 +538,40 @@ public class MonsterAI : MonoBehaviour
     }
 
     /// <summary>
-    /// If another monster is directly ahead within a short look-ahead
-    /// distance, blend in a sideways nudge so this monster curves around it
-    /// instead of walking straight into its back — the fix for monsters
-    /// forming a single-file line behind whoever reached the target first.
-    /// The side (left/right) is fixed per instance so it doesn't flicker.
+    /// Omnidirectional crowd separation: a shove away from every nearby monster,
+    /// weighted so closer ones push harder (linear falloff to zero at
+    /// separationRadius). Summed across all neighbors, so a monster surrounded
+    /// on several sides pushes out of the gap between them rather than into
+    /// anyone.
+    ///
+    /// This replaced a single forward CircleCast, whose one probe could only
+    /// ever see a neighbor directly in the desired direction — blind to anyone
+    /// pressing in from the side or behind, which is exactly the pile-up it was
+    /// meant to resolve, and why monsters kept wedging together no matter how
+    /// much the old sideways nudge escalated. Uses the non-allocating overlap
+    /// (shared NeighborBuffer) so a screen full of monsters churns no garbage.
     /// </summary>
-    private Vector2 SteerAroundNeighbors(Vector2 desiredDirection)
+    private Vector2 SeparationFromNeighbors()
     {
-        var hit = Physics2D.CircleCast(transform.position, avoidanceProbeRadius, desiredDirection,
-                                       avoidanceLookAhead, EnemyCrowdMask);
-        if (hit.collider == null || hit.collider.gameObject == gameObject)
-            return desiredDirection;
+        int count = Physics2D.OverlapCircle(transform.position, separationRadius, crowdFilter, NeighborBuffer);
+        Vector2 push = Vector2.zero;
+        for (int i = 0; i < count; i++)
+        {
+            var neighbor = NeighborBuffer[i];
+            if (neighbor == null || neighbor.gameObject == gameObject) continue;
 
-        // nudgeStrength (see UpdateStuckRecovery) leans further into the
-        // perpendicular the longer this monster has genuinely failed to make
-        // progress — 1 in the ordinary case, growing only while actually stuck.
-        Vector2 perpendicular = new Vector2(-desiredDirection.y, desiredDirection.x) * avoidSide * nudgeStrength;
-        return (desiredDirection + perpendicular).normalized;
+            Vector2 away = (Vector2)transform.position - (Vector2)neighbor.transform.position;
+            float distance = away.magnitude;
+            if (distance < 0.0001f)
+            {
+                // Spawned exactly on top of each other — shove out along this
+                // monster's stable side so they don't sit fused forever.
+                push += new Vector2(avoidSide, 0f);
+                continue;
+            }
+            push += away / distance * (1f - Mathf.Clamp01(distance / separationRadius));
+        }
+        return push;
     }
 
     /// <summary>
