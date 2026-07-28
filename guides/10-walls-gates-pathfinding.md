@@ -234,6 +234,18 @@ Two more things fixed in code, nothing to set up:
   of the two layers Step 4 put it on — a Passes-Through-Gates monster moving
   onto GatePasser was specifically to fool Gate's collider, not to split the
   crowd into two groups that ignore each other.
+- **The "clear line to target" shortcut now accounts for a monster's actual
+  body width, not just the bare center of the line.** This was the real
+  explanation for monsters still snagging right at corners after the fixes
+  above: on open ground, a monster skips its planned route and just walks
+  straight at its target for a more natural feel — but the check for whether
+  that line is actually clear only ever tested tile centers, so a monster
+  sitting right next to a corner could see a technically-clear line whose
+  edge its own body would still clip, conclude "clear, go straight" every
+  single frame, and keep walking straight back into the wall it was already
+  touching. It now also checks a margin to each side of the line scaled to
+  the monster's Body Scale, so it correctly falls back to its (already
+  correct) planned route instead.
 
 ## Step 6 — Playtest
 

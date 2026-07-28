@@ -391,12 +391,26 @@ public class PathGrid : MonoBehaviour
         float length = delta.magnitude;
         if (length < 0.001f) return true;
 
+        // Checked at three offsets across the line, not just its centerline —
+        // a monster has real width, so a line whose bare tile-centers are all
+        // open can still clip a wall corner the moment the monster's own body
+        // sweeps along it. Missing this let a monster sitting right next to a
+        // corner keep concluding "clear line, go straight" every frame and
+        // walking straight back into the wall it was already touching,
+        // instead of falling through to the actual planned route below, which
+        // already correctly routes around it.
+        Vector2 direction = delta / length;
+        Vector2 perpendicular = new Vector2(-direction.y, direction.x);
+        float clearance = Mathf.Max(0.1f, definition.bodyScale * 0.5f);
+
         const float stepSize = 0.4f;
         int steps = Mathf.CeilToInt(length / stepSize);
         for (int i = 1; i <= steps; i++)
         {
             Vector2 point = from + delta * (i / (float)steps);
             if (!IsWalkable(GridMath.WorldToTile(point), definition, goalRoot)) return false;
+            if (!IsWalkable(GridMath.WorldToTile(point + perpendicular * clearance), definition, goalRoot)) return false;
+            if (!IsWalkable(GridMath.WorldToTile(point - perpendicular * clearance), definition, goalRoot)) return false;
         }
         return true;
     }
