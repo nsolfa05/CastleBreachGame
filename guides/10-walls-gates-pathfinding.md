@@ -29,19 +29,6 @@ smashing whatever is sealing them in.
 > if you set Gate to Is Trigger from an earlier pull, undo that; Step 4 walks
 > through the replacement.
 
-> **Update — Steps 2 through 5 are now already done, committed, and pushed.**
-> It turned up that this whole feature (the `PathGrid` object, the Wall and
-> Gate prefabs, the `Gate`/`GatePasser` layers, the collision matrix
-> exceptions, the border wall's Composite Collider 2D, and the Build Options
-> entries) had been built locally at some point but never actually reached
-> GitHub — Steps 2–5 below are kept for reference (and for anyone starting
-> this repo fresh), but if you're reading this after that fix landed, **just
-> pull and skip straight to Step 6 (Playtest).** Don't redo Steps 2–5 by
-> hand — Unity will show you a `PathGrid` object, `Wall.prefab`/`Gate.prefab`,
-> and hotkeys 5/6 already in place; redoing them would just create
-> duplicates. If anything in the Playtest checklist doesn't match, that's
-> the actual signal something's still off — not a reason to rebuild by hand.
-
 ---
 
 ## Step 1 — Pull
