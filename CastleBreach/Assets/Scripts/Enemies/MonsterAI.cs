@@ -21,15 +21,23 @@ using UnityEngine;
 ///
 /// MOVEMENT: routes around player-built mazes via PathGrid (§6) — see
 /// ResolveNavigation and SteeringPoint. With nothing in the way the result is
-/// identical to the straight-line movement this used before. Crowding between
-/// monsters is handled by four local steering behaviors layered on top of the
-/// seek, never by routing (which only ever accounts for static obstacles):
-/// SeparationFromNeighbors (spread out of a pile-up), UpdateStuckRecovery
-/// (break a travelling monster free of a wall wedge or doorway deadlock),
-/// ShouldYieldToLeader (a monster jammed behind an ally at a 1-wide gap eases
-/// back so the leader funnels through first), and GiveWayVelocity (an arrived
-/// monster slides aside to let queued allies reach the same target). None of
-/// them ever make routing aware of other monsters.
+/// identical to the straight-line movement this used before.
+///
+/// WHERE a monster stands to attack is decided by an attack-slot reservation
+/// (AttackSlots / UpdateSlot): closing on a target, it claims a distinct
+/// walkable tile within range and heads there via ApproachPoint, so a crowd
+/// fans into a ring around the objective instead of all converging on one
+/// point — the real fix for front-rank monsters hogging the only reachable
+/// tile, especially at a target boxed into a tight alcove. HOW it gets there,
+/// and what the overflow does once every slot is taken, is handled by four
+/// local steering behaviors layered on top of the seek, never by routing
+/// (which only ever accounts for static obstacles): SeparationFromNeighbors
+/// (spread out of a pile-up), UpdateStuckRecovery (break a travelling monster
+/// free of a wall wedge or doorway deadlock), ShouldYieldToLeader (a monster
+/// jammed behind an ally at a 1-wide gap eases back so the leader funnels
+/// through first), and GiveWayVelocity (a slot-less arrived monster slides
+/// aside to let queued allies reach the same target). None of them ever make
+/// routing aware of other monsters.
 ///
 /// NOTE: the targeting RANGES below (attack range, the structure priority /
 /// interest / near-King ranges) still measure straight-line distance via
@@ -76,6 +84,13 @@ public class MonsterAI : MonoBehaviour
 
     [Tooltip("Seconds a monster keeps easing back once it decides to yield, before re-checking — long enough for the leader to take the gap, short enough to resume promptly. Stops it flickering between backing off and shoving forward every physics step.")]
     [SerializeField] private float yieldHoldSeconds = 0.3f;
+
+    [Header("Attack slots (shared behavior, not per-monster-type data)")]
+    [Tooltip("When on, a monster closing on its target claims a distinct standing spot (\"slot\") around it — one of the real walkable tiles within attack range — and heads there instead of everyone converging on the target's nearest surface. This is what actually spreads a crowd into a ring and stops the front rank hogging the only reachable tile, especially around a target boxed into a tight alcove where there's no room to shuffle sideways. The force behaviors above still handle the journey and any overflow once every slot is taken. Off = the old behavior (approach the target's surface directly).")]
+    [SerializeField] private bool useAttackSlots = true;
+
+    [Tooltip("How close (tiles, edge to edge) a monster must get to its target before it claims a slot. Kept short so it streams in normally from a distance and only fans out to a distinct spot for the final approach — which also means it grabs a slot on its own side of the target rather than one it'd have to cross to. Measured from attack range outward.")]
+    [SerializeField] private float slotClaimDistance = 4f;
 
     [Tooltip("Actual physics velocity below this (units/sec) counts as \"stuck\" — used to detect a monster that's committed to attacking a structure but is physically blocked (e.g. trapped behind another monster) from ever reaching it.")]
     [SerializeField] private float stuckVelocityThreshold = 0.15f;
@@ -127,6 +142,13 @@ public class MonsterAI : MonoBehaviour
     private float nextStuckCheckTime;
     private float stuckSeconds;
     private float yieldUntilTime; // while Time.time < this, keep easing back for a leader — see ShouldYieldToLeader
+
+    // Attack-slot reservation (see AttackSlots). While hasSlot, this monster
+    // steers at claimedSlot's center instead of the target's surface, and holds
+    // that tile against every other monster until it dies or retargets.
+    private bool hasSlot;
+    private Vector2Int claimedSlot;
+    private Transform slotTarget;
 
     // What this monster is currently heading for, and whether it's arrived
     // (in attack range). Read by OTHER monsters' give-way check — a settled
@@ -270,6 +292,7 @@ public class MonsterAI : MonoBehaviour
         {
             currentTarget = null;
             settledAtTarget = false;
+            ReleaseSlot();
             rb.linearVelocity = Vector2.zero;
             if (telegraph != null && telegraphPhase == TelegraphPhase.Winding) { telegraph.Cancel(); telegraphPhase = TelegraphPhase.Idle; }
             return;
@@ -282,6 +305,11 @@ public class MonsterAI : MonoBehaviour
         // an ordinary target with no special-casing of their own.
         target = ResolveNavigation(target);
         currentTarget = target; // published for other monsters' give-way check
+
+        // Reserve a distinct standing spot around the target so the crowd fans
+        // into a ring instead of everyone converging on one tile. Sets the
+        // approach point used by MoveToward below (via ApproachPoint).
+        UpdateSlot(target);
 
         if (definition.usesTelegraphedAreaAttack)
         {
@@ -386,7 +414,12 @@ public class MonsterAI : MonoBehaviour
         // while seekDirection keeps pressing it into the target so it never
         // leaves range. Only ever runs when settled, so it can't fight
         // stuck-recovery (which is disabled while settled). See GiveWayVelocity.
-        if (settledAtTarget && giveWayStrength > 0f)
+        // Skipped when this monster holds an attack slot: it's already in its
+        // assigned spot, so it shouldn't yield it — and letting it slide would
+        // just fight the slot-seek pulling it back, a pointless jitter. Give-way
+        // then only governs slot-less overflow monsters (or when slots are off),
+        // exactly the crowd it was built for.
+        if (settledAtTarget && giveWayStrength > 0f && !hasSlot)
             steer += GiveWayVelocity(target);
 
         steer = steer.sqrMagnitude > 0.0001f ? steer.normalized : seekDirection;
@@ -755,8 +788,67 @@ public class MonsterAI : MonoBehaviour
     /// </summary>
     private Vector2 ApproachPoint(Transform target)
     {
+        // Holding a slot for this exact target — steer at the slot's tile center
+        // instead of the target's surface, so monsters fan out to distinct spots
+        // around it rather than all piling onto the nearest point. (slotTarget
+        // guards against a stale slot from a previous target still in flight.)
+        if (hasSlot && slotTarget == target)
+            return GridMath.TileCenterWorld(claimedSlot);
+
         var targetCollider = target.GetComponentInParent<Collider2D>();
         return targetCollider != null ? targetCollider.ClosestPoint(transform.position) : (Vector2)target.position;
+    }
+
+    /// <summary>
+    /// Keeps this monster's attack-slot reservation current: claim one as it
+    /// closes on the target, hold it while attacking, drop it when the target
+    /// changes or the tile stops being valid (a wall built on it, say). Claiming
+    /// only within slotClaimDistance keeps the long approach unchanged and means
+    /// the slot grabbed is on this monster's own side of the target, not one it
+    /// would have to cross the target to reach. When every slot is taken this
+    /// simply holds no slot and approaches the surface as before, leaving the
+    /// force behaviors (separation / give-way / yield) to queue the overflow.
+    /// </summary>
+    private void UpdateSlot(Transform target)
+    {
+        var gm = GameManager.Instance;
+        bool eligible = useAttackSlots && PathGrid.Instance != null && target != null &&
+                        (gm == null || target != gm.Player) &&   // the player moves — slots are for fixed objectives
+                        target.GetComponentInParent<Collider2D>() != null;
+
+        if (!eligible) { ReleaseSlot(); return; }
+
+        if (slotTarget != target) ReleaseSlot(); // switched targets — give up the old slot
+
+        // Drop a slot that's no longer valid (wall placed on it, target changed
+        // shape); it'll be re-claimed below if still appropriate.
+        if (hasSlot && !AttackSlots.IsValidClaim(target, claimedSlot, definition, this))
+            ReleaseSlot();
+
+        // Stuck on the way to a claimed slot (e.g. it turned out to be awkward to
+        // reach) — let it go and try for a better one next.
+        if (hasSlot && !settledAtTarget && stuckPush > 0f)
+            ReleaseSlot();
+
+        if (!hasSlot && DistanceToTarget(target) <= definition.attackRange + slotClaimDistance)
+        {
+            var claimed = AttackSlots.ClaimNearestSlot(target, definition, transform.position, this);
+            if (claimed.HasValue)
+            {
+                claimedSlot = claimed.Value;
+                slotTarget = target;
+                hasSlot = true;
+            }
+        }
+    }
+
+    /// <summary>Give up any held slot so another monster can take it.</summary>
+    private void ReleaseSlot()
+    {
+        if (!hasSlot) return;
+        AttackSlots.Release(slotTarget, claimedSlot, this);
+        hasSlot = false;
+        slotTarget = null;
     }
 
     /// <summary>
@@ -1054,6 +1146,10 @@ public class MonsterAI : MonoBehaviour
 
     private void OnDied(Health _)
     {
+        // Free any slot immediately so a living monster can take it, whether
+        // this is a temporary bone-pile death or the final one.
+        ReleaseSlot();
+
         // Skeleton rule (§7.3): first death becomes an invulnerable bone pile
         // that revives — only the final death pays out and removes the monster.
         if (livesRemaining > 0)

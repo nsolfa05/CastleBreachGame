@@ -325,6 +325,48 @@ they arrive when you pull:
   politely trailing each other. Turn Yield Back Strength up if they're still
   wedging a gap, or Yield Probe Radius to `0` to switch it off.
 
+### Attack slots — monsters claim a spot around a target (automatic)
+
+The force behaviors above all react to crowding *after* it happens, and can
+only spread monsters into space that exists nearby. That's why a target boxed
+into a tight alcove still jammed no matter how they were tuned: there was
+simply nowhere to the side to shuffle into. Attack slots fix it from the other
+end. Each target (King, tower, or a wall being broken through) now offers a set
+of **slots** — the actual walkable tiles around it a monster could stand on and
+still land a hit — and each monster closing in claims one, walks to *it*, and
+holds it until it dies or switches targets. A crowd fans into a ring instead of
+piling onto one point, and when every slot is taken the extra monsters just
+queue (handled by the same force behaviors) instead of grinding against space
+that isn't there.
+
+Why this is the real fix and not another force tweak: the slots are generated
+from the *actual* map around the target, live. A wall built or broken next to
+the King regenerates them automatically (they're cached against the same
+version counter `PathGrid` already uses). So a target with one narrow opening
+correctly offers only the 2–3 slots that opening allows — the monsters that
+fit attack, the rest wait — which is exactly the behavior the alcove
+screenshots were missing.
+
+Nothing to set up — it's on by default, and the two knobs live on the Monster
+prefab under a new **Attack slots** header:
+- **Use Attack Slots** (`on`) — the master switch; untick to fall back to the
+  old "everyone approaches the target's surface" behavior.
+- **Slot Claim Distance** (`4`) — how close a monster gets before it claims a
+  slot and peels off to it. Short on purpose, so it streams in normally from
+  range and only fans out for the final approach.
+
+The design already generalizes to things that don't exist yet — a slot is any
+walkable tile within a monster's **Attack Range** with a clear line to the
+target, so a future ranged type would automatically get a wide outer ring of
+slots (and never generate ones that would mean shooting through a wall), while
+melee keeps its tight inner ring — but nothing extra was built for that; it
+falls out of the same function.
+
+**To watch it work:** select `PathGrid` in the Hierarchy and tick its new
+**Draw Attack Slots** debug box. During play you'll see each target's slots in
+the Scene view — green = free, red = claimed. This is the fastest way to
+confirm a boxed-in target really is offering fewer slots (rather than guessing).
+
 ### The Goblin (and any gate-passer) taking no damage — fixed (automatic)
 
 Making the Goblin pass through gates moved it onto the **GatePasser** layer
@@ -381,6 +423,15 @@ draw a long line by clicking along it).
   ones press in, until a small arc of them is attacking side by side — not a
   single zombie hogging the spot while the rest freeze behind it. A *lone*
   zombie attacking the King should just stand and attack, not fidget sideways.
+- **Attack slots — ring vs. clump (the alcove test):** wall the King into a
+  small pocket with one narrow opening, like the screenshots that started this,
+  and send a crowd. The monsters that fit should settle onto distinct tiles
+  around the opening and all attack; the rest should queue behind rather than
+  shoving into the pack. Tick **Draw Attack Slots** on `PathGrid` and watch in
+  the Scene view — you should see only as many slots (green/red squares) as the
+  opening physically allows, filling red as monsters claim them. Then widen the
+  opening and confirm more slots appear. In the open field, the King should get
+  a full ring of attackers instead of a blob on one face.
 - **Funnel through a 1-wide gap:** build a wall line with a single 1-tile gap
   and send a bunched group at it. They should sort into single file and pour
   through — the ones behind briefly easing back so whoever's in front commits

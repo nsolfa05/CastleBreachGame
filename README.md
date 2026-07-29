@@ -182,10 +182,21 @@ built so it stays untouched.
   route length, and the cheap way to give it that.
 - **Routing knows about static obstacles only — never other monsters.**
   `PathGrid`'s blocking layers are Structure and King, deliberately not Enemy.
-  Monsters crowding, bumping and pushing past each other is plain physics plus
-  `MonsterAI.SteerAroundNeighbors`, and it's the preferred feel — don't "fix"
-  it by teaching routing about monsters, and note this is also why the doc's
-  Tile Weight Rule (§7.1) remains unbuilt.
+  Everything about monster-vs-monster crowding lives in a separate layer on top
+  of routing and must stay there — don't "fix" crowding by teaching routing
+  about monsters. That layer is: physics collision, four local steering
+  behaviors in `MonsterAI` (separation, stuck-recovery, yield-to-leader,
+  give-way — see the class doc comment), and attack slots (below). This is also
+  why the doc's Tile Weight Rule (§7.1) remains unbuilt.
+- **Where a monster stands to attack = an attack slot, not the target's
+  surface.** `AttackSlots` (static, no scene object; reset from `PathGrid.Awake`)
+  hands each monster a distinct walkable tile within its Attack Range of the
+  target, generated live from the real map and cached against `PathGrid.Version`,
+  so a crowd rings the objective instead of piling on one point and a boxed-in
+  target correctly offers fewer slots. Slot sets key on `(attackRange,
+  passesThroughGates, fliesOverBarriers)`, so ranged/flying types slot in for
+  free later. `MonsterAI.UpdateSlot`/`ApproachPoint` are the integration points;
+  the force behaviors handle the journey and any overflow once slots are full.
 - **Player-built Walls/Gates carry a `Barrier` component**, and that is what
   separates "a wall to route around" from "a building worth attacking".
   Barriers are excluded from all discretionary structure targeting; they only

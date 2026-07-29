@@ -49,6 +49,9 @@ public class PathGrid : MonoBehaviour
     [Tooltip("Draw blocked tiles in the Scene view while this object is selected — red = permanent terrain, orange = breakable structure, blue = gate.")]
     [SerializeField] private bool drawBlockedTiles = false;
 
+    [Tooltip("Draw attack slots in the Scene view while this object is selected — green = free, red = claimed. Only slots that have actually been generated (a monster has approached that target) show up. Handy for confirming a boxed-in target really does offer fewer slots.")]
+    [SerializeField] private bool drawAttackSlots = false;
+
     /// <summary>What a search concluded about getting to the requested goal.</summary>
     public enum PathOutcome
     {
@@ -113,6 +116,13 @@ public class PathGrid : MonoBehaviour
         visitStamp = new int[GridMath.Columns, GridMath.Rows];
         distance = new int[GridMath.Columns, GridMath.Rows];
         parent = new Vector2Int[GridMath.Columns, GridMath.Rows];
+
+        // Attack-slot bookkeeping is static (survives scene reload), so wipe it
+        // when the grid is (re)created — i.e. on load and on the R-to-restart
+        // reload — otherwise slot claims made against last run's now-destroyed
+        // targets would linger. PathGrid is the natural owner of that reset:
+        // slots are meaningless without the grid, and both are rebuilt together.
+        AttackSlots.Reset();
     }
 
     private void OnDestroy()
@@ -233,6 +243,19 @@ public class PathGrid : MonoBehaviour
         if (cell.isBarrier && definition.fliesOverBarriers) return true;
 
         return false;
+    }
+
+    /// <summary>
+    /// Public walkability test for a monster type, ignoring any goal exception —
+    /// i.e. "could a monster of this type stand on this tile right now?" Used by
+    /// the attack-slot generator, which needs standable ground BESIDE a target,
+    /// never the target's own solid tile (passing no goalRoot means the target
+    /// counts as blocked, exactly as wanted). Reflects the last rescan.
+    /// </summary>
+    public bool IsStandable(Vector2Int tile, MonsterDefinition definition)
+    {
+        if (cells == null || definition == null) return false;
+        return IsWalkable(tile, definition, null);
     }
 
     /// <summary>Diagonal steps may not cut a corner between two blocked tiles.</summary>
@@ -417,20 +440,23 @@ public class PathGrid : MonoBehaviour
 
     private void OnDrawGizmosSelected()
     {
-        if (!drawBlockedTiles || cells == null) return;
-
-        for (int col = 0; col < GridMath.Columns; col++)
+        if (drawBlockedTiles && cells != null)
         {
-            for (int row = 0; row < GridMath.Rows; row++)
+            for (int col = 0; col < GridMath.Columns; col++)
             {
-                ref Cell cell = ref cells[col, row];
-                if (!cell.permanent && cell.blocker == null) continue;
+                for (int row = 0; row < GridMath.Rows; row++)
+                {
+                    ref Cell cell = ref cells[col, row];
+                    if (!cell.permanent && cell.blocker == null) continue;
 
-                Gizmos.color = cell.permanent ? new Color(1f, 0.2f, 0.2f, 0.35f)
-                             : cell.isGate ? new Color(0.3f, 0.6f, 1f, 0.45f)
-                             : new Color(1f, 0.65f, 0.15f, 0.45f);
-                Gizmos.DrawCube(GridMath.TileCenterWorld(new Vector2Int(col, row)), Vector3.one * 0.9f);
+                    Gizmos.color = cell.permanent ? new Color(1f, 0.2f, 0.2f, 0.35f)
+                                 : cell.isGate ? new Color(0.3f, 0.6f, 1f, 0.45f)
+                                 : new Color(1f, 0.65f, 0.15f, 0.45f);
+                    Gizmos.DrawCube(GridMath.TileCenterWorld(new Vector2Int(col, row)), Vector3.one * 0.9f);
+                }
             }
         }
+
+        if (drawAttackSlots) AttackSlots.DebugDraw();
     }
 }
