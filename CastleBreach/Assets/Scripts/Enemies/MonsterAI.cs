@@ -21,9 +21,13 @@ using UnityEngine;
 ///
 /// MOVEMENT: routes around player-built mazes via PathGrid (§6) — see
 /// ResolveNavigation and SteeringPoint. With nothing in the way the result is
-/// identical to the straight-line movement this used before, and crowding
-/// between monsters is still pure physics + SeparationFromNeighbors; routing
-/// only ever accounts for static obstacles, never for other monsters.
+/// identical to the straight-line movement this used before. Crowding between
+/// monsters is handled by three local steering behaviors layered on top of the
+/// seek, never by routing (which only ever accounts for static obstacles):
+/// SeparationFromNeighbors (spread out of a pile-up), UpdateStuckRecovery
+/// (break a travelling monster free of a wall wedge or doorway deadlock), and
+/// GiveWayVelocity (an arrived monster slides aside to let queued allies reach
+/// the same target). None of them ever make routing aware of other monsters.
 ///
 /// NOTE: the targeting RANGES below (attack range, the structure priority /
 /// interest / near-King ranges) still measure straight-line distance via
@@ -56,6 +60,12 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("How hard the crowd-separation shove pushes, relative to a monster's own drive toward its target. Higher spreads a crowd more and frees pile-ups faster; too high and monsters can never close on the same target together. ~0.6 keeps them packing in while still sliding off each other instead of interlocking.")]
     [SerializeField] private float separationStrength = 0.6f;
 
+    [Tooltip("How far (tiles) a monster already attacking its target looks for another monster queued up behind it — one heading for the SAME target but not yet in range. Seeing one makes it slide aside to let that one in (see Give Way Strength). A little over one body-length so it notices the next in line.")]
+    [SerializeField] private float giveWayRadius = 1.1f;
+
+    [Tooltip("How firmly a monster attacking its target slides sideways along the target's edge to open the spot for an ally queued directly behind it. It keeps pressing toward the target the whole time and only ever moves while still in attack range, so it never abandons its own target — it just shuffles over enough to let others reach the objective too. Higher makes room faster; too high reads as sidestepping instead of attacking. 0 = off.")]
+    [SerializeField] private float giveWayStrength = 0.6f;
+
     [Tooltip("Actual physics velocity below this (units/sec) counts as \"stuck\" — used to detect a monster that's committed to attacking a structure but is physically blocked (e.g. trapped behind another monster) from ever reaching it.")]
     [SerializeField] private float stuckVelocityThreshold = 0.15f;
 
@@ -65,7 +75,7 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("Below this much movement (tiles) between checks counts as \"stuck\" this check.")]
     [SerializeField] private float stuckProgressThreshold = 0.15f;
 
-    [Tooltip("Seconds of continuous stuck checks before recovery escalates — the monster's push shifts from mostly-forward toward mostly-sideways, sliding it off whatever it's caught on (a wall corner, another monster, or a target it's already flush against). Exists for the cases ordinary crowding can't resolve: a body wedged on a wall corner, two monsters holding each other in a doorway, or a monster planted against a target with nothing pushing it aside to let others in. Escalating breaks that instead of leaving them frozen.")]
+    [Tooltip("Seconds a monster still TRAVELLING to its target can make no progress before recovery escalates — its push shifts from mostly-forward toward mostly-sideways, sliding it off whatever it's caught on (a wall corner or another monster). Exists for the cases ordinary crowding can't resolve: a body wedged on a wall corner, or two monsters holding each other in a doorway. (A monster that has already ARRIVED and is just making room for allies is handled separately by Give Way Strength, not this.) Escalating breaks a wedge instead of leaving them frozen.")]
     [SerializeField] private float stuckEscalationDelay = 0.8f;
 
     [Header("Routing around walls (shared behavior, not per-monster-type data)")]
@@ -81,6 +91,16 @@ public class MonsterAI : MonoBehaviour
 
     public MonsterDefinition Definition => definition;
 
+    /// <summary>What this monster is currently moving toward (its objective —
+    /// the King, a tower, the player, or a wall it must break). Read by another
+    /// monster's give-way check to tell whether they share a target.</summary>
+    public Transform CurrentTarget => currentTarget;
+
+    /// <summary>True once this monster is within attack range of its target —
+    /// i.e. it has arrived and no longer needs to push forward. A monster
+    /// queued behind a settled one is what triggers that one to give way.</summary>
+    public bool IsSettledAtTarget => settledAtTarget;
+
     private enum TelegraphPhase { Idle, Winding, Cooldown }
 
     private Rigidbody2D rb;
@@ -95,6 +115,13 @@ public class MonsterAI : MonoBehaviour
     private Vector2 stuckSamplePosition;
     private float nextStuckCheckTime;
     private float stuckSeconds;
+
+    // What this monster is currently heading for, and whether it's arrived
+    // (in attack range). Read by OTHER monsters' give-way check — a settled
+    // monster only slides aside for an ally that shares its target and hasn't
+    // arrived yet. See GiveWayVelocity / IsSettledAtTarget.
+    private Transform currentTarget;
+    private bool settledAtTarget;
 
     // Reused across every monster so per-frame crowd queries allocate nothing.
     private static readonly Collider2D[] NeighborBuffer = new Collider2D[16];
@@ -229,6 +256,8 @@ public class MonsterAI : MonoBehaviour
 
         if (target == null)
         {
+            currentTarget = null;
+            settledAtTarget = false;
             rb.linearVelocity = Vector2.zero;
             if (telegraph != null && telegraphPhase == TelegraphPhase.Winding) { telegraph.Cancel(); telegraphPhase = TelegraphPhase.Idle; }
             return;
@@ -240,6 +269,7 @@ public class MonsterAI : MonoBehaviour
         // attack range, damage and the telegraph attack below all treat it as
         // an ordinary target with no special-casing of their own.
         target = ResolveNavigation(target);
+        currentTarget = target; // published for other monsters' give-way check
 
         if (definition.usesTelegraphedAreaAttack)
         {
@@ -274,7 +304,14 @@ public class MonsterAI : MonoBehaviour
 
     private void MoveToward(Transform target, float speedScale = 1f)
     {
-        UpdateStuckRecovery();
+        // "Settled" = arrived, in attack range of the target. It's the hinge
+        // between the two behaviors below: a settled monster hands itself to
+        // give-way (slide aside for allies) and is exempt from stuck-recovery
+        // (it's not stuck, it's home). An unsettled one is still travelling, so
+        // the reverse — stuck-recovery is armed, give-way is not.
+        settledAtTarget = target != null && DistanceBetween(transform, target) <= definition.attackRange;
+
+        UpdateStuckRecovery(settledAtTarget);
 
         Vector2 steeringPoint = SteeringPoint(target);
         Vector2 toSteering = steeringPoint - (Vector2)transform.position;
@@ -315,35 +352,112 @@ public class MonsterAI : MonoBehaviour
             steer = seekDirection + separation;
         }
 
+        // Give way: a monster already in range of its target slides along the
+        // target's edge to open the front spot for an ally queued behind it,
+        // while seekDirection keeps pressing it into the target so it never
+        // leaves range. Only ever runs when settled, so it can't fight
+        // stuck-recovery (which is disabled while settled). See GiveWayVelocity.
+        if (settledAtTarget && giveWayStrength > 0f)
+            steer += GiveWayVelocity(target);
+
         steer = steer.sqrMagnitude > 0.0001f ? steer.normalized : seekDirection;
         rb.linearVelocity = steer * (definition.moveSpeed * speedScale);
     }
 
     /// <summary>
-    /// Notices when this monster genuinely isn't getting anywhere and grows
-    /// stuckPush so MoveToward shifts its push from forward toward sideways,
-    /// instead of waiting on crowd separation that clearly isn't resolving
-    /// the situation.
+    /// A monster in attack range of its target slides sideways along the
+    /// target's edge to make room for an ally queued up directly behind it —
+    /// the fix for a front-rank monster hogging the only reachable tile while
+    /// allies pile up uselessly behind, unable to reach the same King / tower /
+    /// wall. Returns a tangential (perpendicular-to-target) push, so combined
+    /// with the inward seek in MoveToward the monster slides ALONG the target's
+    /// surface while staying pressed against it — it keeps attacking the whole
+    /// time and never gives up its own target to make room.
     ///
-    /// Separation alone handles ordinary crowding, but three failure modes
-    /// slip past it: a body wedged on a convex wall corner (no neighbor to
-    /// push off, just geometry), two monsters holding each other in a
-    /// one-wide doorway (their pushes cancel), and a monster planted flush
-    /// against a target it's already attacking with another queued directly
-    /// behind it — separation only pushes neighbors apart, it never tells the
-    /// front one to shuffle sideways and free the spot. This is what breaks
-    /// all three — measured, not assumed: real position is sampled every
-    /// Stuck Check Interval and only counts as stuck if it genuinely hasn't
-    /// moved. Once stuck for Stuck Escalation Delay, stuckPush grows and
-    /// avoidSide flips so the next attempt tries the other way past whatever
-    /// it's caught on. Both escalate a little more each further check, capped
-    /// so the monster never stops trying to reach its target entirely — see
-    /// MoveToward for how stuckPush actually reshapes the push. Resets the
-    /// moment real progress is measured, so a monster moving normally is
+    /// Triggered only when an actual ally is queued behind: another monster
+    /// sharing this one's target (CurrentTarget), not yet in range itself
+    /// (IsSettledAtTarget false), sitting on the far side of this monster from
+    /// the target (inside a cone directly behind it). No one behind → zero, so
+    /// a lone attacker never fidgets. Which way it slides is chosen toward the
+    /// less-crowded side, so a stack fans out into a balanced arc around the
+    /// target instead of everyone peeling the same way; ties break on the
+    /// per-instance avoidSide so a perfectly balanced pair doesn't jitter.
+    /// </summary>
+    private Vector2 GiveWayVelocity(Transform target)
+    {
+        Vector2 approach = ApproachPoint(target);
+        Vector2 radialOut = (Vector2)transform.position - approach;
+        if (radialOut.sqrMagnitude < 0.0001f) return Vector2.zero; // sitting on the surface point — no meaningful "behind"
+        radialOut.Normalize();
+        Vector2 tangent = new Vector2(-radialOut.y, radialOut.x);
+
+        int count = Physics2D.OverlapCircle(transform.position, giveWayRadius, crowdFilter, NeighborBuffer);
+        bool someoneBehind = false;
+        float tangentialCrowd = 0f;
+        for (int i = 0; i < count; i++)
+        {
+            var collider = NeighborBuffer[i];
+            if (collider == null || collider.gameObject == gameObject) continue;
+            var other = collider.GetComponentInParent<MonsterAI>();
+            if (other == null) continue;
+
+            Vector2 toOther = (Vector2)other.transform.position - (Vector2)transform.position;
+            tangentialCrowd += Vector2.Dot(toOther, tangent); // which side the crowd leans, for picking a slide direction
+
+            // Queued behind me = shares my target, hasn't arrived, and sits in
+            // the cone on the far side of me from the target (so it's genuinely
+            // blocked BY me rather than just standing nearby).
+            if (other.currentTarget == target && !other.settledAtTarget &&
+                toOther.sqrMagnitude > 0.0001f &&
+                Vector2.Dot(toOther.normalized, radialOut) > 0.5f)
+                someoneBehind = true;
+        }
+
+        if (!someoneBehind) return Vector2.zero;
+
+        float side = tangentialCrowd > 0.01f ? -1f : tangentialCrowd < -0.01f ? 1f : avoidSide;
+        return tangent * side * giveWayStrength;
+    }
+
+    /// <summary>
+    /// Notices when a monster STILL TRAVELLING to its target genuinely isn't
+    /// getting anywhere and grows stuckPush so MoveToward shifts its push from
+    /// forward toward sideways, instead of waiting on crowd separation that
+    /// clearly isn't resolving the situation.
+    ///
+    /// Separation alone handles ordinary crowding, but two failure modes slip
+    /// past it: a body wedged on a convex wall corner (no neighbor to push off,
+    /// just geometry), and two monsters holding each other in a one-wide
+    /// doorway (their pushes cancel). This breaks both — measured, not assumed:
+    /// real position is sampled every Stuck Check Interval and only counts as
+    /// stuck if it genuinely hasn't moved. Once stuck for Stuck Escalation
+    /// Delay, stuckPush grows and avoidSide flips so the next attempt tries the
+    /// other way past whatever it's caught on, escalating each further check,
+    /// capped so the monster never stops trying to reach its target — see
+    /// MoveToward for how stuckPush reshapes the push.
+    ///
+    /// A monster that has ARRIVED (settled — in attack range) is exempt: it
+    /// isn't stuck, it's home, so it resets rather than escalating. That both
+    /// stops a lone attacker from pointlessly fidgeting against its target and
+    /// hands the "someone's queued behind me" case cleanly to the give-way
+    /// system (GiveWayVelocity), which handles it more precisely — sliding only
+    /// when an ally actually needs the room and only while staying in range.
+    /// Resets the moment real progress is measured too, so normal movement is
     /// never affected.
     /// </summary>
-    private void UpdateStuckRecovery()
+    private void UpdateStuckRecovery(bool settled)
     {
+        if (settled)
+        {
+            // Arrived — not stuck. Clear state and re-baseline so leaving the
+            // target later doesn't instantly read as a stall.
+            stuckSeconds = 0f;
+            stuckPush = 0f;
+            stuckSamplePosition = transform.position;
+            nextStuckCheckTime = Time.time + stuckCheckInterval;
+            return;
+        }
+
         if (Time.time < nextStuckCheckTime) return;
         nextStuckCheckTime = Time.time + stuckCheckInterval;
 

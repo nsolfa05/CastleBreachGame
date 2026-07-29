@@ -290,6 +290,23 @@ they arrive when you pull:
   more each check until it's free. This is your "push it the way the
   pathfinding says to go" idea. Only ever changes behavior for a monster
   that's measurably stuck — normal movement is untouched.
+- **Give way — front-rank monsters slide aside to let allies in (new
+  fields, Crowd Avoidance header: Give Way Radius `1.1`, Give Way Strength
+  `0.6`).** The remaining case: a monster that has *arrived* and is attacking
+  the King (or a tower, or a wall) sits in the one reachable spot while allies
+  pile up uselessly behind it, unable to reach the same target. Now, whenever
+  a monster in attack range notices an ally queued directly behind it heading
+  for the *same* target, it slides sideways **along the target's edge** to open
+  the front spot — while still pressing into the target, so it keeps attacking
+  the whole time and never drifts out of range or loses its target. Repeated
+  down the line, a stack fans out into a balanced arc around the target
+  (chosen toward the emptier side) instead of a single-file queue. A lone
+  attacker with nobody behind it never moves. This replaced the old stop-gap
+  where an arrived monster relied on stuck-recovery to shuffle — that also
+  made *lone* attackers fidget pointlessly and could nudge them off-target;
+  give-way is the precise version: it only slides when an ally actually needs
+  the room, and only ever tangentially, never backward. Turn Give Way Strength
+  down if the shuffling reads as too eager, or to `0` to switch it off.
 
 ### The Goblin (and any gate-passer) taking no damage — fixed (automatic)
 
@@ -341,6 +358,12 @@ draw a long line by clicking along it).
   corner: brief hesitation or a small side-to-side shuffle while several try
   to round it at once is fine and expected, but nobody should stay frozen
   there for more than about a second before working free.
+- **Give way at a target:** send a clump of monsters (say 4–6 zombies) at the
+  King with only a narrow approach, so more arrive than can touch it at once.
+  The first to reach it should slide aside along the King's edge as the next
+  ones press in, until a small arc of them is attacking side by side — not a
+  single zombie hogging the spot while the rest freeze behind it. A *lone*
+  zombie attacking the King should just stand and attack, not fidget sideways.
 - **Goblin takes damage again:** send a Goblin at the player and swing at it —
   it should lose health and die like any other monster. Do the same past an
   Archer or Pike tower — the tower should target and hit it too.
