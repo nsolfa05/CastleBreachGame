@@ -252,13 +252,23 @@ The corner and crowd sticking that kept coming back is fixed by three changes
 that work together — all in code and the Monster prefab, nothing to set up,
 they arrive when you pull:
 
-- **Monsters now use a round collider instead of a square one.** A square
+- **Monsters now use a round collider instead of a square one, and the
+  placeholder body sprite was swapped to match (`Sprites/Circle.png`, the
+  same circle already used for the tower-range indicator).** A square
   collider has corners that interlock — against a wall's corner, or against
   another square monster at an angle — and once two corners catch, neither
   body can slide free. A circle has no corners: it always meets a wall or
   another monster on a smooth curved surface, so it slides past instead of
   snagging. This is the single biggest part of the fix; the other two build
   on it (a body that can't slide is one that no amount of steering frees).
+  Every monster type (Zombie, Skeleton, Goblin, Cyclops, …) is just the one
+  shared `Monster.prefab` recolored per `MonsterDefinition` — there's no
+  per-type prefab to redo, so this one swap already covers all of them. Once
+  you make real (non-placeholder) art per monster later, just make sure
+  whatever you draw actually reads as roughly circular/blob-shaped — a
+  sprite that visually looks square again but sits on a circular collider
+  would look a little odd (hitbox smaller than the art suggests) even though
+  it wouldn't break anything.
 - **Omnidirectional crowd separation (new fields, Crowd Avoidance header:
   Separation Radius `0.85`, Separation Strength `0.6`).** The old avoidance
   only ever looked *straight ahead* — it was blind to a monster pressing in
