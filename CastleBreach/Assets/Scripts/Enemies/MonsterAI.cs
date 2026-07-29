@@ -65,7 +65,7 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("Below this much movement (tiles) between checks counts as \"stuck\" this check.")]
     [SerializeField] private float stuckProgressThreshold = 0.15f;
 
-    [Tooltip("Seconds of continuous stuck checks before recovery escalates — the monster starts pushing harder ALONG its known route direction (the pathfinding already knows the way out) with a little sideways jitter to slip off whatever it's caught on. Exists for the cases ordinary crowding can't resolve: a body wedged on a wall corner, or two monsters holding each other in a doorway. Escalating breaks that instead of leaving them frozen.")]
+    [Tooltip("Seconds of continuous stuck checks before recovery escalates — the monster's push shifts from mostly-forward toward mostly-sideways, sliding it off whatever it's caught on (a wall corner, another monster, or a target it's already flush against). Exists for the cases ordinary crowding can't resolve: a body wedged on a wall corner, two monsters holding each other in a doorway, or a monster planted against a target with nothing pushing it aside to let others in. Escalating breaks that instead of leaving them frozen.")]
     [SerializeField] private float stuckEscalationDelay = 0.8f;
 
     [Header("Routing around walls (shared behavior, not per-monster-type data)")]
@@ -91,7 +91,7 @@ public class MonsterAI : MonoBehaviour
     private bool bonePileActive;
     private Vector3 activeScale;
     private float avoidSide; // -1 or +1, flips on each stuck escalation to break a symmetric deadlock — see UpdateStuckRecovery
-    private float stuckPush; // 0 normally; grows while genuinely stuck to lean harder along the route direction
+    private float stuckPush; // 0 normally; grows while genuinely stuck, shifting MoveToward's push from forward toward sideways
     private Vector2 stuckSamplePosition;
     private float nextStuckCheckTime;
     private float stuckSeconds;
@@ -280,23 +280,39 @@ public class MonsterAI : MonoBehaviour
         Vector2 toSteering = steeringPoint - (Vector2)transform.position;
         Vector2 seekDirection = toSteering.sqrMagnitude > 0.0001f ? toSteering.normalized : Vector2.zero;
 
-        // Drive toward the target/route, plus an omnidirectional shove away from
-        // every crowding neighbor. The shove is what actually breaks a pile-up:
-        // it pushes out of wherever the crowd is densest instead of only
-        // reacting to a single body straight ahead. See SeparationFromNeighbors.
-        Vector2 steer = seekDirection + SeparationFromNeighbors() * separationStrength;
+        // Omnidirectional shove away from every crowding neighbor — the shove
+        // is what actually breaks a pile-up, pushing out of wherever the crowd
+        // is densest instead of only reacting to a single body straight ahead.
+        // Kept as its own term so it still applies below regardless of whether
+        // this monster is currently stuck. See SeparationFromNeighbors.
+        Vector2 separation = SeparationFromNeighbors() * separationStrength;
 
-        // While genuinely stuck (UpdateStuckRecovery), lean harder along the
-        // known route direction — the pathfinding already knows the correct way
-        // out, so pushing that way is what frees a monster wedged on a wall
-        // corner. A little sideways jitter (avoidSide, flipped on each
-        // escalation) breaks the symmetry of two monsters holding each other in
-        // a doorway. Capped in UpdateStuckRecovery so it never fully overrides
-        // seeking — the monster keeps trying to reach its target, just harder.
+        Vector2 steer;
         if (stuckPush > 0f)
         {
+            // While genuinely stuck (UpdateStuckRecovery), shift the push from
+            // "forward" toward "sideways" as it escalates — forward is exactly
+            // the direction that's already proven blocked (a wall corner,
+            // another monster, or a target's own solid body), so continuing to
+            // lean into it wastes the push. A monster planted flush against a
+            // target (e.g. queued behind whoever's already attacking) has a
+            // seekDirection that points straight into that target every frame;
+            // without this shift the sideways component stayed a shallow ~20°
+            // lean even at full escalation, which a solid body can just
+            // absorb — never enough to actually slide the monster along the
+            // target's edge and free the spot for whoever's behind it.
+            // avoidSide (flipped on each escalation) breaks the symmetry of
+            // two monsters holding each other in a doorway. The forward
+            // component never drops to zero — a floor keeps a little seeking
+            // alive for the genuinely-diagonal case, where "forward" isn't
+            // fully blocked, just partially.
             Vector2 sideways = new Vector2(-seekDirection.y, seekDirection.x) * avoidSide;
-            steer += seekDirection * stuckPush + sideways * (stuckPush * 0.5f);
+            float forwardWeight = Mathf.Max(0.25f, 1f - stuckPush * 0.25f);
+            steer = seekDirection * forwardWeight + sideways * stuckPush + separation;
+        }
+        else
+        {
+            steer = seekDirection + separation;
         }
 
         steer = steer.sqrMagnitude > 0.0001f ? steer.normalized : seekDirection;
@@ -304,23 +320,27 @@ public class MonsterAI : MonoBehaviour
     }
 
     /// <summary>
-    /// Notices when this monster genuinely isn't getting anywhere and pushes it
-    /// along its own known route direction to break free, instead of waiting on
-    /// crowd separation that clearly isn't resolving the situation.
+    /// Notices when this monster genuinely isn't getting anywhere and grows
+    /// stuckPush so MoveToward shifts its push from forward toward sideways,
+    /// instead of waiting on crowd separation that clearly isn't resolving
+    /// the situation.
     ///
-    /// Separation alone handles ordinary crowding, but two failure modes slip
-    /// past it: a body wedged on a convex wall corner (no neighbor to push off,
-    /// just geometry), and two monsters holding each other in a one-wide
-    /// doorway (their pushes cancel). This is what breaks both — measured, not
-    /// assumed: real position is sampled every Stuck Check Interval and only
-    /// counts as stuck if it genuinely hasn't moved. Once stuck for Stuck
-    /// Escalation Delay, stuckPush grows so MoveToward leans harder ALONG the
-    /// pathfinding direction (the objectively correct way out), and avoidSide
-    /// flips so the small sideways component tries the other way past whatever
-    /// it's caught on. Both escalate a little more each further check, capped so
-    /// the monster never stops actually trying to reach its target. Resets the
-    /// moment real progress is measured, so a monster moving normally is never
-    /// affected.
+    /// Separation alone handles ordinary crowding, but three failure modes
+    /// slip past it: a body wedged on a convex wall corner (no neighbor to
+    /// push off, just geometry), two monsters holding each other in a
+    /// one-wide doorway (their pushes cancel), and a monster planted flush
+    /// against a target it's already attacking with another queued directly
+    /// behind it — separation only pushes neighbors apart, it never tells the
+    /// front one to shuffle sideways and free the spot. This is what breaks
+    /// all three — measured, not assumed: real position is sampled every
+    /// Stuck Check Interval and only counts as stuck if it genuinely hasn't
+    /// moved. Once stuck for Stuck Escalation Delay, stuckPush grows and
+    /// avoidSide flips so the next attempt tries the other way past whatever
+    /// it's caught on. Both escalate a little more each further check, capped
+    /// so the monster never stops trying to reach its target entirely — see
+    /// MoveToward for how stuckPush actually reshapes the push. Resets the
+    /// moment real progress is measured, so a monster moving normally is
+    /// never affected.
     /// </summary>
     private void UpdateStuckRecovery()
     {
@@ -341,8 +361,8 @@ public class MonsterAI : MonoBehaviour
         if (stuckSeconds < stuckEscalationDelay) return;
 
         stuckSeconds = 0f;
-        avoidSide = -avoidSide;                          // try slipping past the other way next
-        stuckPush = Mathf.Min(stuckPush + 0.75f, 2.5f);  // capped so seeking the target is never fully overridden
+        avoidSide = -avoidSide;                        // try slipping past the other way next
+        stuckPush = Mathf.Min(stuckPush + 1f, 3f);     // see MoveToward — capped so a little seeking always survives
     }
 
     /// <summary>
