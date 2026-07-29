@@ -21,6 +21,7 @@ MonoBehaviour:
   kingDamage: 3
   structureDamage: 2
   praiseTowerDamage: 5
+  wallDamage: 8
   attackInterval: 1
   attackRange: 0.4
   playerTargetRange: 0
@@ -36,6 +37,7 @@ MonoBehaviour:
   targetsOnlyKing: 1
   praiseTowerLureRange: 4
   passesThroughGates: 1
+  fliesOverBarriers: 0
   extraLives: 0
   reviveDelaySeconds: 6
   bonePileColor: {r: 0.9, g: 0.9, b: 0.85, a: 1}

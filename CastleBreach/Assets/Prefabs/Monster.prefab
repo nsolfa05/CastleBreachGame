@@ -251,6 +251,11 @@ MonoBehaviour:
   separationRadius: 0.85
   separationStrength: 0.6
   stuckVelocityThreshold: 0.15
+  stuckCheckInterval: 0.4
+  stuckProgressThreshold: 0.15
+  stuckEscalationDelay: 0.8
+  repathInterval: 0.5
+  waypointArrivalRadius: 0.25
 --- !u!58 &1382595666251222358
 CircleCollider2D:
   m_ObjectHideFlags: 0
