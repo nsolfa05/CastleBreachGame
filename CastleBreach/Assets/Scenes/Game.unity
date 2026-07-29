@@ -680,6 +680,14 @@ MonoBehaviour:
     prefab: {fileID: 429328228911935939, guid: 090cc049b6242ff4bb3e519572f2bdba, type: 3}
     cost: 200
     footprint: {x: 2, y: 2}
+  - displayName: Gate
+    prefab: {fileID: 95002641054790163, guid: 4bdab800e49489a4397fcb1ba524c78c, type: 3}
+    cost: 15
+    footprint: {x: 1, y: 1}
+  - displayName: Wall
+    prefab: {fileID: 95002641054790163, guid: c52e215a13befe04b98ca1db03657a15, type: 3}
+    cost: 5
+    footprint: {x: 1, y: 1}
   - displayName: Praise The King Tower
     prefab: {fileID: 5318507820628708666, guid: 32c1f71a7e7219b4ea9105c7b4dcef0f, type: 3}
     cost: 120
@@ -883,6 +891,8 @@ GameObject:
   - component: {fileID: 528603457}
   - component: {fileID: 528603456}
   - component: {fileID: 528603458}
+  - component: {fileID: 528603460}
+  - component: {fileID: 528603459}
   m_Layer: 0
   m_Name: Walls
   m_TagString: Untagged
@@ -3502,12 +3512,158 @@ TilemapCollider2D:
     m_Bits: 4294967295
   m_IsTrigger: 0
   m_UsedByEffector: 0
-  m_CompositeOperation: 0
+  m_CompositeOperation: 1
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
   m_MaximumTileChangeCount: 1000
   m_ExtrusionFactor: 0
   m_UseDelaunayMesh: 0
+--- !u!66 &528603459
+CompositeCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 528603454}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
+  m_GeometryType: 1
+  m_GenerationType: 0
+  m_EdgeRadius: 0
+  m_ColliderPaths:
+  - m_Collider: {fileID: 528603458}
+    m_ColliderPaths:
+    - - X: 400000000
+        Y: 300000000
+      - X: 0
+        Y: 300000000
+      - X: 0
+        Y: 0
+      - X: 400000000
+        Y: 0
+    - - X: 170000000
+        Y: 10000000
+      - X: 170000000
+        Y: 20000000
+      - X: 20000000
+        Y: 20000000
+      - X: 20000000
+        Y: 130000000
+      - X: 10000000
+        Y: 130000000
+      - X: 10000000
+        Y: 170000000
+      - X: 20000000
+        Y: 170000000
+      - X: 20000000
+        Y: 280000000
+      - X: 170000000
+        Y: 280000000
+      - X: 170000000
+        Y: 290000000
+      - X: 230000000
+        Y: 290000000
+      - X: 230000000
+        Y: 280000000
+      - X: 380000000
+        Y: 280000000
+      - X: 380000000
+        Y: 170000000
+      - X: 390000000
+        Y: 170000000
+      - X: 390000000
+        Y: 130000000
+      - X: 380000000
+        Y: 130000000
+      - X: 380000000
+        Y: 20000000
+      - X: 230000000
+        Y: 20000000
+      - X: 230000000
+        Y: 10000000
+  m_CompositePaths:
+    m_Paths:
+    - - {x: 39.999973, y: 0}
+      - {x: 39.999973, y: 30}
+      - {x: 0, y: 29.999971}
+      - {x: 0.000029300001, y: 0}
+    - - {x: 23, y: 1.0000294}
+      - {x: 17, y: 1.0000294}
+      - {x: 16.999971, y: 2}
+      - {x: 2, y: 2.0000293}
+      - {x: 1.9999708, y: 13}
+      - {x: 1, y: 13.00003}
+      - {x: 1.0000294, y: 17}
+      - {x: 2, y: 17.000029}
+      - {x: 2.0000293, y: 28}
+      - {x: 17, y: 28.000029}
+      - {x: 17.000029, y: 29}
+      - {x: 23, y: 28.999971}
+      - {x: 23.000029, y: 28}
+      - {x: 38, y: 27.999971}
+      - {x: 38.00003, y: 17}
+      - {x: 39, y: 16.999971}
+      - {x: 38.999973, y: 13}
+      - {x: 38, y: 12.99997}
+      - {x: 37.999973, y: 2}
+      - {x: 23, y: 1.9999708}
+  m_VertexDistance: 0.0005
+  m_OffsetDistance: 0.00005
+  m_UseDelaunayMesh: 0
+  m_CompositeGameObject: {fileID: 528603454}
+--- !u!50 &528603460
+Rigidbody2D:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 528603454}
+  m_BodyType: 2
+  m_Simulated: 1
+  m_UseFullKinematicContacts: 0
+  m_UseAutoMass: 0
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_GravityScale: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_Interpolate: 0
+  m_SleepingMode: 1
+  m_CollisionDetection: 0
+  m_Constraints: 0
 --- !u!1 &619394800
 GameObject:
   m_ObjectHideFlags: 0
@@ -16651,6 +16807,57 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
   m_BlendShapeWeights: []
+--- !u!1 &1538420090
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1538420092}
+  - component: {fileID: 1538420091}
+  m_Layer: 0
+  m_Name: PathGrid
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1538420091
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1538420090}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e051385907aedc74c9283b68279bdda6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PathGrid
+  wallTilemap: {fileID: 528603457}
+  blockingLayers:
+    serializedVersion: 2
+    m_Bits: 768
+  searchesPerFrame: 8
+  rescanInterval: 0.25
+  drawBlockedTiles: 1
+--- !u!4 &1538420092
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1538420090}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 20.31536, y: 13.21565, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1540292807
 GameObject:
   m_ObjectHideFlags: 0
@@ -17367,3 +17574,4 @@ SceneRoots:
   - {fileID: 1981807743}
   - {fileID: 631245342}
   - {fileID: 196378522}
+  - {fileID: 1538420092}
