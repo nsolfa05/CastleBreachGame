@@ -8,7 +8,7 @@ of any other project.
 
 | Path | What it is |
 |---|---|
-| `guides/` | Ordered, click-by-click beginner guides (00 → 09, plus 9.5 for playtesting-driven edits). **Start at `guides/00-unity-setup.md`.** |
+| `guides/` | Ordered, click-by-click beginner guides (00 → 09, plus 9.5 for playtesting-driven edits). **Start at `guides/00-unity-setup.md`.** Also see `guides/saving-and-committing.md` — a checklist to re-run every session, not a one-time guide. |
 | `unity-scripts/` | The vertical slice's C# code, staged for import. Guide 00 moves it into the Unity project (`CastleBreach/Assets/Scripts`), after which this folder is deleted — the code's permanent home is inside the project. |
 | `CastleBreach/` | The Unity project itself. Created on the designer's machine by Unity Hub in Guide 00 (Unity 6 LTS, Universal 2D template), then committed. `.gitignore` here already excludes `Library/`, `Temp/`, logs, and IDE files. |
 
@@ -168,21 +168,10 @@ built so it stays untouched.
   traced back to the design doc.
 - The design doc's roadmap after the slice is summarized at the end of
   `guides/05-archer-tower-and-build-mode.md`.
-- **Save the Unity project (File → Save Project) before committing —
-  not just Ctrl+S on whatever scene happens to be open.** Root-caused after
-  this bit us twice (the full monster roster, then Guide 09's tower
-  prefabs + `BuildModeController`'s Build Options list all appeared
-  "missing" from git for a while). Scene-level changes — a resized list on
-  a component living in `Game.unity`, like `BuildModeController` or
-  `WaveSpawner` — only get written to the `.unity` file on disk once the
-  scene is explicitly saved. Until then the Editor's Inspector looks
-  correct and Play Mode even works, since it's all live in memory, but the
-  file on disk (and therefore anything git can ever pick up) hasn't
-  changed at all — so a commit right after can look totally normal while
-  silently including none of it. **After finishing a guide step that
-  touches the scene, save the project first, then check GitHub Desktop's
-  Changes tab actually lists what you expect before committing** — new
-  files showing up there confirms the save actually took.
+- **Save the Unity project (File → Save Project) before committing — not
+  just Ctrl+S.** This has bitten us repeatedly (the full monster roster,
+  Guide 09's tower prefabs, and twice with Guide 10's walls/gates). Full
+  checklist to run every session: `guides/saving-and-committing.md`.
 - **Two separate senses of "distance", kept apart on purpose.**
   `MonsterAI.DistanceBetween(a, b)` is straight-line edge-to-edge and backs
   every targeting *range* (attack range, the structure priority / interest /
