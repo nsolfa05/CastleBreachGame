@@ -367,25 +367,28 @@ falls out of the same function.
 the Scene view — green = free, red = claimed. This is the fastest way to
 confirm a boxed-in target really is offering fewer slots (rather than guessing).
 
-### A slot in a doorway used to block it forever — fixed (automatic)
+### A slot in a doorway blocking everyone behind it — fixed (slot migration)
 
-Real bug, playtesting caught it: slots are generated purely from "is this tile
-walkable, in range, and in sight of the target" — with no idea whether a given
-tile also happens to be the *only* way through a narrow gap. The first monster
-to arrive could claim exactly that tile, and it would then hold the doorway
-forever: not stuck (it's successfully attacking), not unsettled (give-way only
-ever ran for a monster still travelling), and give-way itself was explicitly
-switched off for any monster holding a slot. Every ally behind it just froze.
+Real bug, playtesting caught it (and the Draw Attack Slots view made it
+obvious): slots are generated purely from "is this tile walkable, in range, and
+in sight of the target" — with no idea whether a given tile also happens to be
+the *only* way through a narrow gap. The first monster to arrive claims exactly
+that chokepoint tile and holds it, while everyone behind has claimed free slots
+on the far side they can't path to, because the blocker is in the doorway.
 
-Give-way now applies to slot-holders too. The moment it detects an ally
-genuinely blocked behind it (the same "someone's queued behind me" check as
-before), it releases its slot — freeing the tangential give-way slide to
-actually move it, instead of fighting the fixed slot-seek pulling it straight
-back to the doorway — and holds off reclaiming any slot for a short cooldown
-(**Give Way Slot Release Cooldown**, `0.6`s, new field under Attack Slots) so
-the tile has a real chance to go to whoever was waiting on it, rather than
-being immediately re-claimed by the same monster since it's still the nearest
-one to itself. Nothing to set up.
+The fix is a deterministic **slot migration**, which is exactly the behavior
+you described. When a settled monster detects an ally genuinely queued behind
+it (sharing its target, not yet arrived, directly behind it toward the target),
+it tries to **claim a different free slot and move there** — vacating its
+current tile so the blocked ally can take it — while still attacking the same
+target from its new spot. Crucially: **if there is no other free slot, it does
+nothing and stays put**, since the best it can do is keep attacking and there's
+nowhere better to go. It claims the new slot *before* releasing the old one, so
+it's never briefly slot-less, and a short **Slot Migrate Cooldown** (`0.6`s,
+new field under Attack Slots, replacing the old release-cooldown) stops it
+hopping around the ring every frame. Watch it with Draw Attack Slots on: the
+red (claimed) squares shuffle as blockers relocate and the ones behind fill in
+the freed tiles. Nothing to set up.
 
 ### Debug gizmos actually showing up now, plus a new targeting view (fixed)
 

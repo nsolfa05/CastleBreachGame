@@ -28,17 +28,19 @@ using UnityEngine;
 /// walkable tile within range and heads there via ApproachPoint, so a crowd
 /// fans into a ring around the objective instead of all converging on one
 /// point — the real fix for front-rank monsters hogging the only reachable
-/// tile, especially at a target boxed into a tight alcove. HOW it gets there,
-/// and what the overflow does once every slot is taken, is handled by four
-/// local steering behaviors layered on top of the seek, never by routing
-/// (which only ever accounts for static obstacles): SeparationFromNeighbors
-/// (spread out of a pile-up), UpdateStuckRecovery (break a travelling monster
-/// free of a wall wedge or doorway deadlock), ShouldYieldToLeader (a monster
-/// jammed behind an ally at a 1-wide gap eases back so the leader funnels
-/// through first), and GiveWayVelocity (an arrived monster slides aside to let
-/// a queued ally reach the same target — including one holding an attack
-/// slot, which UpdateSlot releases first specifically so this can move it;
-/// otherwise a slot generated right in a chokepoint would hold it forever).
+/// tile, especially at a target boxed into a tight alcove. A slot generated
+/// right in a chokepoint could still hold it forever, so a settled slot-holder
+/// that's blocking a queued ally MIGRATES to a different free slot
+/// (TryMigrateForBlockedAlly) — deterministically vacating its tile while
+/// still attacking — or stays put if no other slot exists. HOW a monster gets
+/// to its slot, and what slot-LESS overflow does once every slot is taken, is
+/// handled by four local steering behaviors layered on top of the seek, never
+/// by routing (which only ever accounts for static obstacles):
+/// SeparationFromNeighbors (spread out of a pile-up), UpdateStuckRecovery
+/// (break a travelling monster free of a wall wedge or doorway deadlock),
+/// ShouldYieldToLeader (a monster jammed behind an ally at a 1-wide gap eases
+/// back so the leader funnels through first), and GiveWayVelocity (a slot-less
+/// arrived monster slides aside to let a queued ally reach the same target).
 /// None of them ever make routing aware of other monsters.
 ///
 /// NOTE: the targeting RANGES below (attack range, the structure priority /
@@ -100,8 +102,8 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("How close (tiles, edge to edge) a monster must get to its target before it claims a slot. Kept short so it streams in normally from a distance and only fans out to a distinct spot for the final approach — which also means it grabs a slot on its own side of the target rather than one it'd have to cross to. Measured from attack range outward.")]
     [SerializeField] private float slotClaimDistance = 4f;
 
-    [Tooltip("After a slot-holder gives up its tile to let a blocked ally through (see Give Way Strength above — this is what makes that apply even to a monster already holding a slot, not just slot-less overflow), how long it waits before claiming ANY slot again. Without this it would very likely just re-claim the exact tile it just vacated, since it's still the nearest one to itself, undoing the whole point. Long enough to actually move away and let the ally take the freed spot; short enough to rejoin promptly.")]
-    [SerializeField] private float giveWaySlotReleaseCooldown = 0.6f;
+    [Tooltip("Minimum seconds between a settled monster migrating from one attack slot to another to clear the way for a blocked ally (see the alcove/doorway behavior). Prevents a monster from hopping around the ring every frame chasing 'make room'; long enough that each migration is a decisive move to a new spot, short enough that it still responds promptly the next time it's genuinely in someone's way.")]
+    [SerializeField] private float slotMigrateCooldown = 0.6f;
 
     [Tooltip("Actual physics velocity below this (units/sec) counts as \"stuck\" — used to detect a monster that's committed to attacking a structure but is physically blocked (e.g. trapped behind another monster) from ever reaching it.")]
     [SerializeField] private float stuckVelocityThreshold = 0.15f;
@@ -167,7 +169,7 @@ public class MonsterAI : MonoBehaviour
     private bool hasSlot;
     private Vector2Int claimedSlot;
     private Transform slotTarget;
-    private float nextSlotClaimAllowedTime; // cooldown after giving a slot up for a blocked ally — see UpdateSlot
+    private float nextSlotMigrateTime; // throttle on migrating slots to clear a blocked ally — see TryMigrateForBlockedAlly
 
     // What this monster is currently heading for, and whether it's arrived
     // (in attack range). Read by OTHER monsters' give-way check — a settled
@@ -441,12 +443,12 @@ public class MonsterAI : MonoBehaviour
         // while seekDirection keeps pressing it into the target so it never
         // leaves range. Only ever runs when settled, so it can't fight
         // stuck-recovery (which is disabled while settled). See GiveWayVelocity.
-        // Applies even to a monster holding an attack slot — UpdateSlot already
-        // released it a moment ago in exactly this situation (an ally genuinely
-        // queued behind), specifically so this can actually move it. Without
-        // that release this would otherwise fight the slot-seek pulling the
-        // monster straight back to the tile it's trying to leave.
-        if (settledAtTarget && giveWayStrength > 0f)
+        // Only for SLOT-LESS monsters (overflow, or slots switched off): a
+        // slot-holder makes room the deterministic way instead — it migrates to
+        // a different free slot in UpdateSlot (TryMigrateForBlockedAlly) — and
+        // force-sliding it here would just fight the slot-seek pulling it back
+        // to the tile it's meant to vacate.
+        if (settledAtTarget && giveWayStrength > 0f && !hasSlot)
             steer += GiveWayVelocity(target);
 
         steer = steer.sqrMagnitude > 0.0001f ? steer.normalized : seekDirection;
@@ -873,18 +875,13 @@ public class MonsterAI : MonoBehaviour
         if (hasSlot && !settledAtTarget && stuckPush > 0f)
             ReleaseSlot();
 
-        // An ally is genuinely blocked behind this slot — give it up so the
-        // tangential give-way slide below can actually move this monster clear,
-        // and hold off reclaiming for a bit so the freed tile has a real chance
-        // to go to whoever was waiting on it.
-        if (hasSlot && settledAtTarget && giveWayStrength > 0f && AllyQueuedBehind(target))
-        {
-            ReleaseSlot();
-            nextSlotClaimAllowedTime = Time.time + giveWaySlotReleaseCooldown;
-        }
+        // An ally is genuinely blocked behind this slot — try to migrate to a
+        // DIFFERENT free slot so this monster's current tile opens up for it.
+        // If none exists, stay put and keep attacking (see TryMigrateForBlockedAlly).
+        if (hasSlot && settledAtTarget && Time.time >= nextSlotMigrateTime && AllyQueuedBehind(target))
+            TryMigrateForBlockedAlly(target);
 
-        if (!hasSlot && Time.time >= nextSlotClaimAllowedTime &&
-            DistanceToTarget(target) <= definition.attackRange + slotClaimDistance)
+        if (!hasSlot && DistanceToTarget(target) <= definition.attackRange + slotClaimDistance)
         {
             var claimed = AttackSlots.ClaimNearestSlot(target, definition, transform.position, this);
             if (claimed.HasValue)
@@ -894,6 +891,29 @@ public class MonsterAI : MonoBehaviour
                 hasSlot = true;
             }
         }
+    }
+
+    /// <summary>
+    /// A settled monster whose slot is blocking a queued ally moves to a
+    /// DIFFERENT free slot — deterministically relocating rather than
+    /// force-sliding — so its current tile (often the one chokepoint into a
+    /// walled objective) opens up for the ally, while it goes on attacking the
+    /// same target from its new spot. If there is NO other free slot, it keeps
+    /// its current one and stays put: the best it can do is keep attacking, and
+    /// giving up the tile with nowhere to go would just abandon a hit for
+    /// nothing. Claiming the new slot before releasing the old guarantees the
+    /// monster is never briefly slot-less (which would drop it into the surface-
+    /// approach fallback for a frame); the migrate cooldown then stops it
+    /// hopping around the ring every time any ally is behind it.
+    /// </summary>
+    private void TryMigrateForBlockedAlly(Transform target)
+    {
+        var newSlot = AttackSlots.ClaimNearestSlot(target, definition, transform.position, this, excludeTile: claimedSlot);
+        if (!newSlot.HasValue) return; // no other free slot — stay put, keep attacking
+
+        AttackSlots.Release(target, claimedSlot, this); // free the tile that was in the ally's way
+        claimedSlot = newSlot.Value;                    // slotTarget unchanged; still holding a slot for the same target
+        nextSlotMigrateTime = Time.time + slotMigrateCooldown;
     }
 
     /// <summary>

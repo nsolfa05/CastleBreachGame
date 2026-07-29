@@ -93,7 +93,8 @@ public static class AttackSlots
     /// expected to release any slot it already holds before calling this.
     /// </summary>
     public static Vector2Int? ClaimNearestSlot(Transform target, MonsterDefinition definition,
-                                               Vector2 fromWorld, MonsterAI claimant)
+                                               Vector2 fromWorld, MonsterAI claimant,
+                                               Vector2Int? excludeTile = null)
     {
         if (target == null || definition == null) return null;
 
@@ -105,6 +106,11 @@ public static class AttackSlots
         bool found = false;
         foreach (var tile in candidates)
         {
+            // Skip the caller's current tile when it's migrating (see
+            // MonsterAI.TryMigrateForBlockedAlly) — it wants a DIFFERENT slot,
+            // and its own tile would otherwise always win as the nearest.
+            if (excludeTile.HasValue && tile == excludeTile.Value) continue;
+
             // A slot held by a still-living monster is taken; one whose holder
             // has been destroyed (== null) is free again — this self-heals any
             // claim a monster failed to release on death.
