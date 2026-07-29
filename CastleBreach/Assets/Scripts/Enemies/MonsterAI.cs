@@ -85,6 +85,12 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("Seconds a monster keeps easing back once it decides to yield, before re-checking — long enough for the leader to take the gap, short enough to resume promptly. Stops it flickering between backing off and shoving forward every physics step.")]
     [SerializeField] private float yieldHoldSeconds = 0.3f;
 
+    [Tooltip("Within this many tiles of wherever a monster is steering toward (its attack slot, or the target's surface), speed eases down instead of always driving at full moveSpeed. Fixes a real jitter: driving at full speed all the way to an exact point and only getting stopped by collision means tiny position noise right at contact flips direction every physics step, since it's re-normalized to full speed each time — visible as rapid back-and-forth shaking once a monster arrives. Only applies while calmly settling (not while genuinely stuck or yielding, which need full force to actually break free). 0 = off (old always-full-speed behavior).")]
+    [SerializeField] private float arrivalRadius = 0.3f;
+
+    [Tooltip("The floor speed (as a fraction of moveSpeed) arrival easing ramps down to, never all the way to 0. A small floor keeps a settled monster's other forces (give-way, separation) able to actually move it a meaningful amount even right at its spot — dropping all the way to a full stop would fight those.")]
+    [SerializeField, Range(0f, 1f)] private float arrivalMinSpeedFactor = 0.35f;
+
     [Header("Attack slots (shared behavior, not per-monster-type data)")]
     [Tooltip("When on, a monster closing on its target claims a distinct standing spot (\"slot\") around it — one of the real walkable tiles within attack range — and heads there instead of everyone converging on the target's nearest surface. This is what actually spreads a crowd into a ring and stops the front rank hogging the only reachable tile, especially around a target boxed into a tight alcove where there's no room to shuffle sideways. The force behaviors above still handle the journey and any overflow once every slot is taken. Off = the old behavior (approach the target's surface directly).")]
     [SerializeField] private bool useAttackSlots = true;
@@ -141,6 +147,13 @@ public class MonsterAI : MonoBehaviour
     private Vector2 stuckSamplePosition;
     private float nextStuckCheckTime;
     private float stuckSeconds;
+
+    // Debug-only (see PathGrid.DrawTargetingDebug / OnDrawGizmos below): when
+    // and where this monster's last successful hit landed, so the gizmo can
+    // flash it briefly instead of drawing a permanent marker.
+    private float lastHitTime = float.NegativeInfinity;
+    private Vector2 lastHitPosition;
+    private const float HitFlashDuration = 0.2f;
     private float yieldUntilTime; // while Time.time < this, keep easing back for a leader — see ShouldYieldToLeader
 
     // Attack-slot reservation (see AttackSlots). While hasSlot, this monster
@@ -365,6 +378,7 @@ public class MonsterAI : MonoBehaviour
         Vector2 separation = SeparationFromNeighbors() * separationStrength;
 
         float extraSpeedScale = 1f;
+        float arrivalSpeedFactor = 1f;
         Vector2 steer;
 
         if (!settledAtTarget && ShouldYieldToLeader(seekDirection, steeringPoint))
@@ -407,6 +421,13 @@ public class MonsterAI : MonoBehaviour
         else
         {
             steer = seekDirection + separation;
+
+            // Arrival easing — see the Arrival Radius tooltip for why this
+            // exists. Only in this calm-settling branch: a monster that's
+            // stuck or yielding needs full-strength force to actually break
+            // free, so damping there would undermine the fix, not help it.
+            if (arrivalRadius > 0f)
+                arrivalSpeedFactor = Mathf.Clamp(toSteering.magnitude / arrivalRadius, arrivalMinSpeedFactor, 1f);
         }
 
         // Give way: a monster already in range of its target slides along the
@@ -423,7 +444,7 @@ public class MonsterAI : MonoBehaviour
             steer += GiveWayVelocity(target);
 
         steer = steer.sqrMagnitude > 0.0001f ? steer.normalized : seekDirection;
-        rb.linearVelocity = steer * (definition.moveSpeed * speedScale * extraSpeedScale);
+        rb.linearVelocity = steer * (definition.moveSpeed * speedScale * extraSpeedScale * arrivalSpeedFactor);
     }
 
     /// <summary>
@@ -1101,7 +1122,11 @@ public class MonsterAI : MonoBehaviour
 
         var targetHealth = target.GetComponentInParent<Health>();
         if (targetHealth != null)
+        {
             targetHealth.TakeDamage(DamageForHealth(targetHealth, target, gm));
+            lastHitTime = Time.time;
+            lastHitPosition = ApproachPoint(target); // debug-only, for the hit flash gizmo
+        }
     }
 
     /// <summary>
@@ -1205,5 +1230,31 @@ public class MonsterAI : MonoBehaviour
     {
         foreach (var bar in GetComponentsInChildren<HealthBar>(true))
             bar.gameObject.SetActive(visible);
+    }
+
+    /// <summary>
+    /// Debug-only, behind PathGrid's Draw Targeting Debug toggle: a thin line
+    /// to whatever this monster is currently aiming at — yellow for the
+    /// player, cyan for anything else (King, tower, wall) — plus a brief red
+    /// flash right at the point of impact the instant a hit actually lands
+    /// (fading out over HitFlashDuration, not a permanent marker). Answers
+    /// "is this monster targeting/hitting the player or a structure" by eye,
+    /// without needing to click through the Inspector while it's playing.
+    /// </summary>
+    private void OnDrawGizmos()
+    {
+        var grid = PathGrid.Instance;
+        if (grid == null || !grid.DrawTargetingDebug || currentTarget == null) return;
+
+        var gm = GameManager.Instance;
+        bool targetingPlayer = gm != null && currentTarget == gm.Player;
+        Gizmos.color = targetingPlayer ? new Color(1f, 0.9f, 0.2f, 0.6f) : new Color(0.2f, 0.8f, 1f, 0.5f);
+        Gizmos.DrawLine(transform.position, ApproachPoint(currentTarget));
+
+        if (Time.time - lastHitTime < HitFlashDuration)
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawWireSphere(lastHitPosition, 0.25f);
+        }
     }
 }

@@ -367,6 +367,40 @@ falls out of the same function.
 the Scene view — green = free, red = claimed. This is the fastest way to
 confirm a boxed-in target really is offering fewer slots (rather than guessing).
 
+### Debug gizmos actually showing up now, plus a new targeting view (fixed)
+
+If **Draw Blocked Tiles** or **Draw Attack Slots** never seemed to draw
+anything, this was it: both used to only draw while `PathGrid` itself was
+selected in the Hierarchy, silently — nothing told you that was the
+requirement. They now draw unconditionally, so you'll see them any time the
+Scene view is open, no clicking required. Two things are still on you, since
+they're plain Editor state outside anything a script controls: you need to
+actually be in **Play Mode** (nothing is scanned yet in Edit Mode, so there's
+truly nothing to draw), and the **Scene view's own Gizmos toggle** needs to be
+on (top-right of the Scene view window — easy to have off without noticing).
+
+A third debug toggle joins the other two: **Draw Targeting Debug**. With it
+on, every monster draws a thin line to whatever it's currently aiming at —
+**yellow** to the player, **cyan** to anything else (King, tower, wall) — plus
+a brief **red flash** right at the point of impact the instant a hit actually
+lands. Useful for confirming at a glance who's actually fighting what, rather
+than guessing from HP bars ticking down.
+
+### Jitter once a monster arrives — fixed (automatic)
+
+If a monster looked like it was shaking rapidly in place right after reaching
+its spot: the movement code always drove at full speed straight at an exact
+point, with nothing slowing it down as it got close. Right at the point, tiny
+position noise from colliding with the target was enough to flip its direction
+every physics step — and since that direction was always re-applied at full
+speed, it showed up as a visible rapid back-and-forth shake instead of a clean
+stop. Movement now eases off gradually within **Arrival Radius** (`0.3`
+tiles) of wherever it's steering, down to a floor of **Arrival Min Speed
+Factor** (`0.35`× normal speed — never a full stop, so give-way/separation can
+still nudge it a meaningful amount right at its spot). Only applies while
+calmly settling in; a genuinely stuck or yielding monster still gets full
+force, since easing off there would undermine those fixes rather than help.
+
 ### The Goblin (and any gate-passer) taking no damage — fixed (automatic)
 
 Making the Goblin pass through gates moved it onto the **GatePasser** layer
@@ -472,6 +506,9 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] `Walls` Tilemap has Rigidbody 2D (Static) + Composite Collider 2D, and Tilemap Collider 2D → Composite Operation is set to Merge
 - [ ] Standing pressed against the castle's own border wall doesn't get you stuck either
 - [ ] DPS box shows a vs Wall/Gate line on monster definitions
+- [ ] Draw Blocked Tiles / Draw Attack Slots actually show up (Play Mode + Scene view Gizmos toggle on, no need to select `PathGrid` anymore)
+- [ ] Draw Targeting Debug shows lines to targets and a red flash on hits
+- [ ] A monster settling into its spot eases to a stop instead of shaking
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)
 
 ---

@@ -46,11 +46,17 @@ public class PathGrid : MonoBehaviour
     [SerializeField] private float rescanInterval = 0.25f;
 
     [Header("Debug")]
-    [Tooltip("Draw blocked tiles in the Scene view while this object is selected — red = permanent terrain, orange = breakable structure, blue = gate.")]
+    [Tooltip("Draw blocked tiles in the Scene view — red = permanent terrain, orange = breakable structure, blue = gate. Draws whenever the Scene view is open; PathGrid doesn't need to be selected. Needs Play Mode (nothing is scanned yet in Edit Mode) and the Scene view's own Gizmos toggle turned on (top-right of that window).")]
     [SerializeField] private bool drawBlockedTiles = false;
 
-    [Tooltip("Draw attack slots in the Scene view while this object is selected — green = free, red = claimed. Only slots that have actually been generated (a monster has approached that target) show up. Handy for confirming a boxed-in target really does offer fewer slots.")]
+    [Tooltip("Draw attack slots in the Scene view — green = free, red = claimed. Only slots that have actually been generated (a monster has approached that target) show up. Handy for confirming a boxed-in target really does offer fewer slots. Same requirements as Draw Blocked Tiles: Play Mode + the Scene view's Gizmos toggle on.")]
     [SerializeField] private bool drawAttackSlots = false;
+
+    [Tooltip("Draw a line from every monster to whatever it's currently targeting — yellow to the player, cyan to anything else (King, tower, wall) — with a brief red flash right where a hit actually lands. Same requirements as the other Debug toggles: Play Mode + the Scene view's Gizmos toggle on.")]
+    [SerializeField] private bool drawTargetingDebug = false;
+
+    /// <summary>Read by every MonsterAI's own gizmo draw — see Draw Targeting Debug above.</summary>
+    public bool DrawTargetingDebug => drawTargetingDebug;
 
     /// <summary>What a search concluded about getting to the requested goal.</summary>
     public enum PathOutcome
@@ -438,7 +444,11 @@ public class PathGrid : MonoBehaviour
         return true;
     }
 
-    private void OnDrawGizmosSelected()
+    // Unconditional (not OnDrawGizmosSelected) so none of these debug toggles
+    // silently require clicking the PathGrid object in the Hierarchy first —
+    // the single most likely reason a toggle "does nothing": it draws fine,
+    // just only while selected, with no indication that's the requirement.
+    private void OnDrawGizmos()
     {
         if (drawBlockedTiles && cells != null)
         {
