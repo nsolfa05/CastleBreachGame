@@ -35,9 +35,11 @@ using UnityEngine;
 /// (spread out of a pile-up), UpdateStuckRecovery (break a travelling monster
 /// free of a wall wedge or doorway deadlock), ShouldYieldToLeader (a monster
 /// jammed behind an ally at a 1-wide gap eases back so the leader funnels
-/// through first), and GiveWayVelocity (a slot-less arrived monster slides
-/// aside to let queued allies reach the same target). None of them ever make
-/// routing aware of other monsters.
+/// through first), and GiveWayVelocity (an arrived monster slides aside to let
+/// a queued ally reach the same target — including one holding an attack
+/// slot, which UpdateSlot releases first specifically so this can move it;
+/// otherwise a slot generated right in a chokepoint would hold it forever).
+/// None of them ever make routing aware of other monsters.
 ///
 /// NOTE: the targeting RANGES below (attack range, the structure priority /
 /// interest / near-King ranges) still measure straight-line distance via
@@ -97,6 +99,9 @@ public class MonsterAI : MonoBehaviour
 
     [Tooltip("How close (tiles, edge to edge) a monster must get to its target before it claims a slot. Kept short so it streams in normally from a distance and only fans out to a distinct spot for the final approach — which also means it grabs a slot on its own side of the target rather than one it'd have to cross to. Measured from attack range outward.")]
     [SerializeField] private float slotClaimDistance = 4f;
+
+    [Tooltip("After a slot-holder gives up its tile to let a blocked ally through (see Give Way Strength above — this is what makes that apply even to a monster already holding a slot, not just slot-less overflow), how long it waits before claiming ANY slot again. Without this it would very likely just re-claim the exact tile it just vacated, since it's still the nearest one to itself, undoing the whole point. Long enough to actually move away and let the ally take the freed spot; short enough to rejoin promptly.")]
+    [SerializeField] private float giveWaySlotReleaseCooldown = 0.6f;
 
     [Tooltip("Actual physics velocity below this (units/sec) counts as \"stuck\" — used to detect a monster that's committed to attacking a structure but is physically blocked (e.g. trapped behind another monster) from ever reaching it.")]
     [SerializeField] private float stuckVelocityThreshold = 0.15f;
@@ -162,6 +167,7 @@ public class MonsterAI : MonoBehaviour
     private bool hasSlot;
     private Vector2Int claimedSlot;
     private Transform slotTarget;
+    private float nextSlotClaimAllowedTime; // cooldown after giving a slot up for a blocked ally — see UpdateSlot
 
     // What this monster is currently heading for, and whether it's arrived
     // (in attack range). Read by OTHER monsters' give-way check — a settled
@@ -435,12 +441,12 @@ public class MonsterAI : MonoBehaviour
         // while seekDirection keeps pressing it into the target so it never
         // leaves range. Only ever runs when settled, so it can't fight
         // stuck-recovery (which is disabled while settled). See GiveWayVelocity.
-        // Skipped when this monster holds an attack slot: it's already in its
-        // assigned spot, so it shouldn't yield it — and letting it slide would
-        // just fight the slot-seek pulling it back, a pointless jitter. Give-way
-        // then only governs slot-less overflow monsters (or when slots are off),
-        // exactly the crowd it was built for.
-        if (settledAtTarget && giveWayStrength > 0f && !hasSlot)
+        // Applies even to a monster holding an attack slot — UpdateSlot already
+        // released it a moment ago in exactly this situation (an ally genuinely
+        // queued behind), specifically so this can actually move it. Without
+        // that release this would otherwise fight the slot-seek pulling the
+        // monster straight back to the tile it's trying to leave.
+        if (settledAtTarget && giveWayStrength > 0f)
             steer += GiveWayVelocity(target);
 
         steer = steer.sqrMagnitude > 0.0001f ? steer.normalized : seekDirection;
@@ -823,12 +829,28 @@ public class MonsterAI : MonoBehaviour
     /// <summary>
     /// Keeps this monster's attack-slot reservation current: claim one as it
     /// closes on the target, hold it while attacking, drop it when the target
-    /// changes or the tile stops being valid (a wall built on it, say). Claiming
+    /// changes, the tile stops being valid (a wall built on it, say), or — this
+    /// is the important one — an ally is genuinely blocked behind it. Claiming
     /// only within slotClaimDistance keeps the long approach unchanged and means
     /// the slot grabbed is on this monster's own side of the target, not one it
     /// would have to cross the target to reach. When every slot is taken this
     /// simply holds no slot and approaches the surface as before, leaving the
     /// force behaviors (separation / give-way / yield) to queue the overflow.
+    ///
+    /// The blocked-ally case is what stops a slot from turning into a permanent
+    /// roadblock: slots are generated from raw walkability + range + line of
+    /// sight (AttackSlots.Candidates), with no idea whether a given tile also
+    /// happens to be the only way through a narrow gap into the target. The
+    /// first monster to arrive can and does claim exactly that tile — and
+    /// without this, it would hold it forever, since it's neither stuck (it's
+    /// successfully attacking) nor unsettled (give-way requires settled). This
+    /// releases the slot the moment an ally is genuinely queued behind it (the
+    /// same detection GiveWayVelocity uses), which is also what lets give-way's
+    /// tangential slide actually work below in MoveToward — holding a fixed
+    /// slot tile while trying to slide off it would just fight the slot-seek
+    /// pulling it straight back. A short cooldown before reclaiming stops it
+    /// simply grabbing the same tile right back, since it would otherwise still
+    /// be the nearest free one to itself.
     /// </summary>
     private void UpdateSlot(Transform target)
     {
@@ -851,7 +873,18 @@ public class MonsterAI : MonoBehaviour
         if (hasSlot && !settledAtTarget && stuckPush > 0f)
             ReleaseSlot();
 
-        if (!hasSlot && DistanceToTarget(target) <= definition.attackRange + slotClaimDistance)
+        // An ally is genuinely blocked behind this slot — give it up so the
+        // tangential give-way slide below can actually move this monster clear,
+        // and hold off reclaiming for a bit so the freed tile has a real chance
+        // to go to whoever was waiting on it.
+        if (hasSlot && settledAtTarget && giveWayStrength > 0f && AllyQueuedBehind(target))
+        {
+            ReleaseSlot();
+            nextSlotClaimAllowedTime = Time.time + giveWaySlotReleaseCooldown;
+        }
+
+        if (!hasSlot && Time.time >= nextSlotClaimAllowedTime &&
+            DistanceToTarget(target) <= definition.attackRange + slotClaimDistance)
         {
             var claimed = AttackSlots.ClaimNearestSlot(target, definition, transform.position, this);
             if (claimed.HasValue)
@@ -861,6 +894,39 @@ public class MonsterAI : MonoBehaviour
                 hasSlot = true;
             }
         }
+    }
+
+    /// <summary>
+    /// True if an ally sharing this monster's target is genuinely queued
+    /// behind it — blocked from reaching the target by this monster's own
+    /// body, not just standing nearby. Same geometry GiveWayVelocity uses (a
+    /// cone on the far side of this monster from the target), kept as its own
+    /// small query here because UpdateSlot needs a plain yes/no to decide
+    /// whether to release a slot, before GiveWayVelocity runs later in
+    /// MoveToward and separately decides which way to actually slide.
+    /// </summary>
+    private bool AllyQueuedBehind(Transform target)
+    {
+        Vector2 approach = ApproachPoint(target);
+        Vector2 radialOut = (Vector2)transform.position - approach;
+        if (radialOut.sqrMagnitude < 0.0001f) return false;
+        radialOut.Normalize();
+
+        int count = Physics2D.OverlapCircle(transform.position, giveWayRadius, crowdFilter, NeighborBuffer);
+        for (int i = 0; i < count; i++)
+        {
+            var collider = NeighborBuffer[i];
+            if (collider == null || collider.gameObject == gameObject) continue;
+            var other = collider.GetComponentInParent<MonsterAI>();
+            if (other == null) continue;
+
+            Vector2 toOther = (Vector2)other.transform.position - (Vector2)transform.position;
+            if (toOther.sqrMagnitude < 0.0001f) continue;
+            if (other.currentTarget == target && !other.settledAtTarget &&
+                Vector2.Dot(toOther.normalized, radialOut) > 0.5f)
+                return true;
+        }
+        return false;
     }
 
     /// <summary>Give up any held slot so another monster can take it.</summary>

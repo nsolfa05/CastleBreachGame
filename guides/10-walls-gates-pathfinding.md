@@ -367,6 +367,26 @@ falls out of the same function.
 the Scene view — green = free, red = claimed. This is the fastest way to
 confirm a boxed-in target really is offering fewer slots (rather than guessing).
 
+### A slot in a doorway used to block it forever — fixed (automatic)
+
+Real bug, playtesting caught it: slots are generated purely from "is this tile
+walkable, in range, and in sight of the target" — with no idea whether a given
+tile also happens to be the *only* way through a narrow gap. The first monster
+to arrive could claim exactly that tile, and it would then hold the doorway
+forever: not stuck (it's successfully attacking), not unsettled (give-way only
+ever ran for a monster still travelling), and give-way itself was explicitly
+switched off for any monster holding a slot. Every ally behind it just froze.
+
+Give-way now applies to slot-holders too. The moment it detects an ally
+genuinely blocked behind it (the same "someone's queued behind me" check as
+before), it releases its slot — freeing the tangential give-way slide to
+actually move it, instead of fighting the fixed slot-seek pulling it straight
+back to the doorway — and holds off reclaiming any slot for a short cooldown
+(**Give Way Slot Release Cooldown**, `0.6`s, new field under Attack Slots) so
+the tile has a real chance to go to whoever was waiting on it, rather than
+being immediately re-claimed by the same monster since it's still the nearest
+one to itself. Nothing to set up.
+
 ### Debug gizmos actually showing up now, plus a new targeting view (fixed)
 
 If **Draw Blocked Tiles** or **Draw Attack Slots** never seemed to draw
@@ -509,6 +529,7 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] Draw Blocked Tiles / Draw Attack Slots actually show up (Play Mode + Scene view Gizmos toggle on, no need to select `PathGrid` anymore)
 - [ ] Draw Targeting Debug shows lines to targets and a red flash on hits
 - [ ] A monster settling into its spot eases to a stop instead of shaking
+- [ ] A monster holding the only slot in a narrow opening steps aside for a blocked ally instead of permanently holding the doorway
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)
 
 ---
