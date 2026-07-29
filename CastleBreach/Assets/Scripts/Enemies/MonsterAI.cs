@@ -22,12 +22,14 @@ using UnityEngine;
 /// MOVEMENT: routes around player-built mazes via PathGrid (§6) — see
 /// ResolveNavigation and SteeringPoint. With nothing in the way the result is
 /// identical to the straight-line movement this used before. Crowding between
-/// monsters is handled by three local steering behaviors layered on top of the
+/// monsters is handled by four local steering behaviors layered on top of the
 /// seek, never by routing (which only ever accounts for static obstacles):
 /// SeparationFromNeighbors (spread out of a pile-up), UpdateStuckRecovery
-/// (break a travelling monster free of a wall wedge or doorway deadlock), and
-/// GiveWayVelocity (an arrived monster slides aside to let queued allies reach
-/// the same target). None of them ever make routing aware of other monsters.
+/// (break a travelling monster free of a wall wedge or doorway deadlock),
+/// ShouldYieldToLeader (a monster jammed behind an ally at a 1-wide gap eases
+/// back so the leader funnels through first), and GiveWayVelocity (an arrived
+/// monster slides aside to let queued allies reach the same target). None of
+/// them ever make routing aware of other monsters.
 ///
 /// NOTE: the targeting RANGES below (attack range, the structure priority /
 /// interest / near-King ranges) still measure straight-line distance via
@@ -65,6 +67,15 @@ public class MonsterAI : MonoBehaviour
 
     [Tooltip("How firmly a monster attacking its target slides sideways along the target's edge to open the spot for an ally queued directly behind it. It keeps pressing toward the target the whole time and only ever moves while still in attack range, so it never abandons its own target — it just shuffles over enough to let others reach the objective too. Higher makes room faster; too high reads as sidestepping instead of attacking. 0 = off.")]
     [SerializeField] private float giveWayStrength = 0.6f;
+
+    [Tooltip("When a monster travelling to its target gets physically jammed directly behind an ally that's ahead of it and closer to the goal — the classic two-abreast pile-up at the mouth of a 1-wide gap, where there's no room to slide aside — the one behind briefly eases BACK to let the leader funnel through first, then follows. This is how far ahead (tiles) it looks for that leader. 0 = off (no yielding).")]
+    [SerializeField] private float yieldProbeRadius = 0.9f;
+
+    [Tooltip("How hard a yielding monster pushes back to clear the opening for the leader ahead of it. Modest on purpose — it's making room, not fleeing.")]
+    [SerializeField] private float yieldBackStrength = 0.7f;
+
+    [Tooltip("Seconds a monster keeps easing back once it decides to yield, before re-checking — long enough for the leader to take the gap, short enough to resume promptly. Stops it flickering between backing off and shoving forward every physics step.")]
+    [SerializeField] private float yieldHoldSeconds = 0.3f;
 
     [Tooltip("Actual physics velocity below this (units/sec) counts as \"stuck\" — used to detect a monster that's committed to attacking a structure but is physically blocked (e.g. trapped behind another monster) from ever reaching it.")]
     [SerializeField] private float stuckVelocityThreshold = 0.15f;
@@ -115,6 +126,7 @@ public class MonsterAI : MonoBehaviour
     private Vector2 stuckSamplePosition;
     private float nextStuckCheckTime;
     private float stuckSeconds;
+    private float yieldUntilTime; // while Time.time < this, keep easing back for a leader — see ShouldYieldToLeader
 
     // What this monster is currently heading for, and whether it's arrived
     // (in attack range). Read by OTHER monsters' give-way check — a settled
@@ -324,8 +336,25 @@ public class MonsterAI : MonoBehaviour
         // this monster is currently stuck. See SeparationFromNeighbors.
         Vector2 separation = SeparationFromNeighbors() * separationStrength;
 
+        float extraSpeedScale = 1f;
         Vector2 steer;
-        if (stuckPush > 0f)
+
+        if (!settledAtTarget && ShouldYieldToLeader(seekDirection, steeringPoint))
+        {
+            // Jammed directly behind an ally that's ahead of me and closer to
+            // where we're both going — the two-abreast pile-up at the mouth of
+            // a 1-wide gap. Ease BACK (not sideways — a one-wide gap has no
+            // room sideways, only walls) so the leader funnels through first;
+            // I follow once it's clear. Self-yield, not the leader shoving me:
+            // each monster stays the sole author of its own velocity, which
+            // physics resolves far more predictably than one body flinging
+            // another. Takes priority over the stuck sideways-push below,
+            // because when the blocker is a passable ally the answer is
+            // ordering (single-file), not grinding sideways into a wall.
+            steer = separation - seekDirection * yieldBackStrength;
+            extraSpeedScale = 0.6f; // ease back gently — making room, not fleeing
+        }
+        else if (stuckPush > 0f)
         {
             // While genuinely stuck (UpdateStuckRecovery), shift the push from
             // "forward" toward "sideways" as it escalates — forward is exactly
@@ -361,7 +390,66 @@ public class MonsterAI : MonoBehaviour
             steer += GiveWayVelocity(target);
 
         steer = steer.sqrMagnitude > 0.0001f ? steer.normalized : seekDirection;
-        rb.linearVelocity = steer * (definition.moveSpeed * speedScale);
+        rb.linearVelocity = steer * (definition.moveSpeed * speedScale * extraSpeedScale);
+    }
+
+    /// <summary>
+    /// True when this monster should ease back to let an ally funnel in ahead
+    /// of it — the pile-up at the mouth of a 1-wide gap, where sliding aside
+    /// (separation / stuck-recovery) can't help because the only sideways room
+    /// is wall. Fires when an ally is both in my forward cone (roughly ahead of
+    /// me toward the goal) AND closer to that goal than I am: that ally is the
+    /// leader, I'm the follower, so I yield. The leader — closer to the goal,
+    /// with no one ahead-and-closer of its own — never yields, so a clump
+    /// resolves itself into single file without any monster reaching in to move
+    /// another. (Two monsters pinned exactly side by side, neither in the
+    /// other's forward cone, is left to separation to perturb apart.)
+    ///
+    /// Only ever fires while PHYSICALLY jammed right now (near-zero velocity
+    /// from last step) — so in the open, monsters still pack together as a
+    /// crowd instead of politely trailing each other. Once triggered it holds
+    /// for yieldHoldSeconds, a decisive step back rather than a per-frame
+    /// flicker between backing off and shoving forward; by the time it
+    /// re-checks, the leader has usually taken the gap and this monster simply
+    /// advances (no longer jammed → no longer yields).
+    /// </summary>
+    private bool ShouldYieldToLeader(Vector2 seekDirection, Vector2 steeringPoint)
+    {
+        if (yieldProbeRadius <= 0f || seekDirection.sqrMagnitude < 0.0001f) return false;
+
+        // Still committed to a yield decided within the last yieldHoldSeconds.
+        if (Time.time < yieldUntilTime) return true;
+
+        // Only consider yielding when actually blocked. rb.linearVelocity is
+        // last physics step's post-collision result, so near-zero means
+        // something physically stopped this monster despite it trying to move.
+        if (rb.linearVelocity.sqrMagnitude >= stuckVelocityThreshold * stuckVelocityThreshold) return false;
+
+        float myGoalDistSqr = ((Vector2)transform.position - steeringPoint).sqrMagnitude;
+        int count = Physics2D.OverlapCircle(transform.position, yieldProbeRadius, crowdFilter, NeighborBuffer);
+        for (int i = 0; i < count; i++)
+        {
+            var collider = NeighborBuffer[i];
+            if (collider == null || collider.gameObject == gameObject) continue;
+            var other = collider.GetComponentInParent<MonsterAI>();
+            if (other == null) continue;
+
+            Vector2 toOther = (Vector2)other.transform.position - (Vector2)transform.position;
+            if (toOther.sqrMagnitude < 0.0001f) continue;
+            if (Vector2.Dot(toOther.normalized, seekDirection) < 0.5f) continue; // not ahead of me toward the goal
+
+            // Ahead of me AND closer to where I'm heading = the leader for this
+            // pinch; I'm the follower, so I yield. Strict "<" means two exactly
+            // equidistant monsters both hold (separation breaks the tie), never
+            // a mutual back-off.
+            float otherGoalDistSqr = ((Vector2)other.transform.position - steeringPoint).sqrMagnitude;
+            if (otherGoalDistSqr < myGoalDistSqr)
+            {
+                yieldUntilTime = Time.time + yieldHoldSeconds;
+                return true;
+            }
+        }
+        return false;
     }
 
     /// <summary>

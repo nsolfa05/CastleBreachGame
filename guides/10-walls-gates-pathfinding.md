@@ -307,6 +307,23 @@ they arrive when you pull:
   give-way is the precise version: it only slides when an ally actually needs
   the room, and only ever tangentially, never backward. Turn Give Way Strength
   down if the shuffling reads as too eager, or to `0` to switch it off.
+- **Yield at a 1-wide gap — the one behind eases back so the one in front
+  funnels through (new fields, Crowd Avoidance header: Yield Probe Radius
+  `0.9`, Yield Back Strength `0.7`, Yield Hold Seconds `0.3`).** Give-way and
+  the sideways stuck-push both assume there's *room to the side* to spread
+  into — which there isn't at the mouth of a single-tile gap, where the only
+  sideways direction is wall. So two monsters trying to squeeze through the
+  same gap at once used to just wedge it. Now, when a *travelling* monster is
+  physically jammed directly behind an ally that's ahead of it and closer to
+  the goal, the one behind briefly **eases backward** (not sideways) to open
+  the mouth, lets the leader funnel in, then follows — a clump sorts itself
+  into single file. It's a *self*-yield rather than the front monster shoving
+  the back one: each monster only ever drives its own movement, which physics
+  resolves far more cleanly than one body flinging another (and it looks the
+  same — the one behind backs off). Only ever triggers while genuinely stuck
+  at that instant, so in the open, monsters still pack into a crowd instead of
+  politely trailing each other. Turn Yield Back Strength up if they're still
+  wedging a gap, or Yield Probe Radius to `0` to switch it off.
 
 ### The Goblin (and any gate-passer) taking no damage — fixed (automatic)
 
@@ -364,6 +381,11 @@ draw a long line by clicking along it).
   ones press in, until a small arc of them is attacking side by side — not a
   single zombie hogging the spot while the rest freeze behind it. A *lone*
   zombie attacking the King should just stand and attack, not fidget sideways.
+- **Funnel through a 1-wide gap:** build a wall line with a single 1-tile gap
+  and send a bunched group at it. They should sort into single file and pour
+  through — the ones behind briefly easing back so whoever's in front commits
+  to the gap — rather than two wedging the opening and freezing. Watch that
+  nobody sits stuck at the mouth for more than about a second.
 - **Goblin takes damage again:** send a Goblin at the player and swing at it —
   it should lose health and die like any other monster. Do the same past an
   Archer or Pike tower — the tower should target and hit it too.
