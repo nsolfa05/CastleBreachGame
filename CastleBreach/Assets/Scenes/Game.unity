@@ -16839,7 +16839,7 @@ MonoBehaviour:
   wallTilemap: {fileID: 528603457}
   blockingLayers:
     serializedVersion: 2
-    m_Bits: 768
+    m_Bits: 1792
   searchesPerFrame: 8
   rescanInterval: 0.25
   drawBlockedTiles: 1
