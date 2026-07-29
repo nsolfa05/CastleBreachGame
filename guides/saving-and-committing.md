@@ -30,9 +30,14 @@ there's no visible warning, only a silent gap.
 Run through this every time, in order, no skipping:
 
 1. **Finish your Editor changes.**
-2. **File → Save Project** — from the menu bar, not Ctrl+S. Do this even if
-   you're *sure* nothing you touched was scene-level; it costs nothing and
-   removes the guesswork.
+2. **File → Save, then File → Save Project** — both, in that order, every
+   time, from the menu bar (not just Ctrl+S). Confirmed directly, not just
+   theory: on at least one real occasion, Save Project alone didn't make a
+   change show up in GitHub Desktop until Save was also done first — we
+   don't know for certain whether that's a real Unity quirk or Save Project
+   working but GitHub Desktop's Changes tab lagging a moment behind, but
+   either way, doing both removes the doubt. Do this even if you're *sure*
+   nothing you touched was scene-level; it costs nothing.
 3. **Open GitHub Desktop's Changes tab before committing anything.** Compare
    what's listed against what you actually did:
    - New prefab/script/asset → should appear as a new file.
