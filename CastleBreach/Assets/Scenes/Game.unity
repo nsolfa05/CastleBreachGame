@@ -684,6 +684,14 @@ MonoBehaviour:
     prefab: {fileID: 5318507820628708666, guid: 32c1f71a7e7219b4ea9105c7b4dcef0f, type: 3}
     cost: 120
     footprint: {x: 2, y: 2}
+  - displayName: Wall
+    prefab: {fileID: 137004526392459099, guid: e2ceca0d8a45e9f5ca147df3e331cfe7, type: 3}
+    cost: 25
+    footprint: {x: 1, y: 1}
+  - displayName: Gate
+    prefab: {fileID: 4658702140610435754, guid: aeb8ea5ac9d6fd4cd396b471f299a188, type: 3}
+    cost: 60
+    footprint: {x: 1, y: 1}
   wallTilemap: {fileID: 528603457}
   gateTilemap: {fileID: 1764802730}
   blockingLayers:
@@ -883,6 +891,8 @@ GameObject:
   - component: {fileID: 528603457}
   - component: {fileID: 528603456}
   - component: {fileID: 528603458}
+  - component: {fileID: 2254396354061116480}
+  - component: {fileID: 6342390391020576157}
   m_Layer: 0
   m_Name: Walls
   m_TagString: Untagged
@@ -3502,12 +3512,77 @@ TilemapCollider2D:
     m_Bits: 4294967295
   m_IsTrigger: 0
   m_UsedByEffector: 0
-  m_CompositeOperation: 0
+  m_CompositeOperation: 1
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
   m_MaximumTileChangeCount: 1000
   m_ExtrusionFactor: 0
   m_UseDelaunayMesh: 0
+--- !u!50 &2254396354061116480
+Rigidbody2D:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 528603454}
+  m_BodyType: 2
+  m_Simulated: 1
+  m_UseFullKinematicContacts: 0
+  m_UseAutoMass: 0
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_GravityScale: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_Interpolate: 0
+  m_SleepingMode: 1
+  m_CollisionDetection: 0
+  m_Constraints: 0
+--- !u!66 &6342390391020576157
+CompositeCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 528603454}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_Offset: {x: 0, y: 0}
+  m_GenerationType: 0
+  m_GeometryType: 1
+  m_VertexDistance: 0.01
+  m_OffsetDistance: 0.02
+  m_EdgeRadius: 0
 --- !u!1 &619394800
 GameObject:
   m_ObjectHideFlags: 0
@@ -17353,6 +17428,57 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 116cfb9d62cc98741b46cc61158f0160, type: 3}
+--- !u!1 &352128051297406234
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4363358170965293254}
+  - component: {fileID: 8369168192626120942}
+  m_Layer: 0
+  m_Name: PathGrid
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4363358170965293254
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 352128051297406234}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8369168192626120942
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 352128051297406234}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 00d1d7c8c3a2a679363e89c65488f619, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::PathGrid
+  wallTilemap: {fileID: 528603457}
+  blockingLayers:
+    serializedVersion: 2
+    m_Bits: 1792
+  searchesPerFrame: 8
+  rescanInterval: 0.25
+  drawBlockedTiles: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -17367,3 +17493,4 @@ SceneRoots:
   - {fileID: 1981807743}
   - {fileID: 631245342}
   - {fileID: 196378522}
+  - {fileID: 4363358170965293254}
