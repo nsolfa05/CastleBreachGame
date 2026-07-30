@@ -264,6 +264,30 @@ public class PathGrid : MonoBehaviour
         return IsWalkable(tile, definition, null);
     }
 
+    /// <summary>
+    /// True if this tile is currently sealed by a breakable player-built barrier
+    /// (a Wall/Gate with Health) that a monster of this type can't already stand
+    /// on — i.e. a wall which, if broken, would open the tile up to stand on.
+    /// Used by the attack-slot generator to offer "walled slots": would-be attack
+    /// positions currently behind a breakable wall, which overflow monsters claim
+    /// and break open to widen a breach when every open slot around a target is
+    /// already taken. Never true for permanent terrain, the target itself (which
+    /// isn't a Barrier), or a tile the monster can already walk onto (an open
+    /// slot, or a gate it passes through).
+    /// </summary>
+    public bool IsBreakableBarrier(Vector2Int tile, MonsterDefinition definition)
+    {
+        if (cells == null || definition == null) return false;
+        if (!GridMath.InBounds(tile)) return false;
+        if (IsWalkable(tile, definition, null)) return false; // already standable → an open slot, not a walled one
+
+        ref Cell cell = ref cells[tile.x, tile.y];
+        if (cell.permanent || !cell.isBarrier || cell.blocker == null) return false;
+
+        var health = cell.blocker.GetComponent<Health>();
+        return health != null && !health.IsDead;
+    }
+
     /// <summary>Diagonal steps may not cut a corner between two blocked tiles.</summary>
     private bool CanStepDiagonally(Vector2Int from, Vector2Int step, MonsterDefinition definition, Transform goalRoot)
     {

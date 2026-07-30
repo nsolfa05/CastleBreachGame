@@ -904,8 +904,12 @@ public class MonsterAI : MonoBehaviour
         // breaking a wall (blockedByStructure set while we held a slot). Give it
         // up so we go break in unencumbered rather than clinging to a spot we
         // can't get to, and hold off reclaiming briefly so we don't just grab
-        // the same unreachable tile straight back.
-        if (hasSlot && blockedByStructure != null)
+        // the same unreachable tile straight back. EXCEPT when the slot is itself
+        // a walled would-be slot we deliberately claimed to break open: then the
+        // "must break a wall to reach my slot" routing is the whole point, not a
+        // sign the slot is lost — keep it and break in.
+        if (hasSlot && blockedByStructure != null &&
+            !AttackSlots.SlotIsCurrentlyWalled(objective, claimedSlot, definition))
         {
             ReleaseSlot();
             nextSlotMigrateTime = Time.time + slotMigrateCooldown;
@@ -925,10 +929,16 @@ public class MonsterAI : MonoBehaviour
             Time.time >= nextSlotMigrateTime && AllyQueuedBehind(objective))
             TryMigrateForBlockedAlly(objective);
 
+        // Claim a slot once close enough. allowWalled lets an overflow monster
+        // that finds every open slot taken grab a walled would-be slot instead
+        // and go break it open — widening the breach around a boxed-in target
+        // (see AttackSlots.ClaimNearestSlot). The claim-distance gate keeps this
+        // to monsters already at the target, so distant ones still walk the maze.
         if (!hasSlot && Time.time >= nextSlotMigrateTime &&
             DistanceToTarget(objective) <= definition.attackRange + slotClaimDistance)
         {
-            var claimed = AttackSlots.ClaimNearestSlot(objective, definition, transform.position, this);
+            var claimed = AttackSlots.ClaimNearestSlot(objective, definition, transform.position, this,
+                                                       allowWalled: true);
             if (claimed.HasValue)
             {
                 claimedSlot = claimed.Value;
@@ -977,6 +987,10 @@ public class MonsterAI : MonoBehaviour
         if (radialOut.sqrMagnitude < 0.0001f) return false;
         radialOut.Normalize();
 
+        // A neighbor pressing against me counts as "bumping" — used to widen the
+        // detection cone below for side-on contention.
+        const float bumpDistance = 0.9f;
+
         int count = Physics2D.OverlapCircle(transform.position, giveWayRadius, crowdFilter, NeighborBuffer);
         for (int i = 0; i < count; i++)
         {
@@ -986,9 +1000,21 @@ public class MonsterAI : MonoBehaviour
             if (other == null) continue;
 
             Vector2 toOther = (Vector2)other.transform.position - (Vector2)transform.position;
-            if (toOther.sqrMagnitude < 0.0001f) continue;
-            if (other.currentTarget == target && !other.settledAtTarget &&
-                Vector2.Dot(toOther.normalized, radialOut) > 0.5f)
+            float distSqr = toOther.sqrMagnitude;
+            if (distSqr < 0.0001f) continue;
+            if (other.currentTarget != target || other.settledAtTarget) continue;
+
+            // Normally count only allies queued in the cone behind me (on the far
+            // side from the target) — the ones I'm genuinely blocking from getting
+            // in. But an ally physically bumping me while trying to squeeze past to
+            // an adjacent slot presses from the SIDE, not neatly behind; the strict
+            // cone misses it (the residual jam in the walled-King case). So for a
+            // neighbor at bumping range, relax the cone to the whole hemisphere
+            // that isn't clearly between me and the target. The migrate cooldown
+            // keeps this from thrashing.
+            float dot = Vector2.Dot(toOther.normalized, radialOut);
+            bool bumping = distSqr <= bumpDistance * bumpDistance;
+            if (dot > 0.5f || (bumping && dot > -0.1f))
                 return true;
         }
         return false;

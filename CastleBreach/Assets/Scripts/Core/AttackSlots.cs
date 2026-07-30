@@ -10,8 +10,19 @@ using UnityEngine;
 /// the other end. Each target exposes the discrete standing positions ("slots")
 /// from which a monster can actually hit it, derived live from the real
 /// walkable tiles around it; a monster claims one, walks to it, holds it, and
-/// releases it when done. Overflow monsters find every slot taken and simply
-/// wait — deterministically, instead of grinding against space that isn't there.
+/// releases it when done.
+///
+/// When every open slot is taken, overflow monsters don't just wait against a
+/// wall: each target also exposes its "walled slots" — tiles that would be
+/// valid standing positions but for a breakable wall currently on them. An
+/// overflow monster claims the nearest of those and routes to it, which comes
+/// back as "break this wall" (the wall IS the goal tile), so it breaks that
+/// specific ring wall open and takes the fresh slot. Different overflow monsters
+/// claim different ring tiles, so a horde widens the breach around a boxed-in
+/// target instead of single-filing through one gap forever. Only tiles within
+/// attack range of the target are ever offered, so this only ever eats the seal
+/// ring immediately around the target — never far-off maze walls, which monsters
+/// still route around normally.
 ///
 /// Deliberately static (no scene object, so nothing to wire in the Editor).
 /// State survives scene reloads, so PathGrid.Awake calls Reset() when the grid
@@ -67,7 +78,12 @@ public static class AttackSlots
     private sealed class CachedCandidates
     {
         public int Version = -1;
-        public readonly List<Vector2Int> Tiles = new List<Vector2Int>();
+        // Open = tiles a monster can stand on right now and hit from.
+        // Walled = tiles that WOULD be valid slots but for a breakable wall
+        // currently sitting on them; an overflow monster claims one of these and
+        // breaks the wall to open a fresh standing position (see Candidates).
+        public readonly List<Vector2Int> Open = new List<Vector2Int>();
+        public readonly List<Vector2Int> Walled = new List<Vector2Int>();
     }
 
     private sealed class TargetSlots
@@ -88,23 +104,46 @@ public static class AttackSlots
     /// <summary>
     /// Claim the nearest free slot to <paramref name="fromWorld"/> around
     /// <paramref name="target"/>, marking it held by <paramref name="claimant"/>,
-    /// and return its tile — or null if the target has no free slot right now
-    /// (every one taken, or none exist because it's too boxed in). The caller is
-    /// expected to release any slot it already holds before calling this.
+    /// and return its tile — or null if the target has no free slot right now.
+    /// The caller is expected to release any slot it already holds before calling.
+    ///
+    /// An OPEN slot (somewhere the monster can already stand) always wins. Only
+    /// when every open slot is taken AND <paramref name="allowWalled"/> is set
+    /// does it fall back to the nearest free WALLED slot — a would-be position
+    /// sealed behind a breakable wall, which the claimant then breaks open (its
+    /// route to that tile comes back MustBreak on that exact wall). That's the
+    /// "widen the breach" path: with open slots exhausted, extra monsters each
+    /// grab a distinct ring wall and open a new standing spot rather than piling
+    /// up against the one gap. Claims are per tile and shared across the two
+    /// lists, so a walled slot stays claimed by the same monster once its wall is
+    /// broken and the tile becomes open.
     /// </summary>
     public static Vector2Int? ClaimNearestSlot(Transform target, MonsterDefinition definition,
                                                Vector2 fromWorld, MonsterAI claimant,
-                                               Vector2Int? excludeTile = null)
+                                               Vector2Int? excludeTile = null, bool allowWalled = false)
     {
         if (target == null || definition == null) return null;
 
         var ts = SlotsFor(target);
-        var candidates = Candidates(ts, target, definition);
+        var cc = Candidates(ts, target, definition);
 
+        Vector2Int? best = NearestFree(ts, cc.Open, fromWorld, claimant, excludeTile);
+        if (!best.HasValue && allowWalled)
+            best = NearestFree(ts, cc.Walled, fromWorld, claimant, excludeTile);
+
+        if (!best.HasValue) return null;
+        ts.Claims[best.Value] = claimant;
+        return best;
+    }
+
+    /// <summary>Nearest free tile in one candidate list to fromWorld, or null.</summary>
+    private static Vector2Int? NearestFree(TargetSlots ts, List<Vector2Int> tiles, Vector2 fromWorld,
+                                           MonsterAI claimant, Vector2Int? excludeTile)
+    {
         Vector2Int best = default;
         float bestSqr = float.MaxValue;
         bool found = false;
-        foreach (var tile in candidates)
+        foreach (var tile in tiles)
         {
             // Skip the caller's current tile when it's migrating (see
             // MonsterAI.TryMigrateForBlockedAlly) — it wants a DIFFERENT slot,
@@ -125,10 +164,7 @@ public static class AttackSlots
                 found = true;
             }
         }
-
-        if (!found) return null;
-        ts.Claims[best] = claimant;
-        return best;
+        return found ? best : (Vector2Int?)null;
     }
 
     /// <summary>Release a slot if it's currently held by this claimant.</summary>
@@ -152,16 +188,37 @@ public static class AttackSlots
         if (!ByTarget.TryGetValue(target, out var ts)) return false;
         if (!ts.Claims.TryGetValue(tile, out var holder) || holder != claimant) return false;
 
-        return Candidates(ts, target, definition).Contains(tile);
+        // Valid whether it's a standing slot or one still being broken open — a
+        // walled slot the monster is opening must not read as invalid mid-break.
+        var cc = Candidates(ts, target, definition);
+        return cc.Open.Contains(tile) || cc.Walled.Contains(tile);
     }
 
     /// <summary>
-    /// Scene-view diagnostic: draw every known slot as a small cube — green if
-    /// free, red if claimed — so you can see the ring a target actually offers
-    /// and confirm a boxed-in target correctly has fewer slots. Call only from
-    /// an OnDrawGizmos context (PathGrid does, behind its own toggle). Iterates
-    /// whatever candidate lists have been generated so far; a target no monster
-    /// has approached yet simply hasn't generated any and draws nothing.
+    /// True if <paramref name="tile"/> is currently a WALLED slot for this target
+    /// — a would-be standing position still sealed behind a breakable wall. A
+    /// monster holding such a slot is deliberately breaking in to it, so callers
+    /// must not mistake the resulting "must break a wall to reach my slot" routing
+    /// for the slot being genuinely unreachable and drop the claim (see
+    /// MonsterAI.UpdateSlot). Goes false the instant the wall is broken and the
+    /// tile becomes an open slot the monster then stands on.
+    /// </summary>
+    public static bool SlotIsCurrentlyWalled(Transform target, Vector2Int tile, MonsterDefinition definition)
+    {
+        if (target == null || definition == null) return false;
+        if (!ByTarget.TryGetValue(target, out var ts)) return false;
+        return Candidates(ts, target, definition).Walled.Contains(tile);
+    }
+
+    /// <summary>
+    /// Scene-view diagnostic: draw every known slot — open slots as a solid cube
+    /// (green free / red claimed), walled would-be slots as a wire cube (amber
+    /// free / magenta claimed-and-being-broken-open) — so you can see the ring a
+    /// target actually offers, which walls a horde is about to break for more
+    /// room, and confirm a boxed-in target correctly has fewer open slots. Call
+    /// only from an OnDrawGizmos context (PathGrid does, behind its own toggle).
+    /// Iterates whatever candidate lists have been generated so far; a target no
+    /// monster has approached yet simply hasn't generated any and draws nothing.
     /// </summary>
     public static void DebugDraw()
     {
@@ -171,11 +228,20 @@ public static class AttackSlots
             var ts = pair.Value;
             foreach (var byProfile in ts.ByProfile.Values)
             {
-                foreach (var tile in byProfile.Tiles)
+                foreach (var tile in byProfile.Open)
                 {
                     bool taken = ts.Claims.TryGetValue(tile, out var holder) && holder != null;
                     Gizmos.color = taken ? new Color(1f, 0.3f, 0.3f, 0.6f) : new Color(0.3f, 1f, 0.4f, 0.5f);
                     Gizmos.DrawCube(GridMath.TileCenterWorld(tile), Vector3.one * 0.35f);
+                }
+                // Walled would-be slots (a wall waiting to be broken open into a
+                // slot): amber if free, magenta if a monster has claimed it and
+                // is on its way to break it.
+                foreach (var tile in byProfile.Walled)
+                {
+                    bool taken = ts.Claims.TryGetValue(tile, out var holder) && holder != null;
+                    Gizmos.color = taken ? new Color(1f, 0.2f, 0.8f, 0.6f) : new Color(1f, 0.6f, 0.1f, 0.45f);
+                    Gizmos.DrawWireCube(GridMath.TileCenterWorld(tile), Vector3.one * 0.5f);
                 }
             }
         }
@@ -192,10 +258,11 @@ public static class AttackSlots
     }
 
     /// <summary>
-    /// The candidate slot tiles for one profile around one target, regenerated
-    /// only when the grid has changed since they were last computed.
+    /// The candidate slots for one profile around one target — both the open
+    /// tiles a monster can stand on and the walled tiles it could break open into
+    /// slots — regenerated only when the grid has changed since last computed.
     /// </summary>
-    private static List<Vector2Int> Candidates(TargetSlots ts, Transform target, MonsterDefinition definition)
+    private static CachedCandidates Candidates(TargetSlots ts, Transform target, MonsterDefinition definition)
     {
         var profile = new SlotProfile(definition);
         if (!ts.ByProfile.TryGetValue(profile, out var cached))
@@ -205,14 +272,15 @@ public static class AttackSlots
         }
 
         var grid = PathGrid.Instance;
-        if (grid == null) { cached.Tiles.Clear(); return cached.Tiles; }
-        if (cached.Version == grid.Version) return cached.Tiles;
+        if (grid == null) { cached.Open.Clear(); cached.Walled.Clear(); return cached; }
+        if (cached.Version == grid.Version) return cached;
 
         cached.Version = grid.Version;
-        cached.Tiles.Clear();
+        cached.Open.Clear();
+        cached.Walled.Clear();
 
         var targetCollider = target.GetComponentInParent<Collider2D>();
-        if (targetCollider == null) return cached.Tiles;
+        if (targetCollider == null) return cached;
 
         // A tile is a valid slot if a monster standing at its center is close
         // enough to land a hit. Standing at the center, edge-to-edge distance to
@@ -240,24 +308,43 @@ public static class AttackSlots
             {
                 var tile = new Vector2Int(col, row);
                 if (!GridMath.InBounds(tile)) continue;
-                if (!grid.IsStandable(tile, definition)) continue; // solid ground / the target itself / a wall → not a slot
+
+                bool standable = grid.IsStandable(tile, definition);
+                // A tile is only ever interesting if a monster could hit the
+                // target from it: either it's open ground now, or a breakable
+                // wall sits on it that, once gone, would leave open ground. Skip
+                // permanent terrain, the target's own tiles, and anything else.
+                bool walled = !standable && grid.IsBreakableBarrier(tile, definition);
+                if (!standable && !walled) continue;
 
                 Vector2 center = GridMath.TileCenterWorld(tile);
                 Vector2 surface = targetCollider.ClosestPoint(center);
                 if ((center - surface).sqrMagnitude > reach * reach) continue; // out of attack range from here
 
-                // Ranged line of sight: a slot is only valid if the shot to the
-                // target isn't itself blocked by a wall. For a melee monster
-                // standing right against the target this is trivially clear, so
-                // it costs nothing there; for a future ranged type it stops
-                // slots being generated on the far side of a wall it can't shoot
-                // through. Reuses the same clearance check movement already uses.
-                if (!grid.HasClearLine(center, surface, definition, target)) continue;
-
-                cached.Tiles.Add(tile);
+                if (standable)
+                {
+                    // Ranged line of sight: an open slot is only valid if the shot
+                    // to the target isn't itself blocked by a wall. For a melee
+                    // monster standing right against the target this is trivially
+                    // clear, so it costs nothing there; for a future ranged type
+                    // it stops slots being generated on the far side of a wall it
+                    // can't shoot through. Reuses the clearance check movement uses.
+                    if (!grid.HasClearLine(center, surface, definition, target)) continue;
+                    cached.Open.Add(tile);
+                }
+                else
+                {
+                    // Walled would-be slot: a wall on this tile blocks the line of
+                    // sight FROM the tile by definition, so the clear-line test
+                    // above is meaningless until the wall is gone — skip it. Range
+                    // is enough to mark it as a spot worth breaking open; the
+                    // reachability of the break itself is left to the claiming
+                    // monster's own path solve, as with everything else here.
+                    cached.Walled.Add(tile);
+                }
             }
         }
 
-        return cached.Tiles;
+        return cached;
     }
 }

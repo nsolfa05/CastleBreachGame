@@ -416,9 +416,10 @@ Two related routing fixes, both automatic:
 
 One honest consequence, matching how it should feel: if you seal the King so
 only a couple of tiles around it are reachable through one opening, then only a
-couple of monsters attack and the rest queue — walling the King well is
-*supposed* to protect it. They'll only start breaking a wall when every route
-is sealed.
+couple of monsters can attack *from open ground* — walling the King well is
+*supposed* to slow them down. But a horde no longer just queues forever behind
+that one gap: see the next section, where overflow monsters break the ring walls
+to make more room.
 
 ### Debug gizmos actually showing up now, plus a new targeting view (fixed)
 
@@ -465,6 +466,49 @@ of those fields, the code now automatically folds GatePasser into any
 "enemy" layer filter, so gate-passers are hit by everything ordinary monsters
 are. Nothing to set up — but if you ever add a new script that filters for the
 Enemy layer, route it through `MonsterLayers.IncludeGatePasser` too.
+
+### A horde now breaks the ring open to make more room — fixed (automatic)
+
+The scenario: you wall the King in so tightly that only one or two tiles around
+it can actually be stood on, and one monster parks in the single opening. Before,
+every other monster just queued behind that one — a whole horde stalled on one
+attacker, forever, because there was only one open slot and it was taken.
+
+Now each target exposes not only its **open** slots (tiles a monster can stand
+on and hit from) but also its **walled** slots — tiles that *would* be valid
+attack positions except a breakable wall is currently sitting on them. When a
+monster arrives and finds every open slot taken, it claims the nearest walled
+slot instead and routes to it; that routing comes back as "break this wall" on
+that exact tile, so the monster breaks *that specific ring wall* open and takes
+the fresh spot behind it. Because different overflow monsters claim different
+ring tiles, a horde widens the breach around a boxed-in King instead of
+single-filing through one gap — exactly the "break the surrounding walls to make
+more slots" behavior.
+
+Two guardrails keep this from turning into "monsters chew every wall in sight":
+
+- **Only walls within attack range of the target ever count as walled slots** —
+  i.e. the ring of walls immediately touching the King/tower, the actual seal.
+  A maze wall out in the field is never a walled slot, so monsters still route
+  *around* the maze as before; they only eat the seal ring right up against the
+  thing they're attacking.
+- **Only monsters already at the target claim them** (same close-range gate as
+  normal slot claiming), so a monster still far away keeps walking the maze
+  rather than smashing a shortcut.
+
+So a small attack still just trickles in through a well-built maze; it's a
+genuine *horde* against a *tightly sealed* target that now widens the breach.
+With **Draw Attack Slots** on you can watch it happen: open slots draw as solid
+cubes (green free / red taken), and walled would-be slots draw as **wire** cubes
+— **amber** when free, **magenta** the moment a monster claims one and heads off
+to break it open.
+
+This also takes the edge off the last bit of monsters-blocking-each-other:
+mutual jams around a sealed target were fundamentally a *too-few-slots* problem,
+and more slots means less contention. On top of that, a settled monster now also
+notices an ally physically *bumping* it from the side (not just queued directly
+behind) while trying to reach an adjacent slot, and will shuffle to another free
+slot to let it past.
 
 ## Step 6 — Playtest
 
@@ -513,12 +557,20 @@ draw a long line by clicking along it).
 - **Attack slots — ring vs. clump (the alcove test):** wall the King into a
   small pocket with one narrow opening, like the screenshots that started this,
   and send a crowd. The monsters that fit should settle onto distinct tiles
-  around the opening and all attack; the rest should queue behind rather than
-  shoving into the pack. Tick **Draw Attack Slots** on `PathGrid` and watch in
-  the Scene view — you should see only as many slots (green/red squares) as the
-  opening physically allows, filling red as monsters claim them. Then widen the
-  opening and confirm more slots appear. In the open field, the King should get
-  a full ring of attackers instead of a blob on one face.
+  around the opening and all attack. Tick **Draw Attack Slots** on `PathGrid` and
+  watch in the Scene view — open slots draw as solid green/red squares, filling
+  red as monsters claim them. Then widen the opening and confirm more slots
+  appear. In the open field, the King should get a full ring of attackers instead
+  of a blob on one face.
+- **Horde breaks the ring open (the seal test):** wall the King in as tightly as
+  you can — ideally leaving only one reachable tile around it — and send a *large*
+  crowd. Rather than the whole horde stalling behind one attacker forever, the
+  overflow monsters should start breaking the ring walls right around the King to
+  open up more attack spots, and more of them should get in. With **Draw Attack
+  Slots** on you'll see the walled would-be slots as **wire** cubes — **amber**
+  free, turning **magenta** as monsters claim them to go break them open — then
+  becoming ordinary green/red open slots once the wall falls. Confirm they only
+  eat the walls right up against the King, not maze walls further out.
 - **Funnel through a 1-wide gap:** build a wall line with a single 1-tile gap
   and send a bunched group at it. They should sort into single file and pour
   through — the ones behind briefly easing back so whoever's in front commits
@@ -566,6 +618,8 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] A monster assigned a far-side slot walks AROUND the King to it (when there's a lane) instead of pressing the near face
 - [ ] A fully-walled King makes monsters break the wall nearest the King (the seal), walking the maze to it, not the nearest corridor wall
 - [ ] With a maze that has a real path through it, monsters walk the path and never attack its walls
+- [ ] A tightly-sealed King under a large horde gets its surrounding ring walls broken open for more attack slots (wire cubes in Draw Attack Slots), not one attacker with everyone queued forever
+- [ ] Those ring-breaks only hit walls right against the King, never maze walls further out
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)
 
 ---
