@@ -307,9 +307,9 @@ public class MonsterAI : MonoBehaviour
             return;
         }
 
-        Transform target = ChooseTarget(gm);
+        Transform objective = ChooseTarget(gm);
 
-        if (target == null)
+        if (objective == null)
         {
             currentTarget = null;
             settledAtTarget = false;
@@ -319,18 +319,20 @@ public class MonsterAI : MonoBehaviour
             return;
         }
 
-        // Route to it around any player-built maze. If every route is sealed,
-        // whatever is doing the sealing becomes the target instead (§6,
-        // "breakable if no path around it") — swapping the target here means
-        // attack range, damage and the telegraph attack below all treat it as
-        // an ordinary target with no special-casing of their own.
-        target = ResolveNavigation(target);
-        currentTarget = target; // published for other monsters' give-way check
+        // Reserve a distinct standing spot ("slot") around the real objective so
+        // the crowd fans into a ring instead of converging on one tile. Done
+        // BEFORE routing, and keyed to the objective (not whatever wall we might
+        // end up breaking to reach it), so navigation below can route straight
+        // to the claimed slot. Sets the approach point used by MoveToward.
+        UpdateSlot(objective);
 
-        // Reserve a distinct standing spot around the target so the crowd fans
-        // into a ring instead of everyone converging on one tile. Sets the
-        // approach point used by MoveToward below (via ApproachPoint).
-        UpdateSlot(target);
+        // Route toward the objective (or the slot around it). If every route is
+        // sealed, whatever is doing the sealing becomes the thing to attack
+        // instead (§6, "breakable if no path around it") — so `target` is the
+        // objective when reachable, or a wall to break when not. Attack range,
+        // damage and the telegraph attack below all treat it uniformly.
+        Transform target = ResolveNavigation(objective);
+        currentTarget = objective; // publish the real objective for cross-monster slot/give-way coordination
 
         if (definition.usesTelegraphedAreaAttack)
         {
@@ -665,49 +667,77 @@ public class MonsterAI : MonoBehaviour
     }
 
     /// <summary>
-    /// Keeps this monster's route to its target current, and answers the one
-    /// question routing exists to answer: can it actually get there?
+    /// Keeps this monster's route current, and answers the one question routing
+    /// exists to answer: can it actually get where it's going?
     ///
-    /// Returns the target unchanged when a route exists. When every route is
-    /// sealed, returns the obstacle that has to be broken to open one — see
-    /// PathGrid.Solve for why that obstacle is always genuinely part of the
-    /// seal rather than just something standing nearby.
+    /// Routes to the monster's claimed attack-SLOT tile when it holds one (so a
+    /// far-side slot is reached by pathing around the objective, not by pressing
+    /// its near face), otherwise to the objective itself. Returns the objective
+    /// when a route exists; when every route is sealed, returns the wall that
+    /// has to be broken to open one — see PathGrid.Solve for why that's always
+    /// the wall genuinely sealing the objective (nearest the goal), so monsters
+    /// walk the maze to it rather than chewing the nearest side wall. A slot
+    /// that turns out to be unreachable is abandoned (routing falls back to the
+    /// objective, i.e. break-in); UpdateSlot then drops the claim next frame.
     ///
     /// Searches are rate-limited two ways: each monster only re-routes when
-    /// something relevant changed (target, target's tile, or the obstacle
+    /// something relevant changed (objective, goal tile, or the obstacle
     /// layout) or its interval elapses, and PathGrid caps how many monsters may
-    /// search in the same frame. A monster over that cap simply keeps walking
-    /// its existing route.
+    /// search in the same frame. A monster over that cap keeps its current route.
     /// </summary>
-    private Transform ResolveNavigation(Transform target)
+    private Transform ResolveNavigation(Transform objective)
     {
         var grid = PathGrid.Instance;
-        if (grid == null) return target; // no routing in the scene — straight-line, as before
+        if (grid == null) return objective; // no routing in the scene — straight-line, as before
 
         // A structure being broken through can die mid-approach.
         if (blockedByStructure == null || !blockedByStructure.gameObject.activeInHierarchy)
             blockedByStructure = null;
 
-        Vector2Int goalTile = GridMath.WorldToTile(target.position);
-        bool stale = pathTarget != target ||
+        // Route to the claimed slot's TILE when we hold one — not the objective's
+        // own tile — so a monster assigned a slot on the far side of the King
+        // actually paths AROUND it to get there (the King solid, not walked
+        // through), instead of pressing the near face forever. Without a slot,
+        // route to the objective as before.
+        bool toSlot = hasSlot && slotTarget == objective;
+        Vector2Int goalTile = toSlot ? claimedSlot : GridMath.WorldToTile(objective.position);
+
+        bool stale = pathTarget != objective ||
                      pathGridVersion != grid.Version ||
                      goalTile != pathGoalTile ||
                      Time.time >= nextRepathTime;
 
         if (stale && grid.TryBeginSearch())
         {
-            pathTarget = target;
+            pathTarget = objective;
             pathGridVersion = grid.Version;
             pathGoalTile = goalTile;
             nextRepathTime = Time.time + repathInterval;
             pathIndex = 0;
 
-            var outcome = grid.Solve(GridMath.WorldToTile(transform.position), goalTile,
-                                     definition, target, path, out Transform blocker);
+            Vector2Int from = GridMath.WorldToTile(transform.position);
+            PathGrid.PathOutcome outcome;
+            Transform blocker;
+            if (toSlot)
+                // Slot tile is the goal; the objective is solid (route around it)
+                // but must never be chosen as the wall to break.
+                outcome = grid.Solve(from, goalTile, definition, null, path, out blocker, objective);
+            else
+                outcome = grid.Solve(from, goalTile, definition, objective, path, out blocker);
+
+            // A slot we can't actually reach (sealed on the far side of the
+            // objective): abandon routing to it and head straight for the
+            // objective instead, which will target the sealing wall if one is in
+            // the way. The slot claim itself is dropped in UpdateSlot next frame
+            // once it sees the objective isn't reachable via the slot.
+            if (toSlot && outcome != PathGrid.PathOutcome.PathFound && grid.TryBeginSearch())
+                outcome = grid.Solve(from, GridMath.WorldToTile(objective.position),
+                                     definition, objective, path, out blocker);
+
             blockedByStructure = outcome == PathGrid.PathOutcome.MustBreak ? blocker : null;
         }
 
-        return blockedByStructure != null ? blockedByStructure : target;
+        return blockedByStructure != null ? blockedByStructure : objective;
     }
 
     /// <summary>
@@ -854,21 +884,32 @@ public class MonsterAI : MonoBehaviour
     /// simply grabbing the same tile right back, since it would otherwise still
     /// be the nearest free one to itself.
     /// </summary>
-    private void UpdateSlot(Transform target)
+    private void UpdateSlot(Transform objective)
     {
         var gm = GameManager.Instance;
-        bool eligible = useAttackSlots && PathGrid.Instance != null && target != null &&
-                        (gm == null || target != gm.Player) &&   // the player moves — slots are for fixed objectives
-                        target.GetComponentInParent<Collider2D>() != null;
+        bool eligible = useAttackSlots && PathGrid.Instance != null && objective != null &&
+                        (gm == null || objective != gm.Player) &&   // the player moves — slots are for fixed objectives
+                        objective.GetComponentInParent<Collider2D>() != null;
 
         if (!eligible) { ReleaseSlot(); return; }
 
-        if (slotTarget != target) ReleaseSlot(); // switched targets — give up the old slot
+        if (slotTarget != objective) ReleaseSlot(); // switched targets — give up the old slot
 
         // Drop a slot that's no longer valid (wall placed on it, target changed
         // shape); it'll be re-claimed below if still appropriate.
-        if (hasSlot && !AttackSlots.IsValidClaim(target, claimedSlot, definition, this))
+        if (hasSlot && !AttackSlots.IsValidClaim(objective, claimedSlot, definition, this))
             ReleaseSlot();
+
+        // The slot proved unreachable last frame — routing to it fell through to
+        // breaking a wall (blockedByStructure set while we held a slot). Give it
+        // up so we go break in unencumbered rather than clinging to a spot we
+        // can't get to, and hold off reclaiming briefly so we don't just grab
+        // the same unreachable tile straight back.
+        if (hasSlot && blockedByStructure != null)
+        {
+            ReleaseSlot();
+            nextSlotMigrateTime = Time.time + slotMigrateCooldown;
+        }
 
         // Stuck on the way to a claimed slot (e.g. it turned out to be awkward to
         // reach) — let it go and try for a better one next.
@@ -876,18 +917,22 @@ public class MonsterAI : MonoBehaviour
             ReleaseSlot();
 
         // An ally is genuinely blocked behind this slot — try to migrate to a
-        // DIFFERENT free slot so this monster's current tile opens up for it.
-        // If none exists, stay put and keep attacking (see TryMigrateForBlockedAlly).
-        if (hasSlot && settledAtTarget && Time.time >= nextSlotMigrateTime && AllyQueuedBehind(target))
-            TryMigrateForBlockedAlly(target);
+        // DIFFERENT free slot so this monster's current tile opens up for it. If
+        // none exists, stay put and keep attacking (see TryMigrateForBlockedAlly).
+        // Suppressed while breaking in (blockedByStructure): the slot's a King
+        // slot but we're off at a wall, so "behind me" geometry is meaningless.
+        if (hasSlot && settledAtTarget && blockedByStructure == null &&
+            Time.time >= nextSlotMigrateTime && AllyQueuedBehind(objective))
+            TryMigrateForBlockedAlly(objective);
 
-        if (!hasSlot && DistanceToTarget(target) <= definition.attackRange + slotClaimDistance)
+        if (!hasSlot && Time.time >= nextSlotMigrateTime &&
+            DistanceToTarget(objective) <= definition.attackRange + slotClaimDistance)
         {
-            var claimed = AttackSlots.ClaimNearestSlot(target, definition, transform.position, this);
+            var claimed = AttackSlots.ClaimNearestSlot(objective, definition, transform.position, this);
             if (claimed.HasValue)
             {
                 claimedSlot = claimed.Value;
-                slotTarget = target;
+                slotTarget = objective;
                 hasSlot = true;
             }
         }

@@ -295,13 +295,23 @@ public class PathGrid : MonoBehaviour
     /// Obstacles only become targets once there is genuinely no way around,
     /// which is the design doc's "breakable if no path around it" (§6).
     ///
-    /// Nearest-on-the-boundary is deliberately the simple rule. The smarter
-    /// version — simulate removing each boundary candidate and keep whichever
-    /// most shortens the resulting route — would slot in exactly where
-    /// bestBreak is chosen below, without disturbing anything else.
+    /// Among the breakable walls on that boundary it picks the one CLOSEST TO
+    /// THE GOAL, not closest to the monster — the wall actually sealing the
+    /// objective in, rather than whatever corridor wall the monster happens to
+    /// be standing next to. That's what forces monsters to walk the maze to the
+    /// real seal instead of chewing through the nearest side wall.
+    ///
+    /// <paramref name="goalObject"/> is treated as walkable (so a search can
+    /// arrive AT the structure/King it heads for) — pass null to route AROUND a
+    /// solid goal instead, e.g. when heading for an attack-slot tile beside the
+    /// King rather than the King itself. <paramref name="protectFromBreak"/> is
+    /// never chosen as the wall to break; it defaults to the goal, but is passed
+    /// explicitly when routing to a slot so the King (now solid, not the goal)
+    /// still can't be picked as a break target.
     /// </summary>
     public PathOutcome Solve(Vector2Int start, Vector2Int goal, MonsterDefinition definition,
-                             Transform goalObject, List<Vector2Int> outPath, out Transform blocker)
+                             Transform goalObject, List<Vector2Int> outPath, out Transform blocker,
+                             Transform protectFromBreak = null)
     {
         outPath.Clear();
         blocker = null;
@@ -309,6 +319,7 @@ public class PathGrid : MonoBehaviour
         if (!GridMath.InBounds(start) || !GridMath.InBounds(goal)) return PathOutcome.NoRoute;
 
         Transform goalRoot = RootOf(goalObject);
+        Transform protectRoot = protectFromBreak != null ? RootOf(protectFromBreak) : goalRoot;
 
         searchId++;
         queue.Clear();
@@ -344,25 +355,28 @@ public class PathGrid : MonoBehaviour
                     // Blocked, and never enqueued — stamp it so it's only
                     // considered as a break candidate once.
                     visitStamp[next.x, next.y] = searchId;
-                    if (currentDistance <= bestDistance)
+
+                    ref Cell cell = ref cells[next.x, next.y];
+                    // Terrain can't be broken; never break the objective itself
+                    // (protectRoot); only things with Health can be destroyed.
+                    if (!cell.permanent && cell.blocker != null && cell.blocker != protectRoot)
                     {
-                        ref Cell cell = ref cells[next.x, next.y];
-                        // Terrain can't be broken; the goal isn't an obstacle;
-                        // and only things with Health can be destroyed at all.
-                        if (!cell.permanent && cell.blocker != null && cell.blocker != goalRoot)
+                        var health = cell.blocker.GetComponent<Health>();
+                        if (health != null && !health.IsDead)
                         {
-                            var health = cell.blocker.GetComponent<Health>();
-                            if (health != null && !health.IsDead)
+                            // Prefer the breakable wall closest to the GOAL —
+                            // the one sealing the objective in — so monsters
+                            // route through the maze to it instead of chewing
+                            // whatever wall is nearest them. Monster-distance
+                            // only breaks ties between equally-goal-near walls.
+                            float goalProximity = (next - goal).sqrMagnitude;
+                            if (goalProximity < bestGoalProximity ||
+                                (goalProximity == bestGoalProximity && currentDistance < bestDistance))
                             {
-                                float goalProximity = (next - goal).sqrMagnitude;
-                                if (currentDistance < bestDistance ||
-                                    goalProximity < bestGoalProximity)
-                                {
-                                    bestDistance = currentDistance;
-                                    bestGoalProximity = goalProximity;
-                                    bestBreak = cell.blocker;
-                                    bestBreakFrom = current;
-                                }
+                                bestGoalProximity = goalProximity;
+                                bestDistance = currentDistance;
+                                bestBreak = cell.blocker;
+                                bestBreakFrom = current;
                             }
                         }
                     }

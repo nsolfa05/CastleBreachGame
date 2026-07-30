@@ -390,6 +390,36 @@ hopping around the ring every frame. Watch it with Draw Attack Slots on: the
 red (claimed) squares shuffle as blockers relocate and the ones behind fill in
 the freed tiles. Nothing to set up.
 
+### Monsters now walk around to their slot, and break only the sealing wall
+
+Two related routing fixes, both automatic:
+
+- **A monster now paths to its actual slot tile, not just the objective.**
+  Before, a monster's route always led to the King itself; a slot only
+  redirected the *final* step, and only if it already had a clear line to it.
+  So a monster assigned a slot on the far side of the King had no idea how to
+  walk *around* to it — it just pressed the near face, and the "migrate to a
+  free slot" behavior could hand it a far slot it could never actually reach.
+  Now it routes to the slot's tile directly, with the King treated as solid, so
+  it circles around to a far slot when there's a lane. If the slot turns out to
+  be sealed off (no lane — e.g. the far side of a fully-walled King), it gives
+  the claim up and falls back to breaking in, so it never clings to a spot it
+  can't get to.
+- **When walls must be broken, monsters break the one sealing the objective —
+  not the nearest wall to them.** This was the bug where a walled-in King made
+  monsters chew whatever wall they were standing next to instead of following
+  the maze. The break target is now chosen as the breakable wall **closest to
+  the King** (the one actually sealing it in), so monsters route through the
+  maze to the real seal and leave the corridor walls alone. As before, this
+  only ever happens when there's genuinely no open route — build a maze with a
+  path through it and they walk the path, never touching its walls.
+
+One honest consequence, matching how it should feel: if you seal the King so
+only a couple of tiles around it are reachable through one opening, then only a
+couple of monsters attack and the rest queue — walling the King well is
+*supposed* to protect it. They'll only start breaking a wall when every route
+is sealed.
+
 ### Debug gizmos actually showing up now, plus a new targeting view (fixed)
 
 If **Draw Blocked Tiles** or **Draw Attack Slots** never seemed to draw
@@ -533,6 +563,9 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] Draw Targeting Debug shows lines to targets and a red flash on hits
 - [ ] A monster settling into its spot eases to a stop instead of shaking
 - [ ] A monster holding the only slot in a narrow opening steps aside for a blocked ally instead of permanently holding the doorway
+- [ ] A monster assigned a far-side slot walks AROUND the King to it (when there's a lane) instead of pressing the near face
+- [ ] A fully-walled King makes monsters break the wall nearest the King (the seal), walking the maze to it, not the nearest corridor wall
+- [ ] With a maze that has a real path through it, monsters walk the path and never attack its walls
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)
 
 ---
