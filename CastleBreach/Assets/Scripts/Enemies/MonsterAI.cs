@@ -95,6 +95,9 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("The floor speed (as a fraction of moveSpeed) arrival easing ramps down to, never all the way to 0. A small floor keeps a settled monster's other forces (give-way, separation) able to actually move it a meaningful amount even right at its spot — dropping all the way to a full stop would fight those.")]
     [SerializeField, Range(0f, 1f)] private float arrivalMinSpeedFactor = 0.35f;
 
+    [Tooltip("How hard a monster steers sideways, proactively, when it notices a nearby ally moving roughly TOWARD it (an oncoming meeting, not just crowding). Without this, two monsters approaching head-on only get separated reactively — by physically colliding first, then waiting for stuck-recovery's slower escalation to notice and push sideways — which reads as a couple of visible bounces before they finally slide past each other. This anticipates it a step earlier: the more directly two paths oppose, the stronger the sideways nudge, so they peel apart and glide past (sliding across/behind, as intended) rather than meeting head-on at all. 0 = off.")]
+    [SerializeField] private float headOnAvoidStrength = 0.5f;
+
     [Header("Attack slots (shared behavior, not per-monster-type data)")]
     [Tooltip("When on, a monster closing on its target claims a distinct standing spot (\"slot\") around it — one of the real walkable tiles within attack range — and heads there instead of everyone converging on the target's nearest surface. This is what actually spreads a crowd into a ring and stops the front rank hogging the only reachable tile, especially around a target boxed into a tight alcove where there's no room to shuffle sideways. The force behaviors above still handle the journey and any overflow once every slot is taken. Off = the old behavior (approach the target's surface directly).")]
     [SerializeField] private bool useAttackSlots = true;
@@ -216,6 +219,19 @@ public class MonsterAI : MonoBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
+        // This is a top-down game, but the project's global 2D gravity is
+        // (0, -9.81) and the prefab ships gravityScale 1, so every monster was
+        // being pulled downward each physics step. MoveToward sets linearVelocity
+        // at the START of the step while the solver applies gravity DURING it, so
+        // that downward pull is never fully cancelled — it drifts a parked monster
+        // off its slot (→ re-seek → jitter) and biases every path. Zero it here so
+        // the prefab's serialized value can't reintroduce the bug. A little linear
+        // damping then lets any velocity left over from a collision die out
+        // instead of carrying into the next step as an overshoot/bounce — kept
+        // small (MoveToward sets velocity each step, so damping only shaves a few
+        // percent off the effective speed) but enough to calm crowd jostling.
+        rb.gravityScale = 0f;
+        rb.linearDamping = 2f;
         health = GetComponent<Health>();
         telegraph = GetComponent<TelegraphedAreaAttack>();
         health.Died += OnDied;
@@ -461,7 +477,11 @@ public class MonsterAI : MonoBehaviour
         }
         else
         {
-            steer = seekDirection + separation;
+            // headOnAvoidance is added here — not just left to separation — so an
+            // oncoming pair starts peeling apart BEFORE they physically meet,
+            // rather than colliding first and only correcting once stuck-recovery
+            // notices a few checks later. See HeadOnAvoidance.
+            steer = seekDirection + separation + HeadOnAvoidance(seekDirection) * headOnAvoidStrength;
 
             // Arrival easing — see the Arrival Radius tooltip for why this
             // exists. Only in this calm-settling branch: a monster that's
@@ -1168,6 +1188,47 @@ public class MonsterAI : MonoBehaviour
             push += away / distance * (1f - Mathf.Clamp01(distance / separationRadius));
         }
         return push;
+    }
+
+    /// <summary>
+    /// A sideways bias, proportional to how directly an ally is moving toward
+    /// this monster (not just standing nearby, like plain separation), so two
+    /// monsters on a collision course start peeling apart before they actually
+    /// meet. Without this the only response to an oncoming ally was reactive:
+    /// physically collide, then wait for stuck-recovery to measure "no
+    /// progress" over stuckEscalationDelay and only then start pushing
+    /// sideways — which showed up as a monster visibly bouncing off an ally a
+    /// couple of times before finally sliding past (e.g. two monsters crossing
+    /// paths on the way to breaking their own ring walls). Reads a neighbor's
+    /// actual velocity (not its seekDirection, which isn't exposed) as the
+    /// stand-in for "which way is it headed" — a stationary neighbor
+    /// contributes nothing, since there's nothing oncoming about standing
+    /// still. Uses this monster's own avoidSide for the sideways direction, so
+    /// it's stable frame to frame rather than picking a fresh side every check.
+    /// </summary>
+    private Vector2 HeadOnAvoidance(Vector2 seekDirection)
+    {
+        if (headOnAvoidStrength <= 0f || seekDirection.sqrMagnitude < 0.0001f) return Vector2.zero;
+
+        Vector2 sideways = new Vector2(-seekDirection.y, seekDirection.x) * avoidSide;
+        Vector2 bias = Vector2.zero;
+
+        int count = Physics2D.OverlapCircle(transform.position, separationRadius, crowdFilter, NeighborBuffer);
+        for (int i = 0; i < count; i++)
+        {
+            var collider = NeighborBuffer[i];
+            if (collider == null || collider.gameObject == gameObject) continue;
+            var other = collider.GetComponentInParent<MonsterAI>();
+            if (other == null || other.rb == null) continue;
+
+            Vector2 otherVelocity = other.rb.linearVelocity;
+            if (otherVelocity.sqrMagnitude < 0.01f) continue; // not actually moving — nothing oncoming about it
+
+            float headOn = Vector2.Dot(seekDirection, otherVelocity.normalized); // -1 = moving straight at me
+            if (headOn < -0.3f)
+                bias += sideways * -headOn; // the more directly opposed, the stronger the nudge
+        }
+        return bias;
     }
 
     /// <summary>

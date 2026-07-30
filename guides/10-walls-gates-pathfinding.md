@@ -540,6 +540,43 @@ the old "am I near the King?" — a monster wedged a tile short of its slot used
 count as home (so it never tried to un-stick and never made room), and that one
 conflation was behind most of the leftover pushing.
 
+### A real bug: monsters had gravity on — fixed (automatic)
+
+While chasing the last bit of jitter, a genuine bug turned up: this is a
+top-down game, but the project's global 2D gravity was still Unity's default
+`(0, -9.81)`, and the Monster prefab's Rigidbody 2D still had **Gravity Scale
+1** — so every monster was quietly being pulled downward, every physics step,
+the whole time. The movement code sets velocity fresh each step, so it mostly
+papered over this, but not entirely: the pull was reapplied faster than it
+could ever fully cancel out, which is exactly the kind of constant tiny
+correction that reads as jitter — worst on a monster meant to be holding still
+on its slot, and a steady background wobble on every other monster's path
+(feeding the "bounces off allies" issue below too). Fixed in code — Awake now
+forces Gravity Scale to `0` on every monster, so the prefab's own value can't
+reintroduce it — plus a little Linear Damping (`2`) so any velocity left over
+from a collision actually dies out instead of carrying into the next step as
+an overshoot. Nothing to change on the prefab; if you ever inspect it and see
+Gravity Scale still at `1`, that's fine, code overrides it on spawn.
+
+### Monsters bouncing off each other instead of sliding past — fixed (automatic)
+
+Reported alongside the jitter: monsters crossing paths (e.g. two overflow
+monsters heading to break their own separate ring walls) would visibly bounce
+off each other two or three times before finally sliding past, instead of
+gliding around each other smoothly. The gravity bug above was part of it, but
+there was a second, structural cause: the only response to an oncoming ally
+used to be *reactive* — physically collide, then wait for stuck-recovery to
+measure "no progress" over almost a second before it started pushing sideways.
+Those few checks show up as visible bounces.
+
+Fixed with a new **proactive** term (`HeadOnAvoidance`, weighted by **Head-On
+Avoid Strength**, default `0.5`): a monster now watches for an ally actually
+*moving toward it* (not just standing nearby, which plain separation already
+handles) and starts easing sideways before they ever actually meet — the more
+directly their paths oppose, the stronger the nudge. Two monsters on a
+collision course now peel apart and slide past each other early, instead of
+colliding first and correcting after the fact.
+
 ## Step 6 — Playtest
 
 Press **5**, then left-click to lay walls (you keep carrying it, so you can
@@ -652,6 +689,8 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] Those ring-breaks only hit walls right against the King, never maze walls further out
 - [ ] Monsters sitting on their slots hold still and attack instead of jittering/shoving each other when there's room for everyone
 - [ ] Two monsters meeting head-on in a 1-wide ring resolve (one eases back, the other passes) instead of locking against each other
+- [ ] Monsters no longer settle into a faint vertical wobble while holding a slot (the gravity fix)
+- [ ] Two monsters crossing paths (e.g. heading to break separate ring walls) slide past each other instead of visibly bouncing off each other first
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)
 
 ---
