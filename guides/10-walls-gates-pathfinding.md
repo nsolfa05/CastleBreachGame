@@ -516,6 +516,30 @@ short behind a wall of allies is correctly seen as "still needs in" and gets
 made room for. And a monster that can't reach its exact slot isn't idle: as long
 as it's within attack range it keeps hitting the King the whole time.
 
+### Two crowd-polish fixes: no more slot jitter, no more head-on lock (automatic)
+
+Two smaller issues that showed up once the ring was filling properly:
+
+- **Jitter on a slot.** A monster sitting on its slot kept driving at the
+  arrival-speed floor straight at the exact tile centre, so tiny collisions
+  flicked it back and forth across the spot. Now a monster that has actually
+  reached its own slot and has nothing else to do simply **holds position** —
+  only crowd separation still nudges it, and gently, so it stops dead on its
+  slot instead of buzzing. (It leaves the instant it genuinely needs to: it's
+  handed a new far slot by the shuffle, or gets shoved clear off the tile.)
+- **Two monsters shoving each other head-on.** In a 1-wide ring there's no
+  sideways room to slip past, so two monsters meeting head-on both read as
+  stuck and both lean in, holding the jam forever. That's now broken
+  deterministically: when two jammed monsters are pressed together, the
+  lower-priority one (an arbitrary but stable tiebreak) **eases back** to let
+  the other through, then follows once it's clear. In a bigger pile exactly one
+  monster keeps moving at a time and the jam drains instead of locking.
+
+A key part of both: "am I done moving?" now means **"am I on my own slot?"**, not
+the old "am I near the King?" — a monster wedged a tile short of its slot used to
+count as home (so it never tried to un-stick and never made room), and that one
+conflation was behind most of the leftover pushing.
+
 ## Step 6 — Playtest
 
 Press **5**, then left-click to lay walls (you keep carrying it, so you can
@@ -626,6 +650,8 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] With a maze that has a real path through it, monsters walk the path and never attack its walls
 - [ ] A tightly-sealed King under a large horde gets its surrounding ring walls broken open for more attack slots (wire cubes in Draw Attack Slots), not one attacker with everyone queued forever
 - [ ] Those ring-breaks only hit walls right against the King, never maze walls further out
+- [ ] Monsters sitting on their slots hold still and attack instead of jittering/shoving each other when there's room for everyone
+- [ ] Two monsters meeting head-on in a 1-wide ring resolve (one eases back, the other passes) instead of locking against each other
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)
 
 ---

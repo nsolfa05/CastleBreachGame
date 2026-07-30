@@ -367,14 +367,19 @@ public class MonsterAI : MonoBehaviour
 
     private void MoveToward(Transform target, float speedScale = 1f)
     {
-        // "Settled" = arrived, in attack range of the target. It's the hinge
-        // between the two behaviors below: a settled monster hands itself to
-        // give-way (slide aside for allies) and is exempt from stuck-recovery
-        // (it's not stuck, it's home). An unsettled one is still travelling, so
-        // the reverse — stuck-recovery is armed, give-way is not.
+        // "Settled" = in attack range of the target — this governs ATTACKING and
+        // slot-less give-way, and is deliberately about the objective, not a slot.
         settledAtTarget = target != null && DistanceBetween(transform, target) <= definition.attackRange;
 
-        UpdateStuckRecovery(settledAtTarget);
+        // "Arrived" = actually at the spot I'm trying to occupy: my own slot tile
+        // if I hold one, otherwise just in range. This — NOT settledAtTarget — is
+        // what gates the movement-recovery behaviors, because a slot-holder jammed
+        // a tile short of its slot is still near the King (settled) yet very much
+        // NOT where it's going: it must stay eligible for stuck-recovery and
+        // yielding, or it sits wedged in the ring forever reading as "home".
+        bool arrived = hasSlot ? IsPlaced() : settledAtTarget;
+
+        UpdateStuckRecovery(arrived);
 
         Vector2 steeringPoint = SteeringPoint(target);
         Vector2 toSteering = steeringPoint - (Vector2)transform.position;
@@ -391,7 +396,7 @@ public class MonsterAI : MonoBehaviour
         float arrivalSpeedFactor = 1f;
         Vector2 steer;
 
-        if (!settledAtTarget && ShouldYieldToLeader(seekDirection, steeringPoint))
+        if (!arrived && ShouldYieldToLeader(seekDirection, steeringPoint))
         {
             // Jammed directly behind an ally that's ahead of me and closer to
             // where we're both going — the two-abreast pile-up at the mouth of
@@ -405,6 +410,32 @@ public class MonsterAI : MonoBehaviour
             // ordering (single-file), not grinding sideways into a wall.
             steer = separation - seekDirection * yieldBackStrength;
             extraSpeedScale = 0.6f; // ease back gently — making room, not fleeing
+        }
+        else if (hasSlot && arrived)
+        {
+            // Parked in my own slot with nothing else to do (not yielding, and
+            // stuck-recovery has been reset by arriving). Hold position: apply
+            // ONLY separation, and un-normalized, so it's ~zero when well spaced
+            // instead of the full-speed seek that otherwise jitters a monster back
+            // and forth across its slot centre at the arrival-speed floor. This is
+            // the "if everyone's already on a slot, just stay put" behavior — a
+            // monster only leaves when it genuinely needs to (a migrate hands it a
+            // new far slot, dropping IsPlaced, or it's pushed clear off the tile).
+            rb.linearVelocity = separation * (definition.moveSpeed * speedScale);
+            return;
+        }
+        else if (stuckPush > 0f && ShouldStandDownForStuckNeighbor())
+        {
+            // Two monsters jammed head-on (the 1-wide-ring lock) both read as
+            // stuck and both lean in, holding each other in place forever — no
+            // sideways room to slip past, so escalation alone can't break it.
+            // Break the symmetry deterministically: the lower-priority one (by
+            // stable instance id) eases BACK to clear room, letting the other
+            // move through first, then advances once that one is no longer stuck.
+            // Exactly one of any locked pair stands down, so they don't both back
+            // off (re-locking) or both push (staying locked).
+            steer = separation - seekDirection * yieldBackStrength;
+            extraSpeedScale = 0.6f;
         }
         else if (stuckPush > 0f)
         {
@@ -569,6 +600,36 @@ public class MonsterAI : MonoBehaviour
 
         float side = tangentialCrowd > 0.01f ? -1f : tangentialCrowd < -0.01f ? 1f : avoidSide;
         return tangent * side * giveWayStrength;
+    }
+
+    /// <summary>
+    /// True when a higher-priority monster is ALSO stuck and pressed right up
+    /// against me — the signal to stand down (ease back) so it can move through,
+    /// rather than the two of us leaning into each other and holding the jam in
+    /// place. This is the deterministic tiebreak the 1-wide-ring head-on lock
+    /// needs, where there's no sideways room for escalation to work: priority is
+    /// just a stable per-instance id, so of any locked pair EXACTLY ONE stands
+    /// down and the other advances — which is what actually drains the jam
+    /// (in a bigger cluster the single lowest-id monster keeps moving while the
+    /// rest defer, then the next, and so on). Which monster wins is arbitrary;
+    /// all that matters is that the choice is consistent frame to frame.
+    /// </summary>
+    private bool ShouldStandDownForStuckNeighbor()
+    {
+        int count = Physics2D.OverlapCircle(transform.position, separationRadius, crowdFilter, NeighborBuffer);
+        int myId = GetInstanceID();
+        for (int i = 0; i < count; i++)
+        {
+            var collider = NeighborBuffer[i];
+            if (collider == null || collider.gameObject == gameObject) continue;
+            var other = collider.GetComponentInParent<MonsterAI>();
+            if (other == null) continue;
+
+            // Another monster also jammed, right up against me, that outranks me.
+            if (other.stuckPush > 0f && other.GetInstanceID() < myId)
+                return true;
+        }
+        return false;
     }
 
     /// <summary>
