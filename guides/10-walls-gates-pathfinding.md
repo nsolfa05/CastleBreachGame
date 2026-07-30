@@ -505,10 +505,16 @@ to break it open.
 
 This also takes the edge off the last bit of monsters-blocking-each-other:
 mutual jams around a sealed target were fundamentally a *too-few-slots* problem,
-and more slots means less contention. On top of that, a settled monster now also
-notices an ally physically *bumping* it from the side (not just queued directly
-behind) while trying to reach an adjacent slot, and will shuffle to another free
-slot to let it past.
+and more slots means less contention. On top of that there's now a proper
+**shuffle chain**: a monster parked in its slot that gets bumped by any ally
+still trying to get in will hop to the next free slot to let it past — and since
+that hop briefly makes *it* the one still trying to get in, it bumps the next
+monster along, so the shuffle propagates up a packed line until everyone has a
+distinct spot. Crucially this keys off whether a monster has actually *reached
+its own slot*, not just whether it's near the King — so a monster stuck a tile
+short behind a wall of allies is correctly seen as "still needs in" and gets
+made room for. And a monster that can't reach its exact slot isn't idle: as long
+as it's within attack range it keeps hitting the King the whole time.
 
 ## Step 6 — Playtest
 

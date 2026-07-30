@@ -725,12 +725,20 @@ public class MonsterAI : MonoBehaviour
             else
                 outcome = grid.Solve(from, goalTile, definition, objective, path, out blocker);
 
-            // A slot we can't actually reach (sealed on the far side of the
+            // An OPEN slot we can't actually reach (sealed on the far side of the
             // objective): abandon routing to it and head straight for the
             // objective instead, which will target the sealing wall if one is in
             // the way. The slot claim itself is dropped in UpdateSlot next frame
             // once it sees the objective isn't reachable via the slot.
-            if (toSlot && outcome != PathGrid.PathOutcome.PathFound && grid.TryBeginSearch())
+            //
+            // A WALLED slot is the opposite case: "not PathFound" there means the
+            // route came back as "break the wall to reach this slot," which is the
+            // whole point — the monster is meant to go break that ring wall open
+            // and take the spot. So DON'T fall back for a walled slot; keep that
+            // MustBreak, or it would wrongly re-route to the objective and just
+            // squeeze the one open gap while its wall goes untouched.
+            bool walledSlot = AttackSlots.SlotIsCurrentlyWalled(objective, claimedSlot, definition);
+            if (toSlot && !walledSlot && outcome != PathGrid.PathOutcome.PathFound && grid.TryBeginSearch())
                 outcome = grid.Solve(from, GridMath.WorldToTile(objective.position),
                                      definition, objective, path, out blocker);
 
@@ -916,16 +924,21 @@ public class MonsterAI : MonoBehaviour
         }
 
         // Stuck on the way to a claimed slot (e.g. it turned out to be awkward to
-        // reach) — let it go and try for a better one next.
-        if (hasSlot && !settledAtTarget && stuckPush > 0f)
+        // reach) — let it go and try for a better one next. But NOT while breaking
+        // open a walled slot: shouldering through the crowd toward the wall reads
+        // as "stuck" every frame, and dropping the claim there would just make it
+        // oscillate instead of committing to breach that spot.
+        if (hasSlot && !settledAtTarget && stuckPush > 0f &&
+            !AttackSlots.SlotIsCurrentlyWalled(objective, claimedSlot, definition))
             ReleaseSlot();
 
         // An ally is genuinely blocked behind this slot — try to migrate to a
         // DIFFERENT free slot so this monster's current tile opens up for it. If
         // none exists, stay put and keep attacking (see TryMigrateForBlockedAlly).
-        // Suppressed while breaking in (blockedByStructure): the slot's a King
-        // slot but we're off at a wall, so "behind me" geometry is meaningless.
-        if (hasSlot && settledAtTarget && blockedByStructure == null &&
+        // Gated on IsPlaced (actually sitting in our slot) rather than merely
+        // settled-near-the-King, so only an established holder yields; suppressed
+        // while breaking in (blockedByStructure), where "behind me" is meaningless.
+        if (hasSlot && IsPlaced() && blockedByStructure == null &&
             Time.time >= nextSlotMigrateTime && AllyQueuedBehind(objective))
             TryMigrateForBlockedAlly(objective);
 
@@ -1002,22 +1015,52 @@ public class MonsterAI : MonoBehaviour
             Vector2 toOther = (Vector2)other.transform.position - (Vector2)transform.position;
             float distSqr = toOther.sqrMagnitude;
             if (distSqr < 0.0001f) continue;
-            if (other.currentTarget != target || other.settledAtTarget) continue;
+            // Same objective, and not yet parked in its own slot — i.e. genuinely
+            // still trying to get in (IsPlaced, not merely near the King).
+            if (other.currentTarget != target || other.IsPlaced()) continue;
 
-            // Normally count only allies queued in the cone behind me (on the far
-            // side from the target) — the ones I'm genuinely blocking from getting
-            // in. But an ally physically bumping me while trying to squeeze past to
-            // an adjacent slot presses from the SIDE, not neatly behind; the strict
-            // cone misses it (the residual jam in the walled-King case). So for a
-            // neighbor at bumping range, relax the cone to the whole hemisphere
-            // that isn't clearly between me and the target. The migrate cooldown
-            // keeps this from thrashing.
+            // Two ways an ally counts. (1) Queued in the cone behind me — on the
+            // far side from the target, the ones I'm plainly blocking from getting
+            // in. (2) Simply pressed up against me (bumping) from ANY side while
+            // still trying to reach a spot. Case (2) is the user-described chain:
+            // it fires between an established holder and whoever's shoving to get
+            // past, and because a holder that migrates then becomes unsettled
+            // itself while travelling to its new slot, it in turn trips the next
+            // holder — so the shuffle propagates up a packed line. Only unsettled
+            // same-target allies trigger it (filtered above), and the migrate
+            // cooldown keeps it from thrashing.
             float dot = Vector2.Dot(toOther.normalized, radialOut);
             bool bumping = distSqr <= bumpDistance * bumpDistance;
-            if (dot > 0.5f || (bumping && dot > -0.1f))
+            if (dot > 0.5f || bumping)
                 return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// True once this monster has actually reached the spot it's trying to
+    /// occupy — its claimed slot tile if it holds one, or just "in attack range
+    /// of the objective" if it doesn't. Deliberately different from
+    /// settledAtTarget, which only measures range to the OBJECTIVE and so reads
+    /// true for ANY monster merely near the King — even one still jammed short of
+    /// its own slot behind a wall of allies. The yield/migration logic keys off
+    /// this instead: a monster that isn't placed genuinely still needs to get in,
+    /// so a holder in its way should shuffle aside. It's also what lets the
+    /// shuffle chain: a holder that migrates is briefly un-placed (heading to its
+    /// new slot) and so, in turn, trips the next holder up a packed line.
+    /// </summary>
+    private bool IsPlaced()
+    {
+        if (hasSlot)
+        {
+            // Forgiving enough that separation nudging a settled monster off its
+            // exact tile centre doesn't read as "not placed", tight enough that a
+            // monster still a tile or more short of its slot does.
+            const float placedRadius = 0.6f;
+            Vector2 slotCenter = GridMath.TileCenterWorld(claimedSlot);
+            return ((Vector2)transform.position - slotCenter).sqrMagnitude <= placedRadius * placedRadius;
+        }
+        return settledAtTarget;
     }
 
     /// <summary>Give up any held slot so another monster can take it.</summary>
