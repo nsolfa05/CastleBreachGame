@@ -153,6 +153,7 @@ public class MonsterAI : MonoBehaviour
     private bool bonePileActive;
     private Vector3 activeScale;
     private float avoidSide; // -1 or +1, flips on each stuck escalation to break a symmetric deadlock — see UpdateStuckRecovery
+    private float standDownKey; // random, assigned once in Awake — stable tiebreak for ShouldStandDownForStuckNeighbor, deliberately NOT Object.GetInstanceID()/GetEntityId() so this never depends on whichever identity API a given Unity version currently favors
     private float stuckPush; // 0 normally; grows while genuinely stuck, shifting MoveToward's push from forward toward sideways
     private Vector2 stuckSamplePosition;
     private float nextStuckCheckTime;
@@ -237,6 +238,7 @@ public class MonsterAI : MonoBehaviour
         health.Died += OnDied;
         if (body == null) body = GetComponent<SpriteRenderer>();
         avoidSide = UnityEngine.Random.value < 0.5f ? -1f : 1f;
+        standDownKey = UnityEngine.Random.value;
         stuckSamplePosition = transform.position;
         EnemyCrowdMask = LayerMask.GetMask("Enemy", "GatePasser");
         crowdFilter = new ContactFilter2D { useLayerMask = true, useTriggers = false };
@@ -628,16 +630,17 @@ public class MonsterAI : MonoBehaviour
     /// rather than the two of us leaning into each other and holding the jam in
     /// place. This is the deterministic tiebreak the 1-wide-ring head-on lock
     /// needs, where there's no sideways room for escalation to work: priority is
-    /// just a stable per-instance id, so of any locked pair EXACTLY ONE stands
-    /// down and the other advances — which is what actually drains the jam
-    /// (in a bigger cluster the single lowest-id monster keeps moving while the
-    /// rest defer, then the next, and so on). Which monster wins is arbitrary;
-    /// all that matters is that the choice is consistent frame to frame.
+    /// just standDownKey, a random value assigned once per monster in Awake
+    /// (deliberately not any Object identity API — those vary by Unity version),
+    /// so of any locked pair EXACTLY ONE stands down and the other advances —
+    /// which is what actually drains the jam (in a bigger cluster the single
+    /// lowest-key monster keeps moving while the rest defer, then the next, and
+    /// so on). Which monster wins is arbitrary; all that matters is that the
+    /// choice is consistent frame to frame.
     /// </summary>
     private bool ShouldStandDownForStuckNeighbor()
     {
         int count = Physics2D.OverlapCircle(transform.position, separationRadius, crowdFilter, NeighborBuffer);
-        int myId = GetInstanceID();
         for (int i = 0; i < count; i++)
         {
             var collider = NeighborBuffer[i];
@@ -646,7 +649,7 @@ public class MonsterAI : MonoBehaviour
             if (other == null) continue;
 
             // Another monster also jammed, right up against me, that outranks me.
-            if (other.stuckPush > 0f && other.GetInstanceID() < myId)
+            if (other.stuckPush > 0f && other.standDownKey < standDownKey)
                 return true;
         }
         return false;
