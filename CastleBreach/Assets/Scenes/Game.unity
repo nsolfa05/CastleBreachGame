@@ -16833,6 +16833,8 @@ MonoBehaviour:
   searchesPerFrame: 8
   rescanInterval: 0.25
   drawBlockedTiles: 1
+  drawAttackSlots: 1
+  drawTargetingDebug: 1
 --- !u!4 &1538420092
 Transform:
   m_ObjectHideFlags: 0
@@ -16903,7 +16905,7 @@ MonoBehaviour:
       count: 4
       gate: 3
       secondsBetweenSpawns: 1.5
-      startDelay: 0
+      startDelay: 10
   - name: Wave 2
     groups:
     - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
@@ -16946,7 +16948,7 @@ MonoBehaviour:
       count: 3
       gate: 3
       secondsBetweenSpawns: 1.5
-      startDelay: 0
+      startDelay: 10
     - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
       count: 4
       gate: 2
