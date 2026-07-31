@@ -694,16 +694,30 @@ Both are plain tunables on the Monster prefab (Avoid Strength / Migrate Blocked
 Dwell); set either to a low value or `0` to dial it back toward the old
 behavior if a value ever feels off.
 
-**On corridors specifically (a good question that came up):** the ideal for a
-tight one-way corridor is "fill from the back" — the first monster in walks to
-the *deepest* slot so later ones fill toward the mouth and nobody climbs over
-anyone. That's a real technique, but it's the exact *opposite* of what you want
-in an open ring (there, nearest-slot is right), and no simple local rule gets
-both. The clean unifier is a global slot *assignment* that hands out tiles to
-minimize crossing (e.g. angular matching around the target), which produces
-back-to-front in a corridor and nearest-arc in the open automatically. That's a
-larger, separate change — noted here as the intended next step if corridor maps
-end up leaning on it, rather than bolted on now.
+**On corridors / far slots going unfilled (the recurring one):** the failure was
+a crowd bunching at the *mouth* of a walled King while free slots on the far side
+of the ring sat empty — nobody was assigned to walk around to them. Rather than
+compute a global "depth" (fragile on maps that have their own border walls, since
+there's no clean "outside" to measure from), this is now handled **locally**:
+when a settled monster steps aside for a blocked ally, it steps to the nearby
+free tile **furthest from the crowd pressing in on it** — i.e. one tile *deeper*,
+away from where the newcomers are coming from — instead of just the nearest tile.
+
+That single directional bias makes the shuffle **propagate toward the back**:
+the front monster steps deeper, the newcomer takes its old spot, that newcomer is
+now the one being pressed and steps deeper in turn, and so on — the ring fills
+from the far side inward without anyone needing to know where "the back" is. It's
+still a one-tile-at-a-time local move (same `Migrate Search Radius` bound), so it
+never turns into a walk across the ring, and it falls back to a whole-ring search
+only for the genuine 1-wide-doorway case. In an open field (no enclosure, crowd
+roughly all around) "away from the crowd centroid" just spreads monsters apart,
+which is the same thing nearest-slot did — so it doesn't hurt the open case.
+
+This is the practical version of the "fill from the back" idea. A full global
+slot *assignment* (angular matching around the target) is still the theoretical
+best and remains the noted next step if this local version isn't enough — but it
+subsumes the corridor case into normal migration instead of needing a separate
+mode.
 
 ### Big-picture note: the slot system at scale
 
@@ -854,6 +868,7 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] Monsters settle onto whatever valid slot they drift onto and STAY (crossed targeting lines / a crowd that "almost settles then re-jumbles" should be largely gone) rather than shoving back across the pack to reach a tile they reserved from a distance
 - [ ] Two monsters on crossing/oncoming paths curve past each other (both giving a little) instead of colliding and bouncing — reciprocal avoidance
 - [ ] A settled monster only steps aside for an ally that stays blocked behind it (a real doorway jam), not for one that just brushes past in the crowd — migration hysteresis
+- [ ] A crowd bunched at the mouth of a walled King progressively fills the FAR slots too (holders step deeper as newcomers press in) instead of leaving the back of the ring empty
 - [ ] Monsters no longer settle into a faint vertical wobble while holding a slot (the gravity fix)
 - [ ] Two monsters crossing paths (e.g. heading to break separate ring walls) slide past each other instead of visibly bouncing off each other first
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)

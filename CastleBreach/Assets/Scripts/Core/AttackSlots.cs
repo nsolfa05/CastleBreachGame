@@ -180,6 +180,49 @@ public static class AttackSlots
         return found ? best : (Vector2Int?)null;
     }
 
+    /// <summary>
+    /// Claim the free OPEN slot within <paramref name="maxDistance"/> of
+    /// <paramref name="fromWorld"/> that lies FURTHEST from <paramref name="awayFrom"/>.
+    /// Used by a migrating monster (MonsterAI.TryMigrateForBlockedAlly) to step
+    /// DEEPER — away from the crowd pressing in behind it — instead of just to
+    /// the nearest open tile. That's what makes the shuffle propagate toward the
+    /// back of a pocket and actually fill the far slots, rather than everyone
+    /// clustering at the mouth: each displaced monster is nudged one tile deeper,
+    /// the newcomer takes its old spot, and so on down the line. Local by
+    /// construction (the maxDistance bound), so it's still a one-tile shuffle, not
+    /// a walk across the ring. Returns null if no free slot is in range, letting
+    /// the caller fall back to a wider search (the 1-wide-doorway case).
+    /// </summary>
+    public static Vector2Int? ClaimSlotAwayFrom(Transform target, MonsterDefinition definition,
+                                                Vector2 fromWorld, Vector2 awayFrom, MonsterAI claimant,
+                                                Vector2Int? excludeTile, float maxDistance)
+    {
+        if (target == null || definition == null) return null;
+
+        var ts = SlotsFor(target);
+        var cc = Candidates(ts, target, definition);
+        float maxSqr = maxDistance * maxDistance;
+
+        Vector2Int best = default;
+        float bestAwaySqr = -1f;
+        bool found = false;
+        foreach (var tile in cc.Open)
+        {
+            if (excludeTile.HasValue && tile == excludeTile.Value) continue;
+            if (ts.Claims.TryGetValue(tile, out var holder) && holder != null && holder != claimant) continue;
+
+            Vector2 center = GridMath.TileCenterWorld(tile);
+            if ((center - fromWorld).sqrMagnitude > maxSqr) continue; // keep it a local step, same bound as a normal migrate
+
+            float awaySqr = (center - awayFrom).sqrMagnitude;
+            if (awaySqr > bestAwaySqr) { bestAwaySqr = awaySqr; best = tile; found = true; }
+        }
+
+        if (!found) return null;
+        ts.Claims[best] = claimant;
+        return best;
+    }
+
     /// <summary>Release a slot if it's currently held by this claimant.</summary>
     public static void Release(Transform target, Vector2Int tile, MonsterAI claimant)
     {

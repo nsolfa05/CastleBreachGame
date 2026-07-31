@@ -200,6 +200,7 @@ public class MonsterAI : MonoBehaviour
     private float nextSlotMigrateTime; // throttle on migrating slots to clear a blocked ally — see TryMigrateForBlockedAlly
     private float preferLocalClaimUntil; // while Time.time < this, the next reclaim is bounded to migrateSearchRadius — see UpdateSlot's stuck-release branch and stuckReclaimLocalWindow
     private float blockedAllySince; // Time.time an ally first became continuously blocked behind me (0 = none right now) — migration hysteresis, see migrateBlockedDwell
+    private Vector2 blockingAllyPos; // centroid of allies crowding in behind me, set by AllyQueuedBehind; migration steps AWAY from it (deeper) — see TryMigrateForBlockedAlly
 
     // What this monster is currently heading for, and whether it's arrived
     // (in attack range). Read by OTHER monsters' give-way check — a settled
@@ -1166,25 +1167,29 @@ public class MonsterAI : MonoBehaviour
     /// walled objective) opens up for the ally, while it goes on attacking the
     /// same target from its new spot.
     ///
-    /// Tries a genuinely NEARBY tile first (within migrateSearchRadius — a local
-    /// shuffle, not a walk across the ring; see its tooltip for the
-    /// crossing-paths problem an unbounded search caused). But if nothing is
-    /// free that close, this falls back to searching the WHOLE ring rather than
-    /// giving up: a monster holding the one tile in a 1-wide wall gap has no
-    /// "nearby" alternative BY DEFINITION (wall on both sides) — bounding this
-    /// search unconditionally reintroduced the exact "one monster permanently
-    /// blocks the only doorway" bug this migration mechanic was built to solve
-    /// in the first place. Only when NEITHER search finds anything does it keep
-    /// its current slot and stay put — every reachable slot is genuinely full.
-    /// Claiming the new slot before releasing the old guarantees the monster is
-    /// never briefly slot-less (which would drop it into the surface-approach
-    /// fallback for a frame); the migrate cooldown then stops it hopping around
-    /// the ring every time any ally is behind it.
+    /// Steps to a NEARBY free tile, preferring the one furthest from the crowd
+    /// pressing in behind me (blockingAllyPos) — i.e. one tile DEEPER — so the
+    /// shuffle propagates toward the back of a pocket and the far slots actually
+    /// fill, instead of me hopping to a tile right beside the newcomer and
+    /// everyone staying clustered at the mouth. Still bounded to
+    /// migrateSearchRadius, so it's a one-tile shuffle, not a walk across the
+    /// ring (see that tooltip for the crossing-paths problem an unbounded search
+    /// caused). If nothing is free within that radius, it falls back to searching
+    /// the WHOLE ring rather than giving up: a monster holding the one tile in a
+    /// 1-wide wall gap has no nearby alternative BY DEFINITION (wall on both
+    /// sides), and refusing to move there reintroduced the exact "one monster
+    /// permanently blocks the only doorway" bug this mechanic exists to solve.
+    /// Only when neither search finds anything does it keep its slot and stay put
+    /// — every reachable slot is genuinely full. Claiming the new slot before
+    /// releasing the old guarantees the monster is never briefly slot-less (which
+    /// would drop it into the surface-approach fallback for a frame); the migrate
+    /// cooldown then stops it hopping around every time any ally is behind it.
     /// </summary>
     private void TryMigrateForBlockedAlly(Transform target)
     {
-        var newSlot = AttackSlots.ClaimNearestSlot(target, definition, transform.position, this,
-                                                    excludeTile: claimedSlot, maxDistance: migrateSearchRadius)
+        var newSlot = AttackSlots.ClaimSlotAwayFrom(target, definition, transform.position,
+                                                    blockingAllyPos, this, excludeTile: claimedSlot,
+                                                    maxDistance: migrateSearchRadius)
                    ?? AttackSlots.ClaimNearestSlot(target, definition, transform.position, this,
                                                     excludeTile: claimedSlot);
         if (!newSlot.HasValue) return; // no free slot anywhere — stay put, keep attacking
@@ -1215,6 +1220,8 @@ public class MonsterAI : MonoBehaviour
         const float bumpDistance = 0.9f;
 
         float radiusSqr = giveWayRadius * giveWayRadius;
+        Vector2 blockerSum = Vector2.zero;
+        int blockerCount = 0;
         for (int i = 0; i < neighborCount; i++)
         {
             var collider = NeighborBuffer[i];
@@ -1242,9 +1249,17 @@ public class MonsterAI : MonoBehaviour
             float dot = Vector2.Dot(toOther.normalized, radialOut);
             bool bumping = distSqr <= bumpDistance * bumpDistance;
             if (dot > 0.5f || bumping)
-                return true;
+            {
+                blockerSum += (Vector2)other.transform.position;
+                blockerCount++;
+            }
         }
-        return false;
+
+        if (blockerCount == 0) return false;
+        // Centroid of the allies crowding in on me — TryMigrateForBlockedAlly
+        // steps AWAY from this, i.e. deeper, so the shuffle fills the far slots.
+        blockingAllyPos = blockerSum / blockerCount;
+        return true;
     }
 
     /// <summary>
