@@ -591,17 +591,27 @@ tile clear on the far side — sometimes the very tile another monster is
 currently standing on (or walking away from) — so the two of them end up
 crossing paths and shoving through each other just to swap places.
 
-Migration now only ever looks within **Migrate Search Radius** (`1.6` tiles —
+Migration now PREFERS a tile within **Migrate Search Radius** (`1.6` tiles —
 just past one tile over, including diagonally) of the monster's current
-position. It's a genuine local shuffle: "step to the free tile right next to
-me," never a walk across the ring. If nothing is free that close, it simply
-stays put and keeps attacking — same as when no slot is free at all — rather
-than accepting a distant one. (A target that's *genuinely* over capacity still
-gets more room the other way: overflow monsters break open a walled slot
-instead of forcing an existing holder to relocate — see "A horde now breaks
-the ring open" above.) The ordinary first-time claim is untouched and still
-searches freely, which is what correctly spreads an approaching crowd into a
-full ring in the first place.
+position — a genuine local shuffle, "step to the free tile right next to me,"
+instead of a walk across the ring. The ordinary first-time claim is untouched
+and still searches freely, which is what correctly spreads an approaching
+crowd into a full ring in the first place.
+
+**Correction, found right after the above shipped:** bounding this
+unconditionally broke the doorway/chokepoint case from much earlier — a
+monster holding the single tile in a 1-wide wall gap has NO nearby alternative
+by definition (wall on both sides), so a hard bound just meant it could never
+migrate at all and permanently blocked the doorway again, with the ally behind
+it stuck endlessly backing up and bumping into it. Migration now tries nearby
+first, and only when NOTHING is free within that radius falls back to
+searching the whole ring — so a packed-but-roomy ring still only ever shuffles
+locally, while a genuine single chokepoint can still clear itself the way it
+always could. Only when there's truly no free slot anywhere does a monster
+keep its current one and stay put. (A target that's over capacity in every
+direction gets more room the other way — overflow monsters break open a walled
+slot instead of forcing an existing holder to relocate; see "A horde now
+breaks the ring open" above.)
 
 ### A getting-stuck-then-reclaiming gap — fixed (automatic)
 
@@ -766,6 +776,7 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] Two monsters meeting head-on in a 1-wide ring resolve (one eases back, the other passes) instead of locking against each other
 - [ ] Monsters already parked on a slot don't walk clear across the ring / cross paths through each other when a nearby ally is bumping them — they only ever shuffle to the tile right next to them, or stay put if none is free
 - [ ] Two still-approaching monsters that get jammed against each other don't ping-pong between crossed slot assignments after getting unstuck
+- [ ] A monster holding the single tile in a 1-wide wall gap still eventually migrates away to make room, instead of permanently blocking the doorway while the ally behind it just backs up and bumps forward forever
 - [ ] Monsters no longer settle into a faint vertical wobble while holding a slot (the gravity fix)
 - [ ] Two monsters crossing paths (e.g. heading to break separate ring walls) slide past each other instead of visibly bouncing off each other first
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)

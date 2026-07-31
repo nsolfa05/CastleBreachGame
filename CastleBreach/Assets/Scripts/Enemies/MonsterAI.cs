@@ -108,7 +108,7 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("Minimum seconds between a settled monster migrating from one attack slot to another to clear the way for a blocked ally (see the alcove/doorway behavior). Prevents a monster from hopping around the ring every frame chasing 'make room'; long enough that each migration is a decisive move to a new spot, short enough that it still responds promptly the next time it's genuinely in someone's way.")]
     [SerializeField] private float slotMigrateCooldown = 0.6f;
 
-    [Tooltip("How far (tiles) a migrating monster is willing to reach for its NEW slot — deliberately short, just past one tile over (including diagonally). Migration is meant to be a small local shuffle ('step aside one tile so the blocked ally can get in'), not a straight-line-nearest search across the whole ring: unbounded, it could hand a monster a slot clear on the far side of a crowded target, so it and whoever's now walking toward what used to be its spot end up crossing paths and shoving through each other on the way — the 'monsters pushing each other to reach a slot when they didn't have to' case. With nothing within reach it just stays put and keeps attacking, same as when no slot is free at all.")]
+    [Tooltip("How far (tiles) a migrating monster PREFERS to reach for its NEW slot — deliberately short, just past one tile over (including diagonally). Migration is meant to be a small local shuffle ('step aside one tile so the blocked ally can get in'), not always a straight-line-nearest search across the whole ring: unbounded by default, it could hand a monster a slot clear on the far side of a crowded target, so it and whoever's now walking toward what used to be its spot end up crossing paths and shoving through each other on the way. So a nearby tile always wins when one exists. But when NOTHING is free within this radius — the doorway case, a monster holding the one tile in a 1-wide wall gap has no nearby alternative by definition, wall on both sides — it falls back to searching the whole ring rather than refusing to move and jamming the doorway shut forever. Only if there's truly no free slot anywhere does it stay put and keep attacking.")]
     [SerializeField] private float migrateSearchRadius = 1.6f;
 
     [Tooltip("Seconds after a monster drops its slot because it got physically stuck reaching it (still mid-approach, not yet arrived) during which it only reclaims something within Migrate Search Radius — the same 'local shuffle, not a ring-wide swap' rule Migrate Search Radius applies to an arrived holder, extended to cover a still-approaching one too. Without this, the reclaim right after release used the same unbounded nearest-search that produced the stuck/crossed assignment in the first place, so two mutually-stuck monsters could just re-pick each other's tile and keep crossing paths indefinitely.")]
@@ -1120,22 +1120,30 @@ public class MonsterAI : MonoBehaviour
     /// DIFFERENT free slot — deterministically relocating rather than
     /// force-sliding — so its current tile (often the one chokepoint into a
     /// walled objective) opens up for the ally, while it goes on attacking the
-    /// same target from its new spot. If there is NO free slot within
-    /// migrateSearchRadius, it keeps its current one and stays put: the best it
-    /// can do is keep attacking, and giving up the tile with nowhere NEARBY to go
-    /// would just send it on a walk across the ring for nothing. Bounding the
-    /// search (rather than taking whatever's globally nearest) is deliberate —
-    /// see migrateSearchRadius's tooltip for the crossing-paths problem an
-    /// unbounded search caused. Claiming the new slot before releasing the old
-    /// guarantees the monster is never briefly slot-less (which would drop it
-    /// into the surface-approach fallback for a frame); the migrate cooldown
-    /// then stops it hopping around the ring every time any ally is behind it.
+    /// same target from its new spot.
+    ///
+    /// Tries a genuinely NEARBY tile first (within migrateSearchRadius — a local
+    /// shuffle, not a walk across the ring; see its tooltip for the
+    /// crossing-paths problem an unbounded search caused). But if nothing is
+    /// free that close, this falls back to searching the WHOLE ring rather than
+    /// giving up: a monster holding the one tile in a 1-wide wall gap has no
+    /// "nearby" alternative BY DEFINITION (wall on both sides) — bounding this
+    /// search unconditionally reintroduced the exact "one monster permanently
+    /// blocks the only doorway" bug this migration mechanic was built to solve
+    /// in the first place. Only when NEITHER search finds anything does it keep
+    /// its current slot and stay put — every reachable slot is genuinely full.
+    /// Claiming the new slot before releasing the old guarantees the monster is
+    /// never briefly slot-less (which would drop it into the surface-approach
+    /// fallback for a frame); the migrate cooldown then stops it hopping around
+    /// the ring every time any ally is behind it.
     /// </summary>
     private void TryMigrateForBlockedAlly(Transform target)
     {
         var newSlot = AttackSlots.ClaimNearestSlot(target, definition, transform.position, this,
-                                                    excludeTile: claimedSlot, maxDistance: migrateSearchRadius);
-        if (!newSlot.HasValue) return; // no free slot nearby — stay put, keep attacking
+                                                    excludeTile: claimedSlot, maxDistance: migrateSearchRadius)
+                   ?? AttackSlots.ClaimNearestSlot(target, definition, transform.position, this,
+                                                    excludeTile: claimedSlot);
+        if (!newSlot.HasValue) return; // no free slot anywhere — stay put, keep attacking
 
         AttackSlots.Release(target, claimedSlot, this); // free the tile that was in the ally's way
         claimedSlot = newSlot.Value;                    // slotTarget unchanged; still holding a slot for the same target
