@@ -1038,6 +1038,31 @@ public class MonsterAI : MonoBehaviour
         if (hasSlot && !AttackSlots.IsValidClaim(objective, claimedSlot, definition, this))
             ReleaseSlot();
 
+        // Opportunistic re-anchor ("claim where you stand"): if I'm physically on
+        // a valid, free open slot for this objective right now — whether I hold a
+        // different one I'm still shoving toward, or none at all — just take THIS
+        // one and be done. This is the big stabilizer: a monster adopts wherever
+        // it has already drifted instead of crossing back through the crowd to
+        // reach a tile it reserved earlier, which is most of what made monsters
+        // push past each other and re-jumble right as they were about to settle.
+        // On success there's nothing left to reconcile, so it returns before the
+        // release/reclaim/migrate paths below even run. Gated on being near the
+        // target, the same closeness gate claiming uses.
+        if (DistanceToTarget(objective) <= definition.attackRange + slotClaimDistance)
+        {
+            Vector2Int here = GridMath.WorldToTile(transform.position);
+            if ((!hasSlot || claimedSlot != here) &&
+                AttackSlots.TryClaimTile(objective, definition, here, this))
+            {
+                if (hasSlot && claimedSlot != here) AttackSlots.Release(objective, claimedSlot, this);
+                claimedSlot = here;
+                slotTarget = objective;
+                hasSlot = true;
+                blockedByStructure = null; // standing on it — nothing to break to reach it
+                return;
+            }
+        }
+
         // The slot proved unreachable last frame — routing to it fell through to
         // breaking a wall (blockedByStructure set while we held a slot). Give it
         // up so we go break in unencumbered rather than clinging to a spot we

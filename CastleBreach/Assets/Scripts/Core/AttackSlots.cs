@@ -190,6 +190,32 @@ public static class AttackSlots
     }
 
     /// <summary>
+    /// Claim EXACTLY <paramref name="tile"/> — and only if it's a valid OPEN slot
+    /// for this monster type right now and not already held by someone else living
+    /// (already held by this claimant counts as success). Returns true on success.
+    ///
+    /// Unlike ClaimNearestSlot this never searches or substitutes a different
+    /// tile: it's the "just take the spot I'm literally standing on" primitive.
+    /// A monster that has physically drifted onto a perfectly good free slot
+    /// should settle onto THAT rather than shove back across the crowd to reach
+    /// whatever tile it reserved earlier — claim where you stand. That single
+    /// rule removes most of the crossing/pushing, because a monster then almost
+    /// never needs to walk THROUGH other monsters to reach its slot; it adopts
+    /// wherever it already is. OPEN slots only (walkable now) — you can't be
+    /// standing on a walled one.
+    /// </summary>
+    public static bool TryClaimTile(Transform target, MonsterDefinition definition, Vector2Int tile, MonsterAI claimant)
+    {
+        if (target == null || definition == null) return false;
+        var ts = SlotsFor(target);
+        if (!Candidates(ts, target, definition).Open.Contains(tile)) return false;
+        if (ts.Claims.TryGetValue(tile, out var holder) && holder != null && holder != claimant) return false;
+
+        ts.Claims[tile] = claimant;
+        return true;
+    }
+
+    /// <summary>
     /// True if <paramref name="tile"/> is still both a valid candidate slot for
     /// this monster type (as of the current grid) AND still claimed by this
     /// claimant. A monster whose slot goes invalid — a wall built on it, say —

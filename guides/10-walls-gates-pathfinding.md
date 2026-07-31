@@ -631,6 +631,35 @@ considers tiles within Migrate Search Radius of the monster's current
 position — a genuine local pick instead of a ring-wide search. A monster that
 never held a slot at all still searches freely, same as before.
 
+### "Claim where you stand" — the big stabilizer (automatic)
+
+All the fixes above chip at *symptoms* of the same root problem: a monster
+reserves a slot from a distance, then has to physically walk to that exact tile
+— and if the crowd has shifted by the time it arrives, reaching its reserved
+tile means shoving back through everyone. That's the crossing/pushing, and it's
+also why a crowd would look like it was about to settle and then re-jumble: the
+assignment kept churning because everyone was committed to a *specific* tile
+rather than to *a* good spot.
+
+New rule (this is the one you suggested): **if a monster is physically standing
+on a valid, free slot for its target, it just claims THAT one and is done** —
+dropping whatever tile it had reserved earlier. It adopts wherever it has
+already drifted instead of crossing back for its reservation. Because claiming
+the tile you're already on requires no travel, it removes most of the
+pushing outright: a monster almost never has to walk *through* other monsters
+to reach its slot anymore; it settles onto the first good tile it wanders onto
+and stops there.
+
+This also quiets the shuffle-chain churn as a side effect. A monster that has
+opportunistically settled reads as *placed*, so it no longer registers as an
+"ally still trying to get in" bumping the monster ahead of it — which means
+holders stop being asked to migrate for allies that have, in fact, already
+found a spot. Migration now mostly only fires for the genuine chokepoint case
+it's actually meant for (someone boxed in behind a doorway with nowhere of
+their own to stand). The explicit reserve-a-distant-slot path still exists and
+still spreads an incoming crowd into a ring; "claim where you stand" just wins
+whenever a monster is already on something valid.
+
 ### Big-picture note: the slot system at scale
 
 Worth recording for later, since it came up while chasing these crowd bugs:
@@ -777,6 +806,7 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] Monsters already parked on a slot don't walk clear across the ring / cross paths through each other when a nearby ally is bumping them — they only ever shuffle to the tile right next to them, or stay put if none is free
 - [ ] Two still-approaching monsters that get jammed against each other don't ping-pong between crossed slot assignments after getting unstuck
 - [ ] A monster holding the single tile in a 1-wide wall gap still eventually migrates away to make room, instead of permanently blocking the doorway while the ally behind it just backs up and bumps forward forever
+- [ ] Monsters settle onto whatever valid slot they drift onto and STAY (crossed targeting lines / a crowd that "almost settles then re-jumbles" should be largely gone) rather than shoving back across the pack to reach a tile they reserved from a distance
 - [ ] Monsters no longer settle into a faint vertical wobble while holding a slot (the gravity fix)
 - [ ] Two monsters crossing paths (e.g. heading to break separate ring walls) slide past each other instead of visibly bouncing off each other first
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)
