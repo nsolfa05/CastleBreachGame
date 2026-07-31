@@ -660,6 +660,51 @@ their own to stand). The explicit reserve-a-distant-slot path still exists and
 still spreads an incoming crowd into a ring; "claim where you stand" just wins
 whenever a monster is already on something valid.
 
+### Two principled upgrades: reciprocal avoidance + migration hysteresis (automatic)
+
+After chasing the crowd behavior patch by patch for a while, two ideas from how
+real crowd-heavy games solve this got pulled in properly, replacing/backing up
+some of the ad-hoc pieces:
+
+- **Reciprocal collision avoidance (the RVO/ORCA idea).** The old head-on nudge
+  only looked at whether a neighbor was *facing* toward this monster. The
+  replacement (`AvoidNeighbors`, weighted by **Avoid Strength**, default `0.6`)
+  asks the proper question: from our two *velocities*, are we actually
+  converging? When two monsters genuinely are, they BOTH veer to the same
+  rotational side (each to its own right relative to the line between them —
+  which, because that line points opposite ways for the two of them, sends them
+  to opposite world sides). They split the dodge and glide past instead of one
+  bouncing off the other. This is the "reciprocity" real crowd solvers rely on:
+  neither has to win, both give a little, and it resolves cleanly. It's distinct
+  from separation, which only reacts to how *close* bodies are, not where
+  they're headed. (This is a cheap per-neighbor form of the idea, not a full
+  ORCA solver — enough for this game's scale.)
+
+- **Migration hysteresis (the stable-assignment idea).** A monster no longer
+  gives up its slot the instant an ally brushes past it. The ally must have been
+  *continuously* blocked behind it for **Migrate Blocked Dwell** (default `0.5`
+  s) first. In a packed ring monsters are always momentarily jostling past each
+  other; migrating on every transient bump was a big part of the "almost
+  settles, then re-jumbles" churn. A real chokepoint block (a doorway) is
+  *persistent*, so it clears the dwell and still triggers a migration — the
+  case migration is actually meant for — while the fleeting bumps that caused
+  the churn now get ignored.
+
+Both are plain tunables on the Monster prefab (Avoid Strength / Migrate Blocked
+Dwell); set either to a low value or `0` to dial it back toward the old
+behavior if a value ever feels off.
+
+**On corridors specifically (a good question that came up):** the ideal for a
+tight one-way corridor is "fill from the back" — the first monster in walks to
+the *deepest* slot so later ones fill toward the mouth and nobody climbs over
+anyone. That's a real technique, but it's the exact *opposite* of what you want
+in an open ring (there, nearest-slot is right), and no simple local rule gets
+both. The clean unifier is a global slot *assignment* that hands out tiles to
+minimize crossing (e.g. angular matching around the target), which produces
+back-to-front in a corridor and nearest-arc in the open automatically. That's a
+larger, separate change — noted here as the intended next step if corridor maps
+end up leaning on it, rather than bolted on now.
+
 ### Big-picture note: the slot system at scale
 
 Worth recording for later, since it came up while chasing these crowd bugs:
@@ -807,6 +852,8 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] Two still-approaching monsters that get jammed against each other don't ping-pong between crossed slot assignments after getting unstuck
 - [ ] A monster holding the single tile in a 1-wide wall gap still eventually migrates away to make room, instead of permanently blocking the doorway while the ally behind it just backs up and bumps forward forever
 - [ ] Monsters settle onto whatever valid slot they drift onto and STAY (crossed targeting lines / a crowd that "almost settles then re-jumbles" should be largely gone) rather than shoving back across the pack to reach a tile they reserved from a distance
+- [ ] Two monsters on crossing/oncoming paths curve past each other (both giving a little) instead of colliding and bouncing — reciprocal avoidance
+- [ ] A settled monster only steps aside for an ally that stays blocked behind it (a real doorway jam), not for one that just brushes past in the crowd — migration hysteresis
 - [ ] Monsters no longer settle into a faint vertical wobble while holding a slot (the gravity fix)
 - [ ] Two monsters crossing paths (e.g. heading to break separate ring walls) slide past each other instead of visibly bouncing off each other first
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)

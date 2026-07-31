@@ -95,8 +95,8 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("The floor speed (as a fraction of moveSpeed) arrival easing ramps down to, never all the way to 0. A small floor keeps a settled monster's other forces (give-way, separation) able to actually move it a meaningful amount even right at its spot — dropping all the way to a full stop would fight those.")]
     [SerializeField, Range(0f, 1f)] private float arrivalMinSpeedFactor = 0.35f;
 
-    [Tooltip("How hard a monster steers sideways, proactively, when it notices a nearby ally moving roughly TOWARD it (an oncoming meeting, not just crowding). Without this, two monsters approaching head-on only get separated reactively — by physically colliding first, then waiting for stuck-recovery's slower escalation to notice and push sideways — which reads as a couple of visible bounces before they finally slide past each other. This anticipates it a step earlier: the more directly two paths oppose, the stronger the sideways nudge, so they peel apart and glide past (sliding across/behind, as intended) rather than meeting head-on at all. 0 = off.")]
-    [SerializeField] private float headOnAvoidStrength = 0.5f;
+    [Tooltip("How hard a monster steers sideways to avoid an imminent collision with a neighbor it's actually closing on (RECIPROCAL, velocity-based avoidance — the ORCA/RVO idea used by most crowd-heavy games, cut down to a cheap per-neighbor form). Predicts a collision from the two monsters' relative velocity (are we actually converging?), and both agents deterministically veer to the same rotational side, so they split the dodge and glide past instead of meeting head-on and bouncing. Distinct from plain separation, which only reacts to how CLOSE bodies are, not where they're heading. Higher = earlier, wider berths; too high = monsters swerve around allies they'd never have hit. 0 = off (falls back to separation + stuck-recovery alone).")]
+    [SerializeField] private float avoidStrength = 0.6f;
 
     [Header("Attack slots (shared behavior, not per-monster-type data)")]
     [Tooltip("When on, a monster closing on its target claims a distinct standing spot (\"slot\") around it — one of the real walkable tiles within attack range — and heads there instead of everyone converging on the target's nearest surface. This is what actually spreads a crowd into a ring and stops the front rank hogging the only reachable tile, especially around a target boxed into a tight alcove where there's no room to shuffle sideways. The force behaviors above still handle the journey and any overflow once every slot is taken. Off = the old behavior (approach the target's surface directly).")]
@@ -107,6 +107,9 @@ public class MonsterAI : MonoBehaviour
 
     [Tooltip("Minimum seconds between a settled monster migrating from one attack slot to another to clear the way for a blocked ally (see the alcove/doorway behavior). Prevents a monster from hopping around the ring every frame chasing 'make room'; long enough that each migration is a decisive move to a new spot, short enough that it still responds promptly the next time it's genuinely in someone's way.")]
     [SerializeField] private float slotMigrateCooldown = 0.6f;
+
+    [Tooltip("How long (seconds) an ally must be CONTINUOUSLY blocked behind a monster before that monster gives up its slot to make room — hysteresis that keeps a packed-but-roomy ring from constantly reshuffling. Monsters in a crowd momentarily jostle past each other all the time; without this dwell, every transient brush triggered a migration, which is what made a crowd look like it was about to settle and then re-jumble. A genuine chokepoint block (someone stuck at a doorway) is persistent, so it clears the dwell and still gets a migration — the case this is actually for. Higher = calmer/stickier but slower to clear a real block; too high and a legitimately jammed ally waits noticeably.")]
+    [SerializeField] private float migrateBlockedDwell = 0.5f;
 
     [Tooltip("How far (tiles) a migrating monster PREFERS to reach for its NEW slot — deliberately short, just past one tile over (including diagonally). Migration is meant to be a small local shuffle ('step aside one tile so the blocked ally can get in'), not always a straight-line-nearest search across the whole ring: unbounded by default, it could hand a monster a slot clear on the far side of a crowded target, so it and whoever's now walking toward what used to be its spot end up crossing paths and shoving through each other on the way. So a nearby tile always wins when one exists. But when NOTHING is free within this radius — the doorway case, a monster holding the one tile in a 1-wide wall gap has no nearby alternative by definition, wall on both sides — it falls back to searching the whole ring rather than refusing to move and jamming the doorway shut forever. Only if there's truly no free slot anywhere does it stay put and keep attacking.")]
     [SerializeField] private float migrateSearchRadius = 1.6f;
@@ -196,6 +199,7 @@ public class MonsterAI : MonoBehaviour
     private Transform slotTarget;
     private float nextSlotMigrateTime; // throttle on migrating slots to clear a blocked ally — see TryMigrateForBlockedAlly
     private float preferLocalClaimUntil; // while Time.time < this, the next reclaim is bounded to migrateSearchRadius — see UpdateSlot's stuck-release branch and stuckReclaimLocalWindow
+    private float blockedAllySince; // Time.time an ally first became continuously blocked behind me (0 = none right now) — migration hysteresis, see migrateBlockedDwell
 
     // What this monster is currently heading for, and whether it's arrived
     // (in attack range). Read by OTHER monsters' give-way check — a settled
@@ -522,11 +526,11 @@ public class MonsterAI : MonoBehaviour
         }
         else
         {
-            // headOnAvoidance is added here — not just left to separation — so an
-            // oncoming pair starts peeling apart BEFORE they physically meet,
-            // rather than colliding first and only correcting once stuck-recovery
-            // notices a few checks later. See HeadOnAvoidance.
-            steer = seekDirection + separation + HeadOnAvoidance(seekDirection) * headOnAvoidStrength;
+            // Reciprocal avoidance is added here — not just left to separation —
+            // so a converging pair starts peeling apart BEFORE they physically
+            // meet, rather than colliding first and only correcting once
+            // stuck-recovery notices a few checks later. See AvoidNeighbors.
+            steer = seekDirection + separation + AvoidNeighbors() * avoidStrength;
 
             // Arrival easing — see the Arrival Radius tooltip for why this
             // exists. Only in this calm-settling branch: a monster that's
@@ -1109,9 +1113,24 @@ public class MonsterAI : MonoBehaviour
         // Gated on IsPlaced (actually sitting in our slot) rather than merely
         // settled-near-the-King, so only an established holder yields; suppressed
         // while breaking in (blockedByStructure), where "behind me" is meaningless.
-        if (hasSlot && IsPlaced() && blockedByStructure == null &&
-            Time.time >= nextSlotMigrateTime && AllyQueuedBehind(objective))
-            TryMigrateForBlockedAlly(objective);
+        //
+        // HYSTERESIS (the stability lever): don't migrate the instant an ally
+        // brushes past — require it to have been continuously blocked behind me
+        // for migrateBlockedDwell. A packed-but-roomy ring is full of monsters
+        // momentarily jostling past each other; migrating on every transient bump
+        // is exactly what made the crowd "almost settle, then re-jumble". A
+        // genuine chokepoint block (a doorway) is PERSISTENT, so it clears the
+        // dwell and still triggers — the case migration is actually for.
+        if (hasSlot && IsPlaced() && blockedByStructure == null && AllyQueuedBehind(objective))
+        {
+            if (blockedAllySince <= 0f) blockedAllySince = Time.time;
+            if (Time.time - blockedAllySince >= migrateBlockedDwell && Time.time >= nextSlotMigrateTime)
+                TryMigrateForBlockedAlly(objective);
+        }
+        else
+        {
+            blockedAllySince = 0f; // the block cleared (or I'm not eligible) — reset the dwell
+        }
 
         // Claim a slot once close enough. allowWalled lets an overflow monster
         // that finds every open slot taken grab a walled would-be slot instead
@@ -1312,17 +1331,28 @@ public class MonsterAI : MonoBehaviour
     /// sideways — which showed up as a monster visibly bouncing off an ally a
     /// couple of times before finally sliding past (e.g. two monsters crossing
     /// paths on the way to breaking their own ring walls). Reads a neighbor's
-    /// actual velocity (not its seekDirection, which isn't exposed) as the
-    /// stand-in for "which way is it headed" — a stationary neighbor
-    /// contributes nothing, since there's nothing oncoming about standing
-    /// still. Uses this monster's own avoidSide for the sideways direction, so
-    /// it's stable frame to frame rather than picking a fresh side every check.
+    /// Reciprocal, velocity-based collision avoidance — a cut-down take on the
+    /// ORCA/RVO approach most crowd-heavy games use, without the full
+    /// linear-programming solver. For each nearby neighbor it asks the RVO
+    /// question — "given our two velocities, are we actually converging?" — using
+    /// relative velocity, not just how close we are (that's what plain separation
+    /// already covers). When two are genuinely closing, BOTH veer to the same
+    /// rotational side: each steers to its own right relative to the line to the
+    /// other. Because that line points opposite ways for the two of them, "right"
+    /// resolves to opposite WORLD directions, so they split the avoidance and
+    /// slide past each other instead of meeting head-on and bouncing — the
+    /// reciprocity is the whole point, and why it doesn't need one agent to
+    /// "win". A neighbor we're moving APART from contributes nothing (no
+    /// imminent collision), and the nudge scales with how close and how head-on
+    /// the approach is, so a glancing pass barely registers while a dead-on
+    /// closing does. Returns an un-normalized bias; MoveToward folds it into the
+    /// steer alongside seek and separation.
     /// </summary>
-    private Vector2 HeadOnAvoidance(Vector2 seekDirection)
+    private Vector2 AvoidNeighbors()
     {
-        if (headOnAvoidStrength <= 0f || seekDirection.sqrMagnitude < 0.0001f) return Vector2.zero;
+        if (avoidStrength <= 0f) return Vector2.zero;
 
-        Vector2 sideways = new Vector2(-seekDirection.y, seekDirection.x) * avoidSide;
+        Vector2 myVelocity = rb.linearVelocity;
         Vector2 bias = Vector2.zero;
         float radiusSqr = separationRadius * separationRadius;
 
@@ -1332,14 +1362,32 @@ public class MonsterAI : MonoBehaviour
             if (collider == null || collider.gameObject == gameObject) continue;
             var other = collider.GetComponentInParent<MonsterAI>();
             if (other == null || other.rb == null) continue;
-            if (((Vector2)other.transform.position - (Vector2)transform.position).sqrMagnitude > radiusSqr) continue;
 
-            Vector2 otherVelocity = other.rb.linearVelocity;
-            if (otherVelocity.sqrMagnitude < 0.01f) continue; // not actually moving — nothing oncoming about it
+            Vector2 relPos = (Vector2)other.transform.position - (Vector2)transform.position;
+            float distSqr = relPos.sqrMagnitude;
+            if (distSqr < 0.0001f || distSqr > radiusSqr) continue;
 
-            float headOn = Vector2.Dot(seekDirection, otherVelocity.normalized); // -1 = moving straight at me
-            if (headOn < -0.3f)
-                bias += sideways * -headOn; // the more directly opposed, the stronger the nudge
+            // Converging only: my velocity RELATIVE to theirs must point toward
+            // them. Two monsters both flowing the same way (a crowd streaming to
+            // the King together) have near-zero relative velocity and don't
+            // trigger this — it's specifically for crossing/oncoming paths.
+            Vector2 relVel = myVelocity - other.rb.linearVelocity;
+            float closing = Vector2.Dot(relVel, relPos);
+            if (closing <= 0f) continue;
+
+            float dist = Mathf.Sqrt(distSqr);
+            Vector2 toOther = relPos / dist;
+            // "Right" of the direction to the other agent. The other computes the
+            // same off ITS toOther (which points the opposite way), so its right
+            // is our left — the two veer to opposite world sides and pass cleanly.
+            Vector2 right = new Vector2(toOther.y, -toOther.x);
+
+            // Urgency: closer neighbors and more head-on closings push harder.
+            // relVelMag normalizes 'closing' back into "how head-on" (0..1).
+            float relVelMag = relVel.magnitude;
+            float headOn = relVelMag > 0.0001f ? closing / (relVelMag * dist) : 0f;
+            float proximity = 1f - dist / separationRadius;
+            bias += right * (headOn * proximity);
         }
         return bias;
     }
