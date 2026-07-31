@@ -577,6 +577,32 @@ directly their paths oppose, the stronger the nudge. Two monsters on a
 collision course now peel apart and slide past each other early, instead of
 colliding first and correcting after the fact.
 
+### Migration reaching clear across the ring — fixed (automatic)
+
+Still more pushing turned up even after the above: two monsters that had both
+already *arrived*, sitting right next to each other, would still sometimes
+shove past one another for no visible reason. Cause: when a settled monster
+migrates to make room for a blocked ally (see the alcove/doorway fix earlier),
+it used to search for its new slot the same way the very first claim does —
+nearest by straight-line distance, unbounded. That's fine for the first claim,
+made from a distance before the crowd has formed. But a migration happens
+*inside* an already-packed ring, and "nearest, anywhere" can easily land on a
+tile clear on the far side — sometimes the very tile another monster is
+currently standing on (or walking away from) — so the two of them end up
+crossing paths and shoving through each other just to swap places.
+
+Migration now only ever looks within **Migrate Search Radius** (`1.6` tiles —
+just past one tile over, including diagonally) of the monster's current
+position. It's a genuine local shuffle: "step to the free tile right next to
+me," never a walk across the ring. If nothing is free that close, it simply
+stays put and keeps attacking — same as when no slot is free at all — rather
+than accepting a distant one. (A target that's *genuinely* over capacity still
+gets more room the other way: overflow monsters break open a walled slot
+instead of forcing an existing holder to relocate — see "A horde now breaks
+the ring open" above.) The ordinary first-time claim is untouched and still
+searches freely, which is what correctly spreads an approaching crowd into a
+full ring in the first place.
+
 ## Step 6 — Playtest
 
 Press **5**, then left-click to lay walls (you keep carrying it, so you can
@@ -689,6 +715,7 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] Those ring-breaks only hit walls right against the King, never maze walls further out
 - [ ] Monsters sitting on their slots hold still and attack instead of jittering/shoving each other when there's room for everyone
 - [ ] Two monsters meeting head-on in a 1-wide ring resolve (one eases back, the other passes) instead of locking against each other
+- [ ] Monsters already parked on a slot don't walk clear across the ring / cross paths through each other when a nearby ally is bumping them — they only ever shuffle to the tile right next to them, or stay put if none is free
 - [ ] Monsters no longer settle into a faint vertical wobble while holding a slot (the gravity fix)
 - [ ] Two monsters crossing paths (e.g. heading to break separate ring walls) slide past each other instead of visibly bouncing off each other first
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)

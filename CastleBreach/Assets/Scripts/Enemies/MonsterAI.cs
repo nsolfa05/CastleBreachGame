@@ -108,6 +108,9 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("Minimum seconds between a settled monster migrating from one attack slot to another to clear the way for a blocked ally (see the alcove/doorway behavior). Prevents a monster from hopping around the ring every frame chasing 'make room'; long enough that each migration is a decisive move to a new spot, short enough that it still responds promptly the next time it's genuinely in someone's way.")]
     [SerializeField] private float slotMigrateCooldown = 0.6f;
 
+    [Tooltip("How far (tiles) a migrating monster is willing to reach for its NEW slot — deliberately short, just past one tile over (including diagonally). Migration is meant to be a small local shuffle ('step aside one tile so the blocked ally can get in'), not a straight-line-nearest search across the whole ring: unbounded, it could hand a monster a slot clear on the far side of a crowded target, so it and whoever's now walking toward what used to be its spot end up crossing paths and shoving through each other on the way — the 'monsters pushing each other to reach a slot when they didn't have to' case. With nothing within reach it just stays put and keeps attacking, same as when no slot is free at all.")]
+    [SerializeField] private float migrateSearchRadius = 1.6f;
+
     [Tooltip("Actual physics velocity below this (units/sec) counts as \"stuck\" — used to detect a monster that's committed to attacking a structure but is physically blocked (e.g. trapped behind another monster) from ever reaching it.")]
     [SerializeField] private float stuckVelocityThreshold = 0.15f;
 
@@ -1050,18 +1053,22 @@ public class MonsterAI : MonoBehaviour
     /// DIFFERENT free slot — deterministically relocating rather than
     /// force-sliding — so its current tile (often the one chokepoint into a
     /// walled objective) opens up for the ally, while it goes on attacking the
-    /// same target from its new spot. If there is NO other free slot, it keeps
-    /// its current one and stays put: the best it can do is keep attacking, and
-    /// giving up the tile with nowhere to go would just abandon a hit for
-    /// nothing. Claiming the new slot before releasing the old guarantees the
-    /// monster is never briefly slot-less (which would drop it into the surface-
-    /// approach fallback for a frame); the migrate cooldown then stops it
-    /// hopping around the ring every time any ally is behind it.
+    /// same target from its new spot. If there is NO free slot within
+    /// migrateSearchRadius, it keeps its current one and stays put: the best it
+    /// can do is keep attacking, and giving up the tile with nowhere NEARBY to go
+    /// would just send it on a walk across the ring for nothing. Bounding the
+    /// search (rather than taking whatever's globally nearest) is deliberate —
+    /// see migrateSearchRadius's tooltip for the crossing-paths problem an
+    /// unbounded search caused. Claiming the new slot before releasing the old
+    /// guarantees the monster is never briefly slot-less (which would drop it
+    /// into the surface-approach fallback for a frame); the migrate cooldown
+    /// then stops it hopping around the ring every time any ally is behind it.
     /// </summary>
     private void TryMigrateForBlockedAlly(Transform target)
     {
-        var newSlot = AttackSlots.ClaimNearestSlot(target, definition, transform.position, this, excludeTile: claimedSlot);
-        if (!newSlot.HasValue) return; // no other free slot — stay put, keep attacking
+        var newSlot = AttackSlots.ClaimNearestSlot(target, definition, transform.position, this,
+                                                    excludeTile: claimedSlot, maxDistance: migrateSearchRadius);
+        if (!newSlot.HasValue) return; // no free slot nearby — stay put, keep attacking
 
         AttackSlots.Release(target, claimedSlot, this); // free the tile that was in the ally's way
         claimedSlot = newSlot.Value;                    // slotTarget unchanged; still holding a slot for the same target
