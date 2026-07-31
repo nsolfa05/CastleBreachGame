@@ -98,6 +98,12 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("How hard a monster steers sideways to avoid an imminent collision with a neighbor it's actually closing on (RECIPROCAL, velocity-based avoidance — the ORCA/RVO idea used by most crowd-heavy games, cut down to a cheap per-neighbor form). Predicts a collision from the two monsters' relative velocity (are we actually converging?), and both agents deterministically veer to the same rotational side, so they split the dodge and glide past instead of meeting head-on and bouncing. Distinct from plain separation, which only reacts to how CLOSE bodies are, not where they're heading. Higher = earlier, wider berths; too high = monsters swerve around allies they'd never have hit. 0 = off (falls back to separation + stuck-recovery alone).")]
     [SerializeField] private float avoidStrength = 0.6f;
 
+    [Tooltip("PRESSURE GRADIENT — the 'flood like water & surround' knob. How hard a rear-rank monster throttles its forward speed when boxed in behind allies heading to the SAME target. 0 = off (everyone drives at full force = the old behavior, where the rear compresses the front rank through the structure). Higher = the front line holds and attacks while the ranks behind push in progressively softer, so a crowd spills sideways and flows AROUND to surround a target (and fills a corridor like water) instead of piling on its near face. As front-liners die or move, the pressure behind them drops and the next rank flows into the opening. This is the main dial for 'how much the rear pushes the front into corridors' — turn it UP for more water-like/less shoving.")]
+    [SerializeField] private float rearPushFalloff = 2f;
+
+    [Tooltip("The lowest forward-speed fraction the pressure gradient (Rear Push Falloff) can throttle a rear enemy down to. A small floor keeps even a deeply-buried enemy slowly creeping, so it flows into any opening the instant one appears instead of freezing solid. 1 = no throttle at all.")]
+    [SerializeField, Range(0f, 1f)] private float rearPushFloor = 0.2f;
+
     [Header("Attack slots (shared behavior, not per-monster-type data)")]
     [Tooltip("When on, a monster closing on its target claims a distinct standing spot (\"slot\") around it — one of the real walkable tiles within attack range — and heads there instead of everyone converging on the target's nearest surface. This is what actually spreads a crowd into a ring and stops the front rank hogging the only reachable tile, especially around a target boxed into a tight alcove where there's no room to shuffle sideways. The force behaviors above still handle the journey and any overflow once every slot is taken. Off = the old behavior (approach the target's surface directly).")]
     [SerializeField] private bool useAttackSlots = true;
@@ -460,6 +466,7 @@ public class MonsterAI : MonoBehaviour
 
         float extraSpeedScale = 1f;
         float arrivalSpeedFactor = 1f;
+        float crowdScale = 1f; // pressure-gradient throttle for rear ranks — set in the calm branch below
         Vector2 steer;
 
         if (!arrived && ShouldYieldToLeader(seekDirection, steeringPoint))
@@ -533,6 +540,19 @@ public class MonsterAI : MonoBehaviour
             // stuck-recovery notices a few checks later. See AvoidNeighbors.
             steer = seekDirection + separation + AvoidNeighbors() * avoidStrength;
 
+            // Pressure gradient (flood-and-surround): throttle forward speed by
+            // how boxed-in this monster is behind same-target allies ahead of it.
+            // A front-rank monster (nothing ahead) keeps full speed and holds the
+            // line; rear ranks slow down so they don't compress the front into the
+            // structure, and separation (unthrottled here — this only scales the
+            // final speed) turns their slow drive sideways so they flow around and
+            // surround rather than pile on the near face. See rearPushFalloff.
+            if (rearPushFalloff > 0f)
+            {
+                float pressure = ForwardCrowdPressure(seekDirection);
+                crowdScale = Mathf.Max(rearPushFloor, 1f / (1f + pressure * rearPushFalloff));
+            }
+
             // Arrival easing — see the Arrival Radius tooltip for why this
             // exists. Only in this calm-settling branch: a monster that's
             // stuck or yielding needs full-strength force to actually break
@@ -555,7 +575,7 @@ public class MonsterAI : MonoBehaviour
             steer += GiveWayVelocity(target);
 
         steer = steer.sqrMagnitude > 0.0001f ? steer.normalized : seekDirection;
-        rb.linearVelocity = steer * (definition.moveSpeed * speedScale * extraSpeedScale * arrivalSpeedFactor);
+        rb.linearVelocity = steer * (definition.moveSpeed * speedScale * extraSpeedScale * arrivalSpeedFactor * crowdScale);
     }
 
     /// <summary>
@@ -1405,6 +1425,41 @@ public class MonsterAI : MonoBehaviour
             bias += right * (headOn * proximity);
         }
         return bias;
+    }
+
+    /// <summary>
+    /// How boxed-in toward the target this monster is by same-objective allies
+    /// directly AHEAD of it — 0 for a front-rank monster with a clear path,
+    /// growing as ranks stack up in front. MoveToward turns this into a
+    /// forward-speed throttle (rearPushFalloff): the front holds and attacks
+    /// while rear ranks push in softer, so a crowd floods and surrounds a target
+    /// instead of the back compressing the front through it. Same-objective only
+    /// (an unrelated monster crossing my path isn't "the rank ahead"), and only
+    /// neighbors actually in front of me toward where I'm steering count.
+    /// </summary>
+    private float ForwardCrowdPressure(Vector2 seekDir)
+    {
+        if (seekDir.sqrMagnitude < 0.0001f) return 0f;
+
+        float radiusSqr = giveWayRadius * giveWayRadius;
+        float pressure = 0f;
+        for (int i = 0; i < neighborCount; i++)
+        {
+            var collider = NeighborBuffer[i];
+            if (collider == null || collider.gameObject == gameObject) continue;
+            var other = collider.GetComponentInParent<MonsterAI>();
+            if (other == null || other.currentTarget != currentTarget) continue; // same objective only
+
+            Vector2 toOther = (Vector2)other.transform.position - (Vector2)transform.position;
+            float distSqr = toOther.sqrMagnitude;
+            if (distSqr < 0.0001f || distSqr > radiusSqr) continue;
+
+            float dist = Mathf.Sqrt(distSqr);
+            float ahead = Vector2.Dot(toOther / dist, seekDir); // 1 = directly ahead of me toward the target
+            if (ahead > 0.25f)
+                pressure += ahead * (1f - dist / giveWayRadius); // nearer + more-ahead blocks more
+        }
+        return pressure;
     }
 
     /// <summary>

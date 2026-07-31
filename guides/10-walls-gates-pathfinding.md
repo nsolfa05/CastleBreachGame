@@ -719,6 +719,30 @@ best and remains the noted next step if this local version isn't enough — but 
 subsumes the corridor case into normal migration instead of needing a separate
 mode.
 
+### Pressure gradient — "flood like water & surround" (automatic, tunable)
+
+The first step of a deliberate shift toward *emergent* crowd positioning (letting
+attack positions arise from crowd behavior instead of a rigid slot assignment).
+This piece helps regardless of which system you use, and it's the dial you asked
+for: **how hard the rear ranks push the front.**
+
+Every monster now measures how boxed-in it is behind allies heading to the *same*
+target (`ForwardCrowdPressure`) and throttles its own forward speed by it
+(**Rear Push Falloff**, default `2`, with a **Rear Push Floor**, default `0.2`, so
+a buried monster still creeps). A front-rank monster has nothing ahead → full
+speed → it holds the line and attacks. Ranks behind slow progressively, so they
+*don't* compress the front through the structure; instead their slow drive gets
+turned sideways by separation, and they **spill around and surround** the target
+(and fill a corridor like water) rather than piling on its near face. As
+front-liners die or move, the pressure behind drops and the next rank flows into
+the opening on its own.
+
+Tuning: **Rear Push Falloff** is the main knob — turn it *up* for more water-like
+flow and less shoving, *down* (or `0`) for the old ram-forward behavior. This is
+also the groundwork for optionally turning the slot system *off* entirely
+(`Use Attack Slots` = false on the Monster prefab) and letting positions emerge
+purely from crowd flow — the two can be A/B'd in the Inspector on the same scene.
+
 ### Big-picture note: the slot system at scale
 
 Worth recording for later, since it came up while chasing these crowd bugs:
@@ -869,6 +893,7 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] Two monsters on crossing/oncoming paths curve past each other (both giving a little) instead of colliding and bouncing — reciprocal avoidance
 - [ ] A settled monster only steps aside for an ally that stays blocked behind it (a real doorway jam), not for one that just brushes past in the crowd — migration hysteresis
 - [ ] A crowd bunched at the mouth of a walled King progressively fills the FAR slots too (holders step deeper as newcomers press in) instead of leaving the back of the ring empty
+- [ ] With Rear Push Falloff up, a crowd floods a corridor and flows AROUND to surround a structure (front holds, rear spills sideways) instead of the rear compressing the front into the near face
 - [ ] Monsters no longer settle into a faint vertical wobble while holding a slot (the gravity fix)
 - [ ] Two monsters crossing paths (e.g. heading to break separate ring walls) slide past each other instead of visibly bouncing off each other first
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)
