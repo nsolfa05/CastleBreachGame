@@ -104,8 +104,9 @@ public static class AttackSlots
     /// <summary>
     /// Claim the nearest free slot to <paramref name="fromWorld"/> around
     /// <paramref name="target"/>, marking it held by <paramref name="claimant"/>,
-    /// and return its tile — or null if the target has no free slot right now.
-    /// The caller is expected to release any slot it already holds before calling.
+    /// and return its tile — or null if the target has no free slot right now
+    /// (or none within <paramref name="maxDistance"/>, see below). The caller is
+    /// expected to release any slot it already holds before calling.
     ///
     /// An OPEN slot (somewhere the monster can already stand) always wins. Only
     /// when every open slot is taken AND <paramref name="allowWalled"/> is set
@@ -117,29 +118,40 @@ public static class AttackSlots
     /// up against the one gap. Claims are per tile and shared across the two
     /// lists, so a walled slot stays claimed by the same monster once its wall is
     /// broken and the tile becomes open.
+    ///
+    /// <paramref name="maxDistance"/> caps how far away a claim may be from
+    /// <paramref name="fromWorld"/> — used by MonsterAI.TryMigrateForBlockedAlly
+    /// to keep a migration a genuine LOCAL shuffle (step to the next open tile
+    /// over) rather than a straight-line-nearest search that can reach clear
+    /// across a crowded ring to whatever tile happens to be marginally closer,
+    /// even if that means two monsters crossing paths (and shoving through each
+    /// other) to swap places. Unbounded by default for the normal initial claim,
+    /// where reaching across open ground to a legitimate far slot is fine.
     /// </summary>
     public static Vector2Int? ClaimNearestSlot(Transform target, MonsterDefinition definition,
                                                Vector2 fromWorld, MonsterAI claimant,
-                                               Vector2Int? excludeTile = null, bool allowWalled = false)
+                                               Vector2Int? excludeTile = null, bool allowWalled = false,
+                                               float maxDistance = float.PositiveInfinity)
     {
         if (target == null || definition == null) return null;
 
         var ts = SlotsFor(target);
         var cc = Candidates(ts, target, definition);
 
-        Vector2Int? best = NearestFree(ts, cc.Open, fromWorld, claimant, excludeTile);
+        Vector2Int? best = NearestFree(ts, cc.Open, fromWorld, claimant, excludeTile, maxDistance);
         if (!best.HasValue && allowWalled)
-            best = NearestFree(ts, cc.Walled, fromWorld, claimant, excludeTile);
+            best = NearestFree(ts, cc.Walled, fromWorld, claimant, excludeTile, maxDistance);
 
         if (!best.HasValue) return null;
         ts.Claims[best.Value] = claimant;
         return best;
     }
 
-    /// <summary>Nearest free tile in one candidate list to fromWorld, or null.</summary>
+    /// <summary>Nearest free tile within maxDistance in one candidate list to fromWorld, or null.</summary>
     private static Vector2Int? NearestFree(TargetSlots ts, List<Vector2Int> tiles, Vector2 fromWorld,
-                                           MonsterAI claimant, Vector2Int? excludeTile)
+                                           MonsterAI claimant, Vector2Int? excludeTile, float maxDistance)
     {
+        float maxSqr = maxDistance * maxDistance; // PositiveInfinity squared is still PositiveInfinity — no overflow
         Vector2Int best = default;
         float bestSqr = float.MaxValue;
         bool found = false;
@@ -157,6 +169,7 @@ public static class AttackSlots
                 continue;
 
             float sqr = ((Vector2)GridMath.TileCenterWorld(tile) - fromWorld).sqrMagnitude;
+            if (sqr > maxSqr) continue;
             if (sqr < bestSqr)
             {
                 bestSqr = sqr;
