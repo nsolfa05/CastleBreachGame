@@ -250,6 +250,17 @@ MonoBehaviour:
   body: {fileID: 0}
   separationRadius: 0.85
   separationStrength: 0.6
+  giveWayRadius: 1.1
+  giveWayStrength: 0.6
+  yieldProbeRadius: 0.9
+  yieldBackStrength: 0.7
+  yieldHoldSeconds: 0.8
+  arrivalRadius: 0.3
+  arrivalMinSpeedFactor: 0.35
+  headOnAvoidStrength: 0.5
+  useAttackSlots: 1
+  slotClaimDistance: 4
+  slotMigrateCooldown: 0.6
   stuckVelocityThreshold: 0.15
   stuckCheckInterval: 0.4
   stuckProgressThreshold: 0.15

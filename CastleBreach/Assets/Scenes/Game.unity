@@ -3790,7 +3790,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e9fa1ac4217b12a4bb8cc9f85d5df2a9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Health
-  maxHealth: 100
+  maxHealth: 1000
 --- !u!4 &631245342
 Transform:
   m_ObjectHideFlags: 0
@@ -16902,7 +16902,7 @@ MonoBehaviour:
   - name: Wave 1
     groups:
     - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
-      count: 4
+      count: 5
       gate: 3
       secondsBetweenSpawns: 1.5
       startDelay: 10
