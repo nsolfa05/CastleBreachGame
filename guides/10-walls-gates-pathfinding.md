@@ -603,6 +603,55 @@ the ring open" above.) The ordinary first-time claim is untouched and still
 searches freely, which is what correctly spreads an approaching crowd into a
 full ring in the first place.
 
+### A getting-stuck-then-reclaiming gap — fixed (automatic)
+
+One more crossing-paths case turned up, this time between two monsters that
+were BOTH still mid-approach (neither had arrived yet) — not covered by the
+migration fix above, since migration only ever applies to an already-arrived
+holder. When a monster gets physically stuck reaching its claimed slot, it
+drops the claim and immediately tries for a new one — but that reclaim used to
+run the exact same unbounded nearest-search as a first-time claim. Two
+monsters jammed against each other could each release, then each re-grab a
+tile still on the wrong side of the other, ping-ponging between the same
+couple of crossed assignments.
+
+Fixed the same way as migration: for a short window after a stuck-triggered
+release (**Stuck Reclaim Local Window**, `1.5` seconds), the reclaim only
+considers tiles within Migrate Search Radius of the monster's current
+position — a genuine local pick instead of a ring-wide search. A monster that
+never held a slot at all still searches freely, same as before.
+
+### Big-picture note: the slot system at scale
+
+Worth recording for later, since it came up while chasing these crowd bugs:
+the *slot concept* (discrete claimed standing tiles) is the right approach for
+a horde converging on one or two structures, and is what most tower-defense/
+RTS games with big crowds actually do — it's not something to redesign away.
+The part that scales badly is routing: right now each monster solves its own
+path with a rate-limited BFS. A **flow field** (one shared vector field per
+target, computed once when the grid changes, giving every monster an O(1)
+per-frame lookup instead of its own search) is the standard fix for "many
+units converging on one target" and would be the right next step if monster
+counts ever become a real bottleneck. Not pursued yet — see the shared
+neighbor-query change below for the cheap win that WAS done this round.
+
+### Cheap performance win: one neighbor scan per monster per frame (automatic)
+
+Every crowd behavior above — separation, yield-to-leader, give-way,
+ally-queued-behind, stand-down-for-stuck-neighbor, head-on avoidance — used to
+run its own `Physics2D.OverlapCircle` every physics step, up to six broad-phase
+queries per monster per frame, each scanning the same small patch of space for
+overlapping results. With a couple hundred monsters on screen that's a lot of
+redundant physics work for identical answers.
+
+Now there's exactly **one** query per monster per frame (`RefreshNeighbors`,
+called once at the top of `FixedUpdate`, sized to whichever individual crowd
+radius reaches farthest). Every behavior above reads from that one shared
+result and applies its own radius as a plain distance check instead of
+querying again. Purely an internal performance change — none of the crowd
+behaviors themselves changed, so nothing above should look or feel any
+different, just cost less CPU per monster.
+
 ## Step 6 — Playtest
 
 Press **5**, then left-click to lay walls (you keep carrying it, so you can
@@ -716,6 +765,7 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] Monsters sitting on their slots hold still and attack instead of jittering/shoving each other when there's room for everyone
 - [ ] Two monsters meeting head-on in a 1-wide ring resolve (one eases back, the other passes) instead of locking against each other
 - [ ] Monsters already parked on a slot don't walk clear across the ring / cross paths through each other when a nearby ally is bumping them — they only ever shuffle to the tile right next to them, or stay put if none is free
+- [ ] Two still-approaching monsters that get jammed against each other don't ping-pong between crossed slot assignments after getting unstuck
 - [ ] Monsters no longer settle into a faint vertical wobble while holding a slot (the gravity fix)
 - [ ] Two monsters crossing paths (e.g. heading to break separate ring walls) slide past each other instead of visibly bouncing off each other first
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)

@@ -111,6 +111,9 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("How far (tiles) a migrating monster is willing to reach for its NEW slot — deliberately short, just past one tile over (including diagonally). Migration is meant to be a small local shuffle ('step aside one tile so the blocked ally can get in'), not a straight-line-nearest search across the whole ring: unbounded, it could hand a monster a slot clear on the far side of a crowded target, so it and whoever's now walking toward what used to be its spot end up crossing paths and shoving through each other on the way — the 'monsters pushing each other to reach a slot when they didn't have to' case. With nothing within reach it just stays put and keeps attacking, same as when no slot is free at all.")]
     [SerializeField] private float migrateSearchRadius = 1.6f;
 
+    [Tooltip("Seconds after a monster drops its slot because it got physically stuck reaching it (still mid-approach, not yet arrived) during which it only reclaims something within Migrate Search Radius — the same 'local shuffle, not a ring-wide swap' rule Migrate Search Radius applies to an arrived holder, extended to cover a still-approaching one too. Without this, the reclaim right after release used the same unbounded nearest-search that produced the stuck/crossed assignment in the first place, so two mutually-stuck monsters could just re-pick each other's tile and keep crossing paths indefinitely.")]
+    [SerializeField] private float stuckReclaimLocalWindow = 1.5f;
+
     [Tooltip("Actual physics velocity below this (units/sec) counts as \"stuck\" — used to detect a monster that's committed to attacking a structure but is physically blocked (e.g. trapped behind another monster) from ever reaching it.")]
     [SerializeField] private float stuckVelocityThreshold = 0.15f;
 
@@ -162,6 +165,21 @@ public class MonsterAI : MonoBehaviour
     private float nextStuckCheckTime;
     private float stuckSeconds;
 
+    // Shared per-frame neighbor scan (see RefreshNeighbors). Every crowd
+    // behavior below (separation, yield, give-way, ally-queued-behind,
+    // stand-down, head-on avoidance) used to run its OWN Physics2D.OverlapCircle
+    // every frame — up to six broad-phase queries per monster per frame, each
+    // scanning the same small patch of space. With hundreds of monsters on
+    // screen that's a lot of redundant physics work for identical results. Now
+    // there's exactly one query per monster per frame, sized to the largest of
+    // the individual radii below; each behavior reads from the shared result and
+    // applies its OWN (possibly smaller) radius as a plain distance check
+    // instead of re-querying. Neither NeighborBuffer's contents nor
+    // neighborCount are touched between FixedUpdate calls for different
+    // monsters — Unity runs one GameObject's FixedUpdate to completion before
+    // the next starts, so nothing can interleave and overwrite them mid-frame.
+    private int neighborCount;
+
     // Debug-only (see PathGrid.DrawTargetingDebug / OnDrawGizmos below): when
     // and where this monster's last successful hit landed, so the gizmo can
     // flash it briefly instead of drawing a permanent marker.
@@ -177,6 +195,7 @@ public class MonsterAI : MonoBehaviour
     private Vector2Int claimedSlot;
     private Transform slotTarget;
     private float nextSlotMigrateTime; // throttle on migrating slots to clear a blocked ally — see TryMigrateForBlockedAlly
+    private float preferLocalClaimUntil; // while Time.time < this, the next reclaim is bounded to migrateSearchRadius — see UpdateSlot's stuck-release branch and stuckReclaimLocalWindow
 
     // What this monster is currently heading for, and whether it's arrived
     // (in attack range). Read by OTHER monsters' give-way check — a settled
@@ -340,6 +359,11 @@ public class MonsterAI : MonoBehaviour
             return;
         }
 
+        // One shared neighbor scan for every crowd behavior this frame — see
+        // neighborCount's field comment. Must run before UpdateSlot, since
+        // AllyQueuedBehind (called from it) is one of the readers.
+        RefreshNeighbors();
+
         // Reserve a distinct standing spot ("slot") around the real objective so
         // the crowd fans into a ring instead of converging on one tile. Done
         // BEFORE routing, and keyed to the objective (not whatever wall we might
@@ -384,6 +408,22 @@ public class MonsterAI : MonoBehaviour
         }
 
         MoveToward(target);
+    }
+
+    /// <summary>
+    /// One Physics2D.OverlapCircle for this monster's crowd awareness this
+    /// frame, sized to whichever individual crowd radius currently reaches
+    /// farthest (separation / yield / give-way — see their own tooltips for
+    /// what each actually means). Every crowd behavior below then reads
+    /// neighborCount and NeighborBuffer instead of querying for itself,
+    /// filtering down to its OWN radius with a plain squared-distance check.
+    /// Recomputing the max each call (not caching it once) keeps this correct
+    /// if those radii are ever live-tuned in the Inspector during Play Mode.
+    /// </summary>
+    private void RefreshNeighbors()
+    {
+        float radius = Mathf.Max(separationRadius, Mathf.Max(yieldProbeRadius, giveWayRadius));
+        neighborCount = Physics2D.OverlapCircle(transform.position, radius, crowdFilter, NeighborBuffer);
     }
 
     private void MoveToward(Transform target, float speedScale = 1f)
@@ -546,8 +586,8 @@ public class MonsterAI : MonoBehaviour
         if (rb.linearVelocity.sqrMagnitude >= stuckVelocityThreshold * stuckVelocityThreshold) return false;
 
         float myGoalDistSqr = ((Vector2)transform.position - steeringPoint).sqrMagnitude;
-        int count = Physics2D.OverlapCircle(transform.position, yieldProbeRadius, crowdFilter, NeighborBuffer);
-        for (int i = 0; i < count; i++)
+        float radiusSqr = yieldProbeRadius * yieldProbeRadius;
+        for (int i = 0; i < neighborCount; i++)
         {
             var collider = NeighborBuffer[i];
             if (collider == null || collider.gameObject == gameObject) continue;
@@ -555,7 +595,8 @@ public class MonsterAI : MonoBehaviour
             if (other == null) continue;
 
             Vector2 toOther = (Vector2)other.transform.position - (Vector2)transform.position;
-            if (toOther.sqrMagnitude < 0.0001f) continue;
+            float toOtherSqr = toOther.sqrMagnitude;
+            if (toOtherSqr < 0.0001f || toOtherSqr > radiusSqr) continue; // outside my own probe radius
             if (Vector2.Dot(toOther.normalized, seekDirection) < 0.5f) continue; // not ahead of me toward the goal
 
             // Ahead of me AND closer to where I'm heading = the leader for this
@@ -599,10 +640,10 @@ public class MonsterAI : MonoBehaviour
         radialOut.Normalize();
         Vector2 tangent = new Vector2(-radialOut.y, radialOut.x);
 
-        int count = Physics2D.OverlapCircle(transform.position, giveWayRadius, crowdFilter, NeighborBuffer);
+        float radiusSqr = giveWayRadius * giveWayRadius;
         bool someoneBehind = false;
         float tangentialCrowd = 0f;
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < neighborCount; i++)
         {
             var collider = NeighborBuffer[i];
             if (collider == null || collider.gameObject == gameObject) continue;
@@ -610,6 +651,7 @@ public class MonsterAI : MonoBehaviour
             if (other == null) continue;
 
             Vector2 toOther = (Vector2)other.transform.position - (Vector2)transform.position;
+            if (toOther.sqrMagnitude > radiusSqr) continue; // outside my own give-way radius
             tangentialCrowd += Vector2.Dot(toOther, tangent); // which side the crowd leans, for picking a slide direction
 
             // Queued behind me = shares my target, hasn't arrived, and sits in
@@ -643,13 +685,14 @@ public class MonsterAI : MonoBehaviour
     /// </summary>
     private bool ShouldStandDownForStuckNeighbor()
     {
-        int count = Physics2D.OverlapCircle(transform.position, separationRadius, crowdFilter, NeighborBuffer);
-        for (int i = 0; i < count; i++)
+        float radiusSqr = separationRadius * separationRadius;
+        for (int i = 0; i < neighborCount; i++)
         {
             var collider = NeighborBuffer[i];
             if (collider == null || collider.gameObject == gameObject) continue;
             var other = collider.GetComponentInParent<MonsterAI>();
             if (other == null) continue;
+            if (((Vector2)other.transform.position - (Vector2)transform.position).sqrMagnitude > radiusSqr) continue;
 
             // Another monster also jammed, right up against me, that outranks me.
             if (other.stuckPush > 0f && other.standDownKey < standDownKey)
@@ -1015,9 +1058,25 @@ public class MonsterAI : MonoBehaviour
         // open a walled slot: shouldering through the crowd toward the wall reads
         // as "stuck" every frame, and dropping the claim there would just make it
         // oscillate instead of committing to breach that spot.
+        //
+        // preferLocalClaimUntil is the important part: this release happens while
+        // still mid-approach (not yet IsPlaced), which is exactly the case
+        // TryMigrateForBlockedAlly's own bounded search doesn't cover — that one
+        // only fires for an ALREADY-ARRIVED holder. Without a bound here, the
+        // reclaim below runs the same unbounded nearest-search that produced the
+        // stuck/crossed assignment in the first place, off the monster's CURRENT
+        // (still-jammed) position — which can just re-pick the same or an
+        // equally-crossed tile, and two mutually-stuck monsters can ping-pong
+        // between each other's tiles indefinitely. Marking a short window here
+        // makes the reclaim below prefer something genuinely nearby first,
+        // exactly like a migration, giving separation/avoidance a chance to
+        // actually pull the two apart before either locks in a new claim.
         if (hasSlot && !settledAtTarget && stuckPush > 0f &&
             !AttackSlots.SlotIsCurrentlyWalled(objective, claimedSlot, definition))
+        {
             ReleaseSlot();
+            preferLocalClaimUntil = Time.time + stuckReclaimLocalWindow;
+        }
 
         // An ally is genuinely blocked behind this slot — try to migrate to a
         // DIFFERENT free slot so this monster's current tile opens up for it. If
@@ -1034,11 +1093,19 @@ public class MonsterAI : MonoBehaviour
         // and go break it open — widening the breach around a boxed-in target
         // (see AttackSlots.ClaimNearestSlot). The claim-distance gate keeps this
         // to monsters already at the target, so distant ones still walk the maze.
+        //
+        // Bounded to migrateSearchRadius while still inside the window set by a
+        // stuck-triggered release just above — the "local shuffle, not a
+        // ring-wide swap" rule applied to reclaiming, not just migrating. A
+        // monster that never held a slot at all (the ordinary long approach)
+        // still searches freely, which is what spreads an incoming crowd into a
+        // full ring in the first place.
         if (!hasSlot && Time.time >= nextSlotMigrateTime &&
             DistanceToTarget(objective) <= definition.attackRange + slotClaimDistance)
         {
+            float claimReach = Time.time < preferLocalClaimUntil ? migrateSearchRadius : float.PositiveInfinity;
             var claimed = AttackSlots.ClaimNearestSlot(objective, definition, transform.position, this,
-                                                       allowWalled: true);
+                                                       allowWalled: true, maxDistance: claimReach);
             if (claimed.HasValue)
             {
                 claimedSlot = claimed.Value;
@@ -1095,8 +1162,8 @@ public class MonsterAI : MonoBehaviour
         // detection cone below for side-on contention.
         const float bumpDistance = 0.9f;
 
-        int count = Physics2D.OverlapCircle(transform.position, giveWayRadius, crowdFilter, NeighborBuffer);
-        for (int i = 0; i < count; i++)
+        float radiusSqr = giveWayRadius * giveWayRadius;
+        for (int i = 0; i < neighborCount; i++)
         {
             var collider = NeighborBuffer[i];
             if (collider == null || collider.gameObject == gameObject) continue;
@@ -1105,7 +1172,7 @@ public class MonsterAI : MonoBehaviour
 
             Vector2 toOther = (Vector2)other.transform.position - (Vector2)transform.position;
             float distSqr = toOther.sqrMagnitude;
-            if (distSqr < 0.0001f) continue;
+            if (distSqr < 0.0001f || distSqr > radiusSqr) continue; // outside my own give-way radius
             // Same objective, and not yet parked in its own slot — i.e. genuinely
             // still trying to get in (IsPlaced, not merely near the King).
             if (other.currentTarget != target || other.IsPlaced()) continue;
@@ -1179,9 +1246,8 @@ public class MonsterAI : MonoBehaviour
     /// </summary>
     private Vector2 SeparationFromNeighbors()
     {
-        int count = Physics2D.OverlapCircle(transform.position, separationRadius, crowdFilter, NeighborBuffer);
         Vector2 push = Vector2.zero;
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < neighborCount; i++)
         {
             var neighbor = NeighborBuffer[i];
             if (neighbor == null || neighbor.gameObject == gameObject) continue;
@@ -1195,6 +1261,9 @@ public class MonsterAI : MonoBehaviour
                 push += new Vector2(avoidSide, 0f);
                 continue;
             }
+            // Clamp01 already zeroes this out beyond separationRadius, so a
+            // neighbor picked up only because it's within some OTHER behavior's
+            // larger radius (see RefreshNeighbors) naturally contributes nothing.
             push += away / distance * (1f - Mathf.Clamp01(distance / separationRadius));
         }
         return push;
@@ -1222,14 +1291,15 @@ public class MonsterAI : MonoBehaviour
 
         Vector2 sideways = new Vector2(-seekDirection.y, seekDirection.x) * avoidSide;
         Vector2 bias = Vector2.zero;
+        float radiusSqr = separationRadius * separationRadius;
 
-        int count = Physics2D.OverlapCircle(transform.position, separationRadius, crowdFilter, NeighborBuffer);
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < neighborCount; i++)
         {
             var collider = NeighborBuffer[i];
             if (collider == null || collider.gameObject == gameObject) continue;
             var other = collider.GetComponentInParent<MonsterAI>();
             if (other == null || other.rb == null) continue;
+            if (((Vector2)other.transform.position - (Vector2)transform.position).sqrMagnitude > radiusSqr) continue;
 
             Vector2 otherVelocity = other.rb.linearVelocity;
             if (otherVelocity.sqrMagnitude < 0.01f) continue; // not actually moving — nothing oncoming about it
