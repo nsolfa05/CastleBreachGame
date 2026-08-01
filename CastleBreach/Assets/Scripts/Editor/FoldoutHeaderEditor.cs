@@ -102,6 +102,25 @@ public abstract class FoldoutHeaderEditor : Editor
     private void SetFoldoutState(string section, bool value) =>
         SessionState.SetBool(FoldoutKey(section), value);
 
-    private string FoldoutKey(string section) =>
-        $"{GetType().Name}.{target.GetInstanceID()}.{section}";
+    /// <summary>
+    /// A key stable across reselecting the SAME object — required for the
+    /// "stays collapsed while you keep working" guarantee, since Unity creates
+    /// a brand-new Editor instance every time an object is (re)selected, so
+    /// anything assigned fresh per-Editor-instance (e.g. a random value handed
+    /// out once) would reset on every reselection and defeat the point of using
+    /// SessionState at all. Deliberately NOT Object.GetInstanceID()/GetEntityId()
+    /// — that class of API keeps changing across Unity versions (see the
+    /// standDownKey precedent in MonsterAI) — so this uses the target's asset
+    /// path when it has one (ScriptableObjects, prefab assets: unique and
+    /// permanent unless the file moves) and falls back to type+name for a
+    /// scene-instance component (unique enough in practice; a rare name
+    /// collision just means two objects cosmetically share fold state, which is
+    /// harmless UI-only convenience data, not anything that affects gameplay).
+    /// </summary>
+    private string FoldoutKey(string section)
+    {
+        string path = AssetDatabase.GetAssetPath(target);
+        string identity = !string.IsNullOrEmpty(path) ? path : $"{target.GetType().Name}/{target.name}";
+        return $"{GetType().Name}.{identity}.{section}";
+    }
 }
