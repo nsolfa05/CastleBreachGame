@@ -70,9 +70,14 @@ public class MonsterDefinition : ScriptableObject
     public float recentPlayerCombatWindow = 3f;
 
     // ─────────────────────────────────────────────────────────────
+    [Header("Knockback & stun dealt (Guide 11)")]
+    [Tooltip("What this monster's attack does on TOP of damage — knockback and/or stun, both off by default. Mainly meaningful against the player (who has a KnockbackReceiver); the King and structures don't react. The knockback shoves the player directly away from this monster. Example: give a big enemy some knockback + a short stun so a hit from it actually staggers the player.")]
+    public HitEffects attackEffects;
+
+    // ─────────────────────────────────────────────────────────────
     [Header("Economy & weight")]
     public int currencyDrop = 3;
-    [Tooltip("Tile weight (§7.1 — enforced in the walls/pathfinding phase).")]
+    [Tooltip("Tile weight (§7.1). Also used by the combat framework: heavier monsters are knocked back LESS (MonsterAI copies this into the monster's KnockbackReceiver at spawn).")]
     public int tileWeight = 2;
 
     // ─────────────────────────────────────────────────────────────

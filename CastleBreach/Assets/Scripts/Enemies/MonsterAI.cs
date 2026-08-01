@@ -175,6 +175,7 @@ public class MonsterAI : MonoBehaviour
     private Rigidbody2D rb;
     private Health health;
     private TelegraphedAreaAttack telegraph;
+    private KnockbackReceiver knockback; // may be null if the prefab has no receiver
     private float nextAttackTime;
     private int livesRemaining;
     private bool bonePileActive;
@@ -280,6 +281,7 @@ public class MonsterAI : MonoBehaviour
         rb.linearDamping = 2f;
         health = GetComponent<Health>();
         telegraph = GetComponent<TelegraphedAreaAttack>();
+        knockback = GetComponent<KnockbackReceiver>();
         health.Died += OnDied;
         if (body == null) body = GetComponent<SpriteRenderer>();
         avoidSide = UnityEngine.Random.value < 0.5f ? -1f : 1f;
@@ -343,6 +345,7 @@ public class MonsterAI : MonoBehaviour
         activeScale = transform.localScale;
         if (body != null) body.color = definition.bodyColor;
         health.SetMax(definition.maxHealth, refill: true);
+        if (knockback != null) knockback.SetWeight(definition.tileWeight); // heavy types resist knockback
         livesRemaining = definition.extraLives;
 
         // Gate is solid to ordinary monsters (a real physical backstop, so a
@@ -369,6 +372,11 @@ public class MonsterAI : MonoBehaviour
             if (rb.simulated) rb.linearVelocity = Vector2.zero; // avoid warning while a bone pile has physics off
             return;
         }
+
+        // Being knocked back or stunned: the KnockbackReceiver owns the body this
+        // frame, and a stunned monster neither moves NOR attacks — so bail out
+        // entirely and let the receiver drive velocity (see KnockbackReceiver).
+        if (knockback != null && knockback.ControlSuppressed) return;
 
         Transform objective = ChooseTarget(gm);
 
@@ -1039,6 +1047,10 @@ public class MonsterAI : MonoBehaviour
 
             if (gm != null && targetHealth == gm.PlayerHealth) lastAttackedPlayerTime = Time.time;
             targetHealth.TakeDamage(DamageForHealth(targetHealth, hit.transform, gm));
+            // A telegraphed slam (Cyclops = the "large enemy") carries the same
+            // knockback/stun as a normal attack; knockback radiates from the box
+            // centre, so everything caught in the slam is thrown outward from it.
+            definition.attackEffects.ApplyTo(hit, lockedBoxCenter);
         }
     }
 
@@ -1788,6 +1800,10 @@ public class MonsterAI : MonoBehaviour
         if (targetHealth != null)
         {
             targetHealth.TakeDamage(DamageForHealth(targetHealth, target, gm));
+            // Knockback/stun on top of damage (off unless enabled on the definition).
+            // Only the player has a KnockbackReceiver, so this is a no-op vs the
+            // King/structures; the shove pushes the player away from this monster.
+            definition.attackEffects.ApplyTo(target, transform.position);
             lastHitTime = Time.time;
             lastHitPosition = ApproachPoint(target); // debug-only, for the hit flash gizmo
         }
