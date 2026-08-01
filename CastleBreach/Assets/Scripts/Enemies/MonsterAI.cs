@@ -104,6 +104,9 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("The lowest forward-speed fraction the pressure gradient (Rear Push Falloff) can throttle a rear enemy down to. A small floor keeps even a deeply-buried enemy slowly creeping, so it flows into any opening the instant one appears instead of freezing solid. 1 = no throttle at all.")]
     [SerializeField, Range(0f, 1f)] private float rearPushFloor = 0.2f;
 
+    [Tooltip("REAR PRESSURE — 'crowd behind me' (the opposite of the pressure gradient above, which measures crowd AHEAD). Only used while Use Attack Slots is off. Real allies pressing in from behind, still trying to reach the SAME target, above this amount mean: (1) I stay eligible for stuck-recovery's escalation even while nominally 'in range' — without this, a monster wedged right at a doorway can read as settled by plain straight-line distance and permanently disable its own stuck-recovery, freezing indefinitely since give-way alone can't help there (it only slides TANGENTIALLY along the target's edge, which at a narrow gap just presses the monster into the flanking wall); (2) I stop backing off for a leader ahead of me (there's nowhere to back INTO); (3) I skip the gentle arrival-easing slowdown and keep driving at full strength. This is the 'crowd pressure makes you commit and squeeze through' feel — a monster doesn't get shoved by neighbors, it just personally becomes less willing to wait or ease off the more of a crowd is counting on it moving. 0 = a monster with rear allies never gets this urgency boost (falls back to the old behavior).")]
+    [SerializeField] private float rearPressureThreshold = 0.4f;
+
     [Header("Attack slots (shared behavior, not per-monster-type data)")]
     [Tooltip("When on, a monster closing on its target claims a distinct standing spot (\"slot\") around it — one of the real walkable tiles within attack range — and heads there instead of everyone converging on the target's nearest surface. This is what actually spreads a crowd into a ring and stops the front rank hogging the only reachable tile, especially around a target boxed into a tight alcove where there's no room to shuffle sideways. The force behaviors above still handle the journey and any overflow once every slot is taken. Off = the old behavior (approach the target's surface directly).")]
     [SerializeField] private bool useAttackSlots = true;
@@ -451,7 +454,26 @@ public class MonsterAI : MonoBehaviour
         // yielding, or it sits wedged in the ring forever reading as "home".
         bool arrived = hasSlot ? IsPlaced() : settledAtTarget;
 
-        UpdateStuckRecovery(arrived);
+        // Rear pressure only matters for slot-less monsters — see its tooltip.
+        // A slot holder's IsPlaced() is already a strict exact-tile check with no
+        // looseness to patch, and migration is its own correct answer for "someone
+        // needs my spot" there.
+        float rearPressure = !hasSlot ? RearCrowdPressure(target) : 0f;
+        bool pressured = rearPressureThreshold > 0f && rearPressure >= rearPressureThreshold;
+
+        // Slot-less "arrived" is just settledAtTarget — a loose straight-line
+        // check that can be satisfied while wedged right at a doorway/pinch
+        // point, not actually well positioned. Once true it permanently disables
+        // stuck-recovery below (which resets to 0 every single frame arrived is
+        // true), and the only other responder, GiveWayVelocity, only slides
+        // TANGENTIALLY along the target's surface — at a narrow gap that just
+        // presses the monster into the flanking wall instead of helping it
+        // advance. Left alone, a monster can freeze indefinitely the instant it
+        // merely reads as close enough. Real rear pressure is the tell that this
+        // isn't a comfortable, uncontested settle: stay eligible for
+        // stuck-recovery's escalation whenever a crowd genuinely still needs the
+        // room, even while nominally "arrived".
+        UpdateStuckRecovery(arrived && !pressured);
 
         Vector2 steeringPoint = SteeringPoint(target);
         Vector2 toSteering = steeringPoint - (Vector2)transform.position;
@@ -469,7 +491,7 @@ public class MonsterAI : MonoBehaviour
         float crowdScale = 1f; // pressure-gradient throttle for rear ranks — set in the calm branch below
         Vector2 steer;
 
-        if (!arrived && ShouldYieldToLeader(seekDirection, steeringPoint))
+        if (!arrived && ShouldYieldToLeader(seekDirection, steeringPoint, rearPressure))
         {
             // Jammed directly behind an ally that's ahead of me and closer to
             // where we're both going — the two-abreast pile-up at the mouth of
@@ -557,7 +579,11 @@ public class MonsterAI : MonoBehaviour
             // exists. Only in this calm-settling branch: a monster that's
             // stuck or yielding needs full-strength force to actually break
             // free, so damping there would undermine the fix, not help it.
-            if (arrivalRadius > 0f)
+            // Also skipped while pressured: easing off is for a monster gently
+            // settling in with nothing behind it — one with real rear pressure
+            // isn't done yet and should keep driving at full strength instead of
+            // coasting in, the "crowd pressure keeps you committed" effect.
+            if (arrivalRadius > 0f && !pressured)
                 arrivalSpeedFactor = Mathf.Clamp(toSteering.magnitude / arrivalRadius, arrivalMinSpeedFactor, 1f);
         }
 
@@ -597,10 +623,16 @@ public class MonsterAI : MonoBehaviour
     /// flicker between backing off and shoving forward; by the time it
     /// re-checks, the leader has usually taken the gap and this monster simply
     /// advances (no longer jammed → no longer yields).
+    ///
+    /// Suppressed while under real rearPressure (see its tooltip): backing off
+    /// with a crowd pressing in from behind just rams them, so a pressured
+    /// monster holds/pushes forward instead of retreating for the leader ahead —
+    /// the "crowd pressure makes you commit" half of that feature.
     /// </summary>
-    private bool ShouldYieldToLeader(Vector2 seekDirection, Vector2 steeringPoint)
+    private bool ShouldYieldToLeader(Vector2 seekDirection, Vector2 steeringPoint, float rearPressure)
     {
         if (yieldProbeRadius <= 0f || seekDirection.sqrMagnitude < 0.0001f) return false;
+        if (rearPressureThreshold > 0f && rearPressure >= rearPressureThreshold) return false;
 
         // Still committed to a yield decided within the last yieldHoldSeconds.
         if (Time.time < yieldUntilTime) return true;
@@ -1458,6 +1490,45 @@ public class MonsterAI : MonoBehaviour
             float ahead = Vector2.Dot(toOther / dist, seekDir); // 1 = directly ahead of me toward the target
             if (ahead > 0.25f)
                 pressure += ahead * (1f - dist / giveWayRadius); // nearer + more-ahead blocks more
+        }
+        return pressure;
+    }
+
+    /// <summary>
+    /// The opposite of ForwardCrowdPressure: how much real crowd is pressing in
+    /// from BEHIND me, still trying to reach the SAME target I'm defending or
+    /// approaching. Uses the same target-relative "behind" geometry as
+    /// GiveWayVelocity/AllyQueuedBehind (a cone on the far side of me from the
+    /// target) rather than my instantaneous heading, since that's a more stable
+    /// read of "who's counting on me making room" while I might be jittering in
+    /// place at a pinch point. Only counts allies that haven't arrived themselves
+    /// (IsPlaced) — an ally that's already found its own spot isn't pressuring me.
+    /// See rearPressureThreshold's tooltip for what MoveToward does with this.
+    /// </summary>
+    private float RearCrowdPressure(Transform target)
+    {
+        Vector2 approach = ApproachPoint(target);
+        Vector2 radialOut = (Vector2)transform.position - approach;
+        if (radialOut.sqrMagnitude < 0.0001f) return 0f;
+        radialOut.Normalize();
+
+        float radiusSqr = giveWayRadius * giveWayRadius;
+        float pressure = 0f;
+        for (int i = 0; i < neighborCount; i++)
+        {
+            var collider = NeighborBuffer[i];
+            if (collider == null || collider.gameObject == gameObject) continue;
+            var other = collider.GetComponentInParent<MonsterAI>();
+            if (other == null || other.currentTarget != target || other.IsPlaced()) continue;
+
+            Vector2 toOther = (Vector2)other.transform.position - (Vector2)transform.position;
+            float distSqr = toOther.sqrMagnitude;
+            if (distSqr < 0.0001f || distSqr > radiusSqr) continue;
+
+            float dist = Mathf.Sqrt(distSqr);
+            float behind = Vector2.Dot(toOther / dist, radialOut); // 1 = directly behind me, target-relative
+            if (behind > 0.5f)
+                pressure += behind * (1f - dist / giveWayRadius);
         }
         return pressure;
     }

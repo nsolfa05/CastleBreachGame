@@ -743,6 +743,53 @@ also the groundwork for optionally turning the slot system *off* entirely
 (`Use Attack Slots` = false on the Monster prefab) and letting positions emerge
 purely from crowd flow — the two can be A/B'd in the Inspector on the same scene.
 
+### Real bug found testing slots off: a monster could freeze indefinitely at a doorway — fixed
+
+With `Use Attack Slots` off, a monster could get stuck at the mouth of a walled
+target for a very long time (minutes, not seconds) — no oscillation, just a hard
+freeze. Root cause: without slots, "arrived" collapses to `settledAtTarget`, a
+plain straight-line distance check with no notion of whether the monster is
+actually well-positioned — just close enough by geometry. A monster sitting right
+at (or just inside) a doorway can satisfy that easily. The problem: **being
+"arrived" permanently disables stuck-recovery** (it resets to zero every single
+frame arrived reads true), and the only other responder for "someone needs my
+spot" — `GiveWayVelocity` — only slides a monster **tangentially** along the
+target's surface, which at a narrow gap just presses it into the flanking wall
+instead of helping it advance. Once a monster fell into this state at a
+chokepoint, nothing was left that could ever force further progress.
+
+Fixed with **Rear Pressure** (`RearCrowdPressure`, mirroring the pressure
+gradient's forward-facing measurement but for allies pressing in from BEHIND,
+still trying to reach the same target). Above **Rear Pressure Threshold**
+(default `0.4`), a slot-less monster:
+1. **Stays eligible for stuck-recovery** even while nominally "arrived" — this
+   is the actual fix for the freeze; a monster under real rear pressure is
+   clearly not a comfortable, uncontested settle, so it keeps escalating
+   sideways until it actually breaks free.
+2. **Stops yielding to a leader ahead of it** — backing off with a crowd
+   pressing in from behind just rams them, so a pressured monster holds or
+   pushes forward instead of retreating.
+3. **Skips arrival easing** and drives at full strength instead of gently
+   coasting in — easing off is for a monster that's genuinely done, not one a
+   crowd is still counting on to make room.
+
+This is also the practical form of "crowd pressure makes you commit" — a
+monster is never literally shoved by its neighbors (still a deliberate
+non-goal, see below), it just personally becomes less willing to wait or ease
+off the more of a crowd is counting on it to move. `Rear Pressure Threshold =
+0` turns the whole feature off (old behavior).
+
+**On literally pushing monsters sideways to help them squeeze through** (a
+question that came up): deliberately not done. Every force in this system is
+self-authored — a monster only ever computes its OWN velocity by reading
+neighbors, never applies force TO one. This project already tried the opposite
+early on (one monster physically sliding another aside) and reverted it for
+being unpredictable — letting monster A's motion depend on a force B applies to
+it creates real feedback chains (A pushes B, B's collision response pushes C,
+which can bounce back and disturb A) that are much harder to reason about than
+what's here now, and can look like ragdolling rather than intentional movement.
+Rear Pressure gets the "crowd squeezes through" feel without that risk.
+
 ### Big-picture note: the slot system at scale
 
 Worth recording for later, since it came up while chasing these crowd bugs:
@@ -894,6 +941,7 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] A settled monster only steps aside for an ally that stays blocked behind it (a real doorway jam), not for one that just brushes past in the crowd — migration hysteresis
 - [ ] A crowd bunched at the mouth of a walled King progressively fills the FAR slots too (holders step deeper as newcomers press in) instead of leaving the back of the ring empty
 - [ ] With Rear Push Falloff up, a crowd floods a corridor and flows AROUND to surround a structure (front holds, rear spills sideways) instead of the rear compressing the front into the near face
+- [ ] With slots off, a monster wedged at a doorway with allies pressing behind it no longer freezes indefinitely — it keeps working the jam (stuck-recovery escalation) until it actually breaks free
 - [ ] Monsters no longer settle into a faint vertical wobble while holding a slot (the gravity fix)
 - [ ] Two monsters crossing paths (e.g. heading to break separate ring walls) slide past each other instead of visibly bouncing off each other first
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)
