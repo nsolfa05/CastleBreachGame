@@ -21,7 +21,7 @@ MonoBehaviour:
   kingDamage: 3
   structureDamage: 3
   praiseTowerDamage: 0
-  wallDamage: 10
+  wallDamage: 5
   attackInterval: 1.8
   attackRange: 0.5
   playerTargetRange: 5
@@ -32,6 +32,12 @@ MonoBehaviour:
   structureInterestRange: 5
   structureNearKingRange: 0
   recentPlayerCombatWindow: 5
+  attackEffects:
+    knockbackEnabled: 1
+    knockbackStrength: 6
+    stunEnabled: 1
+    stunDuration: 0
+  stunResistance: 0
   currencyDrop: 3
   tileWeight: 2
   targetsOnlyKing: 0

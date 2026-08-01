@@ -107,6 +107,7 @@ GameObject:
   - component: {fileID: 8939975703344095119}
   - component: {fileID: 1382595666251222358}
   - component: {fileID: 8499136379906789683}
+  - component: {fileID: 3817662289329264283}
   m_Layer: 7
   m_Name: Monster
   m_TagString: Untagged
@@ -260,12 +261,16 @@ MonoBehaviour:
   avoidStrength: 0.6
   rearPushFalloff: 3
   rearPushFloor: 0.4
+  rearPressureThreshold: 0.4
   useAttackSlots: 0
   slotClaimDistance: 4
   slotMigrateCooldown: 0.6
   migrateBlockedDwell: 0.5
   migrateSearchRadius: 1.6
   stuckReclaimLocalWindow: 1.5
+  funnelBreach: 1
+  funnelBreachDistance: 3
+  funnelMinOpenSlots: 2
   stuckVelocityThreshold: 0.15
   stuckCheckInterval: 0.4
   stuckProgressThreshold: 0.15
@@ -322,6 +327,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TelegraphedAreaAttack
   boxSprite: {fileID: 7482667652216324306, guid: 40439bb77c28ba0449cc3a93ddc46bbf, type: 3}
   sortingOrder: 5
+--- !u!114 &3817662289329264283
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3148155477858316370}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5db19793915e88e4cb82a510fa27253e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KnockbackReceiver
+  weight: 2
+  knockbackResistance: 0
+  knockbackDuration: 0.18
+  knockbackScale: 1
 --- !u!1 &5620553789505844306
 GameObject:
   m_ObjectHideFlags: 0

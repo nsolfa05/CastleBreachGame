@@ -32,8 +32,14 @@ MonoBehaviour:
   structureInterestRange: 0
   structureNearKingRange: 0
   recentPlayerCombatWindow: 3
+  attackEffects:
+    knockbackEnabled: 1
+    knockbackStrength: 12
+    stunEnabled: 0
+    stunDuration: 0.6
+  stunResistance: 1
   currencyDrop: 15
-  tileWeight: 6
+  tileWeight: 10
   targetsOnlyKing: 0
   praiseTowerLureRange: 0
   passesThroughGates: 0
