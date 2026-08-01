@@ -1814,6 +1814,15 @@ public class MonsterAI : MonoBehaviour
     }
 
     /// <summary>
+    /// Called by the Hammer's slam (Guide 11b): makes this monster read as
+    /// currently engaged with the player (see HasRecentPlayerCombat) even on a
+    /// hit that dealt no knockback/stun — the "distract" effect, pulling a
+    /// monster's attention onto the player without needing a real exchange of
+    /// damage to register as combat.
+    /// </summary>
+    public void NotifyForcedPlayerEngagement() => lastAttackedPlayerTime = Time.time;
+
+    /// <summary>
     /// True if this monster attacked the player, or the player attacked it,
     /// within Recent Player Combat Window seconds. Checked in ChooseTarget to
     /// keep a monster engaged with the player instead of letting it switch to

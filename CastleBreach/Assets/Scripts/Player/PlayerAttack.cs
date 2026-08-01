@@ -2,9 +2,19 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Mouse-aimed sword swing (design doc §7.2): spacebar to attack,
-/// hits everything on `hitLayers` inside a box 1 tile ahead of the player
-/// and 3 tiles wide, with a 0.5s cooldown between swings.
+/// The Sword — the player's starting weapon (Guide 11b), managed as weapon
+/// slot 0 by WeaponSwitcher. Mouse-aimed melee swing: spacebar to attack,
+/// hits everything on `hitLayers` inside an ARC in front of the player —
+/// roughly Arc Width tiles wide at Reach tiles out — with a Cooldown between
+/// swings and no wind-up (unlike the other three weapons).
+///
+/// The arc is a true angular wedge centered on the player (not a rectangle
+/// offset ahead, which is what this used to be): every candidate within
+/// Reach of the player is tested against the swing's half-angle, so it reads
+/// as a sweeping cut around the wielder rather than a static box. Reach and
+/// Arc Width stay the two Inspector knobs either way — the half-angle is
+/// just derived from them (atan2(halfWidth, reach)) so tuning them still
+/// feels like "how wide / how far", not "how many degrees".
 /// </summary>
 public class PlayerAttack : MonoBehaviour
 {
@@ -12,10 +22,10 @@ public class PlayerAttack : MonoBehaviour
     [SerializeField] private float damage = 2f;
     [SerializeField] private float cooldown = 0.5f;
 
-    [Tooltip("How far ahead of the player the center of the swing lands (tiles).")]
+    [Tooltip("How far the swing reaches (tiles) — the arc's radius.")]
     [SerializeField] private float reach = 1f;
 
-    [Tooltip("Width of the swing arc (tiles).")]
+    [Tooltip("Width of the swing arc (tiles) at Reach distance — sets the arc's angular width (wider = a bigger sweep), not a straight-line box width anymore.")]
     [SerializeField] private float arcWidth = 3f;
 
     [Tooltip("What the sword can hit — set this to the Enemy layer.")]
@@ -28,9 +38,6 @@ public class PlayerAttack : MonoBehaviour
     [SerializeField] private HitEffects swordEffects;
 
     [Header("Visuals [Placeholder]")]
-    [Tooltip("Child object rotated to face the mouse; the swing sprite lives under it.")]
-    [SerializeField] private Transform aimPivot;
-
     [Tooltip("Sprite briefly flashed when swinging.")]
     [SerializeField] private SpriteRenderer swingVisual;
 
@@ -38,27 +45,25 @@ public class PlayerAttack : MonoBehaviour
 
     private float nextSwingTime;
     private float swingVisualOffTime;
+    private PlayerAim aim;
     private KnockbackReceiver knockback; // may be null; used only to block attacking while stunned
-
-    public Vector2 AimDirection { get; private set; } = Vector2.right;
 
     private void Awake()
     {
         if (swingVisual != null)
             swingVisual.enabled = false; // only visible during the swing flash
 
+        aim = GetComponent<PlayerAim>();
         knockback = GetComponent<KnockbackReceiver>();
 
         // A gate-passing monster (the Goblin) spawns onto the GatePasser layer,
-        // not Enemy — without this the sword's box would filter it out and it
+        // not Enemy — without this the sword's arc would filter it out and it
         // would take no damage. See MonsterLayers.
         hitLayers = MonsterLayers.IncludeGatePasser(hitLayers);
     }
 
     private void Update()
     {
-        UpdateAim();
-
         // A stunned player can't swing (matches losing movement control).
         bool stunned = knockback != null && knockback.IsStunned;
 
@@ -68,24 +73,6 @@ public class PlayerAttack : MonoBehaviour
 
         if (swingVisual != null && swingVisual.enabled && Time.time >= swingVisualOffTime)
             swingVisual.enabled = false;
-    }
-
-    private void UpdateAim()
-    {
-        var mouse = Mouse.current;
-        var cam = Camera.main;
-        if (mouse == null || cam == null) return;
-
-        Vector3 mouseWorld = cam.ScreenToWorldPoint(mouse.position.ReadValue());
-        Vector2 toMouse = (Vector2)(mouseWorld - transform.position);
-        if (toMouse.sqrMagnitude > 0.001f)
-            AimDirection = toMouse.normalized;
-
-        if (aimPivot != null)
-        {
-            float angle = Mathf.Atan2(AimDirection.y, AimDirection.x) * Mathf.Rad2Deg;
-            aimPivot.rotation = Quaternion.Euler(0f, 0f, angle);
-        }
     }
 
     private void Swing()
@@ -99,13 +86,22 @@ public class PlayerAttack : MonoBehaviour
         }
 
         Vector2 origin = transform.position;
-        Vector2 center = origin + AimDirection * reach;
-        float angle = Mathf.Atan2(AimDirection.y, AimDirection.x) * Mathf.Rad2Deg;
-        var hits = Physics2D.OverlapBoxAll(center, new Vector2(reach, arcWidth), angle, hitLayers);
+        Vector2 aimDir = aim != null ? aim.AimDirection : Vector2.right;
+        float halfAngleRad = Mathf.Atan2(arcWidth * 0.5f, Mathf.Max(0.01f, reach));
+
+        var hits = Physics2D.OverlapCircleAll(origin, reach, hitLayers);
         foreach (var hit in hits)
         {
             var health = hit.GetComponentInParent<Health>();
             if (health == null) continue;
+
+            Vector2 toTarget = (Vector2)health.transform.position - origin;
+            if (toTarget.sqrMagnitude < 0.0001f) continue; // exactly on top of the player — nothing meaningful to aim at
+
+            // Inside the swing's cone? Angle between where we're aiming and where
+            // the target actually is, compared against the arc's half-width.
+            float angleToTarget = Vector2.Angle(aimDir, toTarget) * Mathf.Deg2Rad;
+            if (angleToTarget > halfAngleRad) continue;
 
             // Wall block (line-of-sight): if a wall/structure/King sits on the
             // straight line from the player to this enemy, the swing doesn't reach
@@ -121,16 +117,29 @@ public class PlayerAttack : MonoBehaviour
         }
     }
 
-    // Draws the swing hitbox in the Scene view while the player is selected.
+    // Draws the swing's arc (a pie-slice wedge) in the Scene view while selected.
     private void OnDrawGizmosSelected()
     {
-        Vector2 dir = Application.isPlaying ? AimDirection : Vector2.right;
-        Vector2 center = (Vector2)transform.position + dir * reach;
-        float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+        Vector2 dir = (Application.isPlaying && aim != null) ? aim.AimDirection : Vector2.right;
+        Vector3 origin = transform.position;
+        float halfAngleRad = Mathf.Atan2(arcWidth * 0.5f, Mathf.Max(0.01f, reach));
+        float baseAngleRad = Mathf.Atan2(dir.y, dir.x);
 
         Gizmos.color = Color.yellow;
-        Gizmos.matrix = Matrix4x4.TRS(center, Quaternion.Euler(0f, 0f, angle), Vector3.one);
-        Gizmos.DrawWireCube(Vector3.zero, new Vector3(reach, arcWidth, 0f));
-        Gizmos.matrix = Matrix4x4.identity;
+        const int segments = 16;
+        Vector3 prevPoint = origin + AngleToOffset(baseAngleRad - halfAngleRad, reach);
+        Gizmos.DrawLine(origin, prevPoint); // near edge of the wedge
+        for (int i = 1; i <= segments; i++)
+        {
+            float t = (float)i / segments;
+            float a = baseAngleRad - halfAngleRad + t * (2f * halfAngleRad);
+            Vector3 point = origin + AngleToOffset(a, reach);
+            Gizmos.DrawLine(prevPoint, point); // the arc itself
+            prevPoint = point;
+        }
+        Gizmos.DrawLine(origin, prevPoint); // far edge of the wedge
     }
+
+    private static Vector3 AngleToOffset(float angleRad, float radius) =>
+        new Vector3(Mathf.Cos(angleRad), Mathf.Sin(angleRad), 0f) * radius;
 }

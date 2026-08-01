@@ -46,7 +46,7 @@ public class PlayerRespawn : MonoBehaviour
         var movement = GetComponent<PlayerMovement>();
         if (movement != null) movement.MovementLocked = !alive;
 
-        var attack = GetComponent<PlayerAttack>();
-        if (attack != null) attack.enabled = alive;
+        var weapons = GetComponent<WeaponSwitcher>();
+        if (weapons != null) weapons.SetCombatEnabled(alive);
     }
 }

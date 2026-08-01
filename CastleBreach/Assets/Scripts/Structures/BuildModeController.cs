@@ -92,6 +92,11 @@ public class BuildModeController : MonoBehaviour
             return;
         }
 
+        // Ignore this frame entirely while the weapon-select menu (V) is open —
+        // it uses the same number keys for a different purpose, and B/V
+        // opening each other's menu at once would fire both on one keypress.
+        if (WeaponSwitcher.SelectingWeapon) return;
+
         // Number keys pick up a specific structure (and switch mid-carry).
         for (int i = 0; i < buildOptions.Count && i < 9; i++)
         {
