@@ -4,14 +4,15 @@ using UnityEngine;
 /// <summary>
 /// Custom inspector for MonsterDefinition — draws an estimated damage-per-second
 /// summary box at the TOP of the asset's inspector (for the designer's
-/// convenience), then the normal fields below. DPS = damage ÷ the full attack
-/// cycle length (attack interval, plus the wind-up for telegraphed attackers).
-/// Editor-only; never included in a build.
+/// convenience), then every field grouped into collapsible foldout sections
+/// (see FoldoutHeaderEditor). DPS = damage ÷ the full attack cycle length
+/// (attack interval, plus the wind-up for telegraphed attackers). Editor-only;
+/// never included in a build.
 /// </summary>
 [CustomEditor(typeof(MonsterDefinition))]
-public class MonsterDefinitionEditor : Editor
+public class MonsterDefinitionEditor : FoldoutHeaderEditor
 {
-    public override void OnInspectorGUI()
+    protected override void DrawPreamble()
     {
         var def = (MonsterDefinition)target;
 
@@ -33,7 +34,5 @@ public class MonsterDefinitionEditor : Editor
 
         EditorGUILayout.HelpBox(summary, MessageType.Info);
         EditorGUILayout.Space();
-
-        DrawDefaultInspector();
     }
 }

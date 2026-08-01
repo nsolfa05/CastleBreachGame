@@ -74,6 +74,10 @@ public class MonsterDefinition : ScriptableObject
     [Tooltip("What this monster's attack does on TOP of damage — knockback and/or stun, both off by default. Mainly meaningful against the player (who has a KnockbackReceiver); the King and structures don't react. The knockback shoves the player directly away from this monster. Example: give a big enemy some knockback + a short stun so a hit from it actually staggers the player.")]
     public HitEffects attackEffects;
 
+    [Header("Knockback & stun RECEIVED (Guide 11)")]
+    [Tooltip("How much THIS monster resists being stunned by the player's weapons — 0 = fully stunnable, 1 = stun-immune, 0.5 = stuns on it last half as long. Lets a big enemy shrug off a stun that would freeze a small one, even though the weapon's Stun Duration is the same for both. Does NOT affect knockback distance — see Tile Weight for that.")]
+    [Range(0f, 1f)] public float stunResistance = 0f;
+
     // ─────────────────────────────────────────────────────────────
     [Header("Economy & weight")]
     public int currencyDrop = 3;

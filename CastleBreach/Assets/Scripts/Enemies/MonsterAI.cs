@@ -345,7 +345,11 @@ public class MonsterAI : MonoBehaviour
         activeScale = transform.localScale;
         if (body != null) body.color = definition.bodyColor;
         health.SetMax(definition.maxHealth, refill: true);
-        if (knockback != null) knockback.SetWeight(definition.tileWeight); // heavy types resist knockback
+        if (knockback != null)
+        {
+            knockback.SetWeight(definition.tileWeight); // heavy types resist knockback
+            knockback.SetStunResistance(definition.stunResistance); // e.g. a Cyclops can shrug off stuns a Zombie can't
+        }
         livesRemaining = definition.extraLives;
 
         // Gate is solid to ordinary monsters (a real physical backstop, so a

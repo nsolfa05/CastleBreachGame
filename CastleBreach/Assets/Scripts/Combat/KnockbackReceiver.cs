@@ -25,6 +25,9 @@ public class KnockbackReceiver : MonoBehaviour
     [Tooltip("Flat 0..1 reduction to ALL knockback taken (0 = full knockback, 1 = immovable), independent of weight — for an entity that should specifically resist being shoved without being made heavy for other purposes.")]
     [Range(0f, 1f)][SerializeField] private float knockbackResistance = 0f;
 
+    [Tooltip("Flat 0..1 reduction to any STUN taken (0 = fully stunnable, 1 = stun-immune; 0.5 = stuns last half as long). MonsterAI copies each monster's Stun Resistance (from its Definition) in here at spawn, so a big enemy can shrug off stuns a small one can't — in practice you only set this by hand on the Player.")]
+    [Range(0f, 1f)][SerializeField] private float stunResistance = 0f;
+
     [Tooltip("Seconds a knockback shove lasts as it decays to a stop. Short on purpose — it's a shove, not a launch. The stun (if the attack also stuns) is timed separately and takes over once the shove ends.")]
     [SerializeField] private float knockbackDuration = 0.18f;
 
@@ -49,6 +52,9 @@ public class KnockbackReceiver : MonoBehaviour
     /// <summary>Copy in a spawn-time weight — MonsterAI passes the monster's Tile Weight so heavy types resist knockback without hand-wiring each prefab.</summary>
     public void SetWeight(float newWeight) => weight = Mathf.Max(0.1f, newWeight);
 
+    /// <summary>Copy in a spawn-time stun resistance — MonsterAI passes each monster's Stun Resistance so, e.g., a Cyclops can shrug off stuns a Zombie can't.</summary>
+    public void SetStunResistance(float newResistance) => stunResistance = Mathf.Clamp01(newResistance);
+
     /// <summary>Shove this body away along <paramref name="direction"/>, at a speed
     /// scaled down by weight and resistance. Ignored if strength or direction is zero.</summary>
     public void ApplyKnockback(Vector2 direction, float strength)
@@ -62,10 +68,12 @@ public class KnockbackReceiver : MonoBehaviour
         knockbackEnd = Time.time + knockbackDuration;
     }
 
-    /// <summary>Freeze this body in place for <paramref name="duration"/> seconds
-    /// (extends, never shortens, any stun already running).</summary>
+    /// <summary>Freeze this body in place for <paramref name="duration"/> seconds,
+    /// shortened by Stun Resistance (1 = immune, ignored entirely). Extends,
+    /// never shortens, any stun already running.</summary>
     public void ApplyStun(float duration)
     {
+        duration *= 1f - stunResistance;
         if (duration <= 0f) return;
         stunnedUntil = Mathf.Max(stunnedUntil, Time.time + duration);
     }

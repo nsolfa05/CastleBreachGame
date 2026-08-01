@@ -4,20 +4,19 @@ using UnityEngine;
 /// <summary>
 /// Custom inspector for AttackTower — draws an estimated damage-per-second
 /// summary box at the TOP of the component's inspector (for the designer's
-/// convenience), then the normal fields below. DPS = Damage ÷ Seconds
-/// Between Shots, per target hit — Splash Radius doesn't raise this number,
-/// it just means the same damage also lands on everything else caught in
-/// the blast, not extra damage on any single target. Editor-only; never
-/// included in a build. Mirrors MonsterDefinitionEditor's DPS box, but reads
-/// via SerializedProperty since AttackTower's stat fields are private.
+/// convenience), then every field grouped into collapsible foldout sections
+/// (see FoldoutHeaderEditor). DPS = Damage ÷ Seconds Between Shots, per target
+/// hit — Splash Radius doesn't raise this number, it just means the same
+/// damage also lands on everything else caught in the blast, not extra damage
+/// on any single target. Editor-only; never included in a build. Mirrors
+/// MonsterDefinitionEditor's DPS box, but reads via SerializedProperty since
+/// AttackTower's stat fields are private.
 /// </summary>
 [CustomEditor(typeof(AttackTower))]
-public class AttackTowerEditor : Editor
+public class AttackTowerEditor : FoldoutHeaderEditor
 {
-    public override void OnInspectorGUI()
+    protected override void DrawPreamble()
     {
-        serializedObject.Update();
-
         float damage = serializedObject.FindProperty("damage").floatValue;
         float secondsBetweenShots = serializedObject.FindProperty("secondsBetweenShots").floatValue;
         float splashRadius = serializedObject.FindProperty("splashRadius").floatValue;
@@ -35,7 +34,5 @@ public class AttackTowerEditor : Editor
 
         EditorGUILayout.HelpBox(summary, MessageType.Info);
         EditorGUILayout.Space();
-
-        DrawDefaultInspector();
     }
 }

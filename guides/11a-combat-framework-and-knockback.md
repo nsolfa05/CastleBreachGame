@@ -52,7 +52,33 @@ and a few values set.
 
 ---
 
-## Step 2 — Add `KnockbackReceiver` to the Player
+## Step 2 — Collapsible inspector sections (new, nothing to build)
+
+Every `[Header]` section on **Monster Definition** assets, the **Monster**
+prefab's `MonsterAI` component, **Attack Tower**, and **Player Attack** is now
+a **collapsible foldout** instead of a flat wall of fields — click a section's
+title to fold it away. This applies automatically; there's nothing to add or
+wire, just click around and confirm it looks right:
+
+1. Select the **Cyclops** Monster Definition asset (`Assets/Monsters/Cyclops`).
+   You should see foldout headers like **Damage dealt (§7.3)**, **Targeting —
+   player vs King**, **Knockback & stun dealt (Guide 11)**, etc. — click one to
+   collapse/expand it.
+2. Select the **Monster** prefab and look at its `MonsterAI` component — same
+   thing, now with foldouts for **Crowd avoidance**, **Attack slots**,
+   **Routing around walls**, etc.
+3. A section you collapse **stays collapsed** while you keep working (even if
+   you click to a different asset and back) — it only resets if you close and
+   reopen Unity. Handy for hiding the pathing tunables while you're focused on
+   combat, for instance.
+
+Any *new* field or `[Header]` added later — including everything the rest of
+Guide 11 adds — automatically lands in the right foldout (or a new one) with no
+extra setup on your end.
+
+---
+
+## Step 3 — Add `KnockbackReceiver` to the Player
 
 1. In the **Hierarchy**, select your **Player** object (the knight — the one with
    `Player Movement` and `Player Attack` on it).
@@ -69,7 +95,7 @@ and a few values set.
 
 ---
 
-## Step 3 — Add `KnockbackReceiver` to the Monster prefab
+## Step 4 — Add `KnockbackReceiver` to the Monster prefab
 
 1. In the **Project** window, open `Assets/Prefabs/`, and **double-click the
    `Monster` prefab** to open it in Prefab Mode (or select it and use the
@@ -87,7 +113,7 @@ and a few values set.
 
 ---
 
-## Step 4 — Turn the sword's knockback + stun on
+## Step 5 — Turn the sword's knockback + stun on
 
 The sword is the first weapon to use the framework (the full weapon rework is
 11b; this is just the knockback/stun/wall-block part).
@@ -105,14 +131,14 @@ The sword is the first weapon to use the framework (the full weapon rework is
 
 ---
 
-## Step 5 — Give the "large enemy" a knockback + stun vs the player
+## Step 6 — Give the "large enemy" a knockback + stun vs the player
 
 Per your brief, a *big* enemy hitting the player should knock back **and** stun;
 a small one just nudges. Let's set that on the **Cyclops** (the big one) and give
 the **Zombie** a small nudge.
 
 1. In **Project**, open `Assets/Monsters/` and select **`Cyclops`**.
-2. Find the new **Knockback & Stun Dealt (Guide 11)** header → **Attack Effects**:
+2. Find the **Knockback & Stun Dealt (Guide 11)** foldout → **Attack Effects**:
    - **Knockback Enabled → ✔**, **Knockback Strength → `20`**.
    - **Stun Enabled → ✔**, **Stun Duration → `0.6`**.
 3. Select **`Zombie`**. Under **Attack Effects**:
@@ -125,11 +151,28 @@ the **Zombie** a small nudge.
 > The King and structures don't have receivers, so monster attacks never knock
 > *them* around — exactly as intended.
 
+### Stun Resistance — the OTHER side of stun (new)
+
+Step 5 gave the sword a Stun Duration, and Step 6 gave the Cyclops one too — but
+until now, every enemy took the exact same stun length from the sword, no matter
+how big it was. Each Monster Definition now has its own **Stun Resistance**
+(0–1) under the new **Knockback & Stun RECEIVED (Guide 11)** foldout — `0` =
+fully stunnable, `1` = stun-immune, `0.5` = stuns on it last half as long. This
+is separate from Tile Weight (which only affects knockback *distance*, not
+stun).
+
+1. Select **`Cyclops`** → **Knockback & Stun Received (Guide 11)** →
+   **Stun Resistance → `0.5`** (a big monster shrugs off half the stun the sword
+   would otherwise give it).
+2. Select **`Zombie`** → **Stun Resistance → `0`** (leave it fully stunnable —
+   the default).
+3. Tune any others to taste; `0` (no resistance) is the default for all of them.
+
 **Save Project.**
 
 ---
 
-## Step 6 — Playtest
+## Step 7 — Playtest
 
 1. Press **Play**. Send a wave (however you normally spawn — the Test controls or
    your wave setup).
@@ -145,9 +188,13 @@ the **Zombie** a small nudge.
 4. **Getting hit:** let a **Cyclops** land a slam on you — you should get shoved
    away and frozen for ~0.6s (can't move or swing), then recover. A **Zombie**
    hit should give a small nudge and no freeze.
-5. Tune to taste: `Knockback Strength` per attack for shove distance, `Stun
-   Duration` for freeze length, the player's `Knockback Scale`/`Weight` for how
-   the player takes hits overall.
+5. **Stun Resistance:** swing the sword at a Cyclops vs a Zombie with the same
+   Sword Effects Stun Duration — the Cyclops should freeze for noticeably less
+   time (half, with the `0.5` from Step 6) than the Zombie.
+6. Tune to taste: `Knockback Strength` per attack for shove distance, `Stun
+   Duration` for freeze length, `Stun Resistance` per monster for how much of
+   that they shrug off, the player's `Knockback Scale`/`Weight` for how the
+   player takes hits overall.
 
 ---
 
@@ -155,6 +202,9 @@ the **Zombie** a small nudge.
 
 - [ ] Console has no errors after pulling; `HitEffects` + `KnockbackReceiver`
       exist under `Assets/Scripts/Combat/`
+- [ ] Monster Definitions / the Monster prefab's `MonsterAI` / Attack Tower /
+      Player Attack all show **collapsible foldout sections** instead of a flat
+      field list, and a collapsed section stays collapsed as you work
 - [ ] Player has a **Knockback Receiver** (Weight 6)
 - [ ] Monster prefab has a **Knockback Receiver** (Weight left default —
       auto-filled from Tile Weight)
@@ -162,7 +212,10 @@ the **Zombie** a small nudge.
       knockback + stun enabled
 - [ ] Cyclops (and any others you want) has **Attack Effects** knockback/stun set;
       small enemies a lighter nudge or nothing
+- [ ] Cyclops has **Stun Resistance `0.5`**; Zombie left at `0`
 - [ ] Sword shoves + briefly freezes enemies; heavier enemies resist more
+- [ ] A stun-resistant enemy (Cyclops) freezes for noticeably less time than a
+      non-resistant one (Zombie) from the same sword hit
 - [ ] Sword no longer hits enemies through a wall
 - [ ] A big enemy's hit knocks back + stuns the player; a small enemy just nudges
 - [ ] **File ▸ Save Project**, committed & pushed (verified on github.com)
@@ -182,3 +235,16 @@ the **Zombie** a small nudge.
 - **The sword's wall-block is the cheap line-of-sight version** we agreed on. If
   you later want the fancier "expanding arc that physically stops on the wall"
   for visuals, that drops in at the sword without touching this framework.
+- **On removing redundant fields:** you asked me to delete anything that's a
+  copy of something else already in an enemy's inspector. I went through
+  `MonsterAI` and `MonsterDefinition` carefully and didn't find a genuine
+  duplicate — every value plays a distinct role, and the handful of `MonsterAI`
+  fields that LOOK adjacent to Definition data (e.g. `Structure Layers`, `Body`)
+  are scene-wiring references, not copies of a stat. Point me at the specific
+  field(s) you had in mind and I'll remove them.
+- **New foldout editors are additive, not a rewrite.** `FoldoutHeaderEditor`
+  (`Assets/Scripts/Editor/`) is a small reusable base class; `MonsterDefinitionEditor`
+  and `AttackTowerEditor` were converted to use it (keeping their DPS summary
+  boxes), and `MonsterAIEditor`/`PlayerAttackEditor` are new. Any future script
+  with `[Header]` sections can opt in the same way — just inherit
+  `FoldoutHeaderEditor` instead of `Editor`.
