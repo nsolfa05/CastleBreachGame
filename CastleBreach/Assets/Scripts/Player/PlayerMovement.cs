@@ -14,6 +14,7 @@ public class PlayerMovement : MonoBehaviour
 
     private Rigidbody2D rb;
     private Vector2 moveInput;
+    private KnockbackReceiver knockback; // may be null if the prefab has no receiver
 
     /// <summary>Set true while dead/respawning to freeze the player.</summary>
     public bool MovementLocked { get; set; }
@@ -21,6 +22,7 @@ public class PlayerMovement : MonoBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
+        knockback = GetComponent<KnockbackReceiver>();
     }
 
     private void Update()
@@ -42,6 +44,11 @@ public class PlayerMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
+        // While being knocked back or stunned, the KnockbackReceiver owns the
+        // body — don't fight it (see KnockbackReceiver). Control hands back the
+        // instant the shove/stun ends.
+        if (knockback != null && knockback.ControlSuppressed) return;
+
         rb.linearVelocity = moveInput * moveSpeed;
     }
 }
