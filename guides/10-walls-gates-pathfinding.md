@@ -779,6 +779,26 @@ non-goal, see below), it just personally becomes less willing to wait or ease
 off the more of a crowd is counting on it to move. `Rear Pressure Threshold =
 0` turns the whole feature off (old behavior).
 
+**Correction, found retesting the exact doorway that started this:** the first
+version of `RearCrowdPressure` excluded any neighbor whose OWN `IsPlaced()`
+already read true — but with slots off, that's just `settledAtTarget` again,
+the exact loose signal this feature exists to route around. An entire cluster
+jammed at a doorway can ALL satisfy it simultaneously (everyone's within
+straight-line attack range of the King even though nobody's actually gotten
+anywhere), which made every monster read every other monster as "already
+placed" and exclude it — so pressure came out ~0 for the whole group, in
+precisely the scenario meant to detect it. The freeze persisted (25s in
+testing, vs. the original 45s+ — the fix wasn't doing nothing, it just wasn't
+reliably engaging).
+
+Fixed by dropping that filter and using tight **proximity** instead: only a
+same-objective neighbor within `Separation Radius` (not the wider `Give Way
+Radius`) counts, regardless of whether it also happens to read as arrived. A
+comfortably-settled, non-jammed group spaces itself out beyond separation's own
+push radius once forces balance; two same-target bodies staying persistently
+this close only happens when there's genuinely nowhere for separation to push
+them apart to — a real jam, and a signal a loose distance check can't fake.
+
 **On literally pushing monsters sideways to help them squeeze through** (a
 question that came up): deliberately not done. Every force in this system is
 self-authored — a monster only ever computes its OWN velocity by reading

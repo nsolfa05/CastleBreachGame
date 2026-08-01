@@ -1501,8 +1501,28 @@ public class MonsterAI : MonoBehaviour
     /// GiveWayVelocity/AllyQueuedBehind (a cone on the far side of me from the
     /// target) rather than my instantaneous heading, since that's a more stable
     /// read of "who's counting on me making room" while I might be jittering in
-    /// place at a pinch point. Only counts allies that haven't arrived themselves
-    /// (IsPlaced) — an ally that's already found its own spot isn't pressuring me.
+    /// place at a pinch point.
+    ///
+    /// Deliberately does NOT filter out a neighbor just because ITS OWN
+    /// IsPlaced()/settledAtTarget reads true — a first version did, and that's
+    /// exactly the bug this whole feature exists to route around: with slots
+    /// off, "arrived" is a loose straight-line distance check, and an entire
+    /// cluster jammed at a doorway can ALL satisfy it simultaneously (everyone's
+    /// within straight-line attack range of the King even though nobody's
+    /// actually gotten anywhere) — which made every monster read every other
+    /// monster as "already placed" and exclude it, so pressure came out ~0 for
+    /// the whole group, in precisely the scenario meant to detect it.
+    ///
+    /// Instead, reliability comes from tight PROXIMITY: this only counts a
+    /// same-objective neighbor within separationRadius (not the wider
+    /// giveWayRadius), because that's evidence a plain "arrived" check can't
+    /// fake. A comfortably-settled, non-jammed group spaces itself out beyond
+    /// separation's own push radius once the forces balance — two same-target
+    /// bodies staying persistently THIS close only happens when there's
+    /// genuinely nowhere for separation to push them apart to, i.e. a real jam.
+    /// Compares against currentTarget (each monster's real objective, always
+    /// accurate) rather than the target parameter (which can be a wall mid-break
+    /// for either monster), matching ForwardCrowdPressure's convention.
     /// See rearPressureThreshold's tooltip for what MoveToward does with this.
     /// </summary>
     private float RearCrowdPressure(Transform target)
@@ -1512,14 +1532,14 @@ public class MonsterAI : MonoBehaviour
         if (radialOut.sqrMagnitude < 0.0001f) return 0f;
         radialOut.Normalize();
 
-        float radiusSqr = giveWayRadius * giveWayRadius;
+        float radiusSqr = separationRadius * separationRadius;
         float pressure = 0f;
         for (int i = 0; i < neighborCount; i++)
         {
             var collider = NeighborBuffer[i];
             if (collider == null || collider.gameObject == gameObject) continue;
             var other = collider.GetComponentInParent<MonsterAI>();
-            if (other == null || other.currentTarget != target || other.IsPlaced()) continue;
+            if (other == null || other.currentTarget != currentTarget) continue;
 
             Vector2 toOther = (Vector2)other.transform.position - (Vector2)transform.position;
             float distSqr = toOther.sqrMagnitude;
@@ -1528,7 +1548,7 @@ public class MonsterAI : MonoBehaviour
             float dist = Mathf.Sqrt(distSqr);
             float behind = Vector2.Dot(toOther / dist, radialOut); // 1 = directly behind me, target-relative
             if (behind > 0.5f)
-                pressure += behind * (1f - dist / giveWayRadius);
+                pressure += behind * (1f - dist / separationRadius);
         }
         return pressure;
     }
