@@ -248,19 +248,24 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 256
   body: {fileID: 0}
-  separationRadius: 0.85
-  separationStrength: 0.6
+  separationRadius: 1.2
+  separationStrength: 0.8
   giveWayRadius: 1.1
   giveWayStrength: 0.6
-  yieldProbeRadius: 0.9
-  yieldBackStrength: 0.7
-  yieldHoldSeconds: 0.8
+  yieldProbeRadius: 0.8
+  yieldBackStrength: 0.5
+  yieldHoldSeconds: 0.6
   arrivalRadius: 0.3
   arrivalMinSpeedFactor: 0.35
-  headOnAvoidStrength: 0.5
-  useAttackSlots: 1
+  avoidStrength: 0.6
+  rearPushFalloff: 3
+  rearPushFloor: 0.4
+  useAttackSlots: 0
   slotClaimDistance: 4
   slotMigrateCooldown: 0.6
+  migrateBlockedDwell: 0.5
+  migrateSearchRadius: 1.6
+  stuckReclaimLocalWindow: 1.5
   stuckVelocityThreshold: 0.15
   stuckCheckInterval: 0.4
   stuckProgressThreshold: 0.15
