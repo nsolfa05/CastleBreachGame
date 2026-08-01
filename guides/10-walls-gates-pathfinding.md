@@ -810,6 +810,40 @@ which can bounce back and disturb A) that are much harder to reason about than
 what's here now, and can look like ragdolling rather than intentional movement.
 Rear Pressure gets the "crowd squeezes through" feel without that risk.
 
+### Funnel Breach — a heavily-walled target opens at least 2 tiles, not 1 (automatic, tunable)
+
+A geometry-level fix, not another crowd-behavior patch. Nearly every jam chased
+in this guide traces back to one root shape: the King ends up with a single
+1-wide breach, which is **inherently** jam-prone no matter how good the crowd
+steering is — two monsters can never pass each other in a 1-tile gap, full
+stop. Funnel Breach fixes this at the source: when a target is walled in tight,
+overflow monsters proactively widen the opening to at least two ADJACENT tiles
+instead of trickling through (or eventually settling for) a knife-edge gap.
+
+Trigger, both conditions required: the target has fewer than **Funnel Min Open
+Slots** (default `2`) standing positions in total (not "free right now" — the
+actual count that exists), AND at least one breakable wall sits within
+**Funnel Breach Distance** (default `3` tiles) of it. When both hold, a
+claiming monster prefers a walled slot **adjacent to a tile already claimed**
+for that target (open or walled, by anyone) over the plain nearest one —
+that's what makes the second breach actually widen the first hole instead of
+opening a disconnected second one somewhere else on the ring. The very first
+monster to trigger this has nothing to be adjacent to yet, so it just claims
+the nearest walled slot as before; every subsequent one then prefers extending
+that same hole. Once total open slots reach the minimum, the pressure stops on
+its own (`NeedsWiderBreach` re-evaluates false) — a big simultaneous horde can
+still open a bit more than the strict minimum, same as the existing "horde
+breaks the ring open" behavior; this only guarantees the *floor*, not a cap.
+
+**Turn it off** (`Funnel Breach` unchecked) for the old behavior: walls near a
+target only ever break one at a time, purely as overflow once every open slot
+is already taken — meaning a player CAN wall a target down to a permanent
+single-file chokepoint if that's the intended difficulty/strategy. With it on,
+that specific extreme defense is no longer available directly around a target,
+though full maze-design freedom remains everywhere outside `Funnel Breach
+Distance` — a deliberate design tradeoff, not just a bug workaround, worth
+testing both ways.
+
 ### Big-picture note: the slot system at scale
 
 Worth recording for later, since it came up while chasing these crowd bugs:
@@ -962,6 +996,7 @@ Then **push**, and confirm on github.com that the new prefabs actually landed.
 - [ ] A crowd bunched at the mouth of a walled King progressively fills the FAR slots too (holders step deeper as newcomers press in) instead of leaving the back of the ring empty
 - [ ] With Rear Push Falloff up, a crowd floods a corridor and flows AROUND to surround a structure (front holds, rear spills sideways) instead of the rear compressing the front into the near face
 - [ ] With slots off, a monster wedged at a doorway with allies pressing behind it no longer freezes indefinitely — it keeps working the jam (stuck-recovery escalation) until it actually breaks free
+- [ ] Wall a King down to one reachable tile and send a horde: at least 2 ADJACENT walls break open (wire-cube gizmos going magenta side by side), not a single knife-edge gap — toggle Funnel Breach off and confirm it goes back to one-at-a-time
 - [ ] Monsters no longer settle into a faint vertical wobble while holding a slot (the gravity fix)
 - [ ] Two monsters crossing paths (e.g. heading to break separate ring walls) slide past each other instead of visibly bouncing off each other first
 - [ ] **File → Save Project**, committed & pushed (verified on github.com)

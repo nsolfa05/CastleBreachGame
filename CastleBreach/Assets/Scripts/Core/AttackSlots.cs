@@ -223,6 +223,101 @@ public static class AttackSlots
         return best;
     }
 
+    /// <summary>Grid-adjacent offsets (8-directional) used by ClaimAdjacentWalledSlot.</summary>
+    private static readonly Vector2Int[] EightNeighbors =
+    {
+        new Vector2Int( 1,  0), new Vector2Int(-1,  0),
+        new Vector2Int( 0,  1), new Vector2Int( 0, -1),
+        new Vector2Int( 1,  1), new Vector2Int( 1, -1),
+        new Vector2Int(-1,  1), new Vector2Int(-1, -1),
+    };
+
+    /// <summary>
+    /// True if <paramref name="target"/> is walled in tight right now: fewer than
+    /// <paramref name="minOpenSlots"/> OPEN standing positions exist at all (not
+    /// "free right now" — this is about the geometry being too narrow, not
+    /// momentary occupancy), AND at least one WALLED candidate is within
+    /// <paramref name="breachDistance"/> of its collider. Used by MonsterAI's
+    /// Funnel Breach feature to decide whether to proactively widen a target's
+    /// breach instead of waiting for pure slot-overflow contention — see its
+    /// field tooltips for the "why" (a single 1-wide gap is inherently jam-prone
+    /// no matter how good the crowd steering is; guaranteeing at least two
+    /// adjacent open tiles removes that failure mode at the geometry level).
+    /// </summary>
+    public static bool NeedsWiderBreach(Transform target, MonsterDefinition definition,
+                                        int minOpenSlots, float breachDistance)
+    {
+        if (target == null || definition == null) return false;
+
+        var ts = SlotsFor(target);
+        var cc = Candidates(ts, target, definition);
+        if (cc.Open.Count >= minOpenSlots) return false;
+        if (cc.Walled.Count == 0) return false;
+
+        var targetCollider = target.GetComponentInParent<Collider2D>();
+        if (targetCollider == null) return false;
+
+        float breachSqr = breachDistance * breachDistance;
+        foreach (var tile in cc.Walled)
+        {
+            Vector2 center = GridMath.TileCenterWorld(tile);
+            Vector2 surface = targetCollider.ClosestPoint(center);
+            if ((center - surface).sqrMagnitude <= breachSqr) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Claim a free WALLED slot within <paramref name="maxDistance"/> of
+    /// <paramref name="fromWorld"/>, preferring one grid-ADJACENT to a tile
+    /// already claimed for this target (open or walled, by anyone) over the
+    /// plain nearest one. This is what turns a forced "wider breach" into an
+    /// actual wider breach: the second monster extends the SAME hole the first
+    /// one is opening instead of starting a second, disconnected one elsewhere
+    /// on the ring. Falls back to the ordinary nearest walled slot when nothing
+    /// is adjacent yet — covers the very first breach, when there's nothing to
+    /// be adjacent to.
+    /// </summary>
+    public static Vector2Int? ClaimAdjacentWalledSlot(Transform target, MonsterDefinition definition,
+                                                       Vector2 fromWorld, MonsterAI claimant, float maxDistance)
+    {
+        if (target == null || definition == null) return null;
+
+        var ts = SlotsFor(target);
+        var cc = Candidates(ts, target, definition);
+        float maxSqr = maxDistance * maxDistance;
+
+        Vector2Int adjBest = default;
+        float adjBestSqr = float.MaxValue;
+        bool adjFound = false;
+        foreach (var tile in cc.Walled)
+        {
+            if (ts.Claims.TryGetValue(tile, out var holder) && holder != null && holder != claimant) continue;
+
+            float sqr = ((Vector2)GridMath.TileCenterWorld(tile) - fromWorld).sqrMagnitude;
+            if (sqr > maxSqr) continue;
+
+            bool adjacentToClaimed = false;
+            for (int i = 0; i < EightNeighbors.Length; i++)
+            {
+                if (ts.Claims.TryGetValue(tile + EightNeighbors[i], out var neighborHolder) && neighborHolder != null)
+                {
+                    adjacentToClaimed = true;
+                    break;
+                }
+            }
+            if (!adjacentToClaimed) continue;
+
+            if (sqr < adjBestSqr) { adjBestSqr = sqr; adjBest = tile; adjFound = true; }
+        }
+
+        Vector2Int? result = adjFound ? adjBest : NearestFree(ts, cc.Walled, fromWorld, claimant, null, maxDistance);
+        if (!result.HasValue) return null;
+
+        ts.Claims[result.Value] = claimant;
+        return result;
+    }
+
     /// <summary>Release a slot if it's currently held by this claimant.</summary>
     public static void Release(Transform target, Vector2Int tile, MonsterAI claimant)
     {

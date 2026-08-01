@@ -126,6 +126,15 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("Seconds after a monster drops its slot because it got physically stuck reaching it (still mid-approach, not yet arrived) during which it only reclaims something within Migrate Search Radius — the same 'local shuffle, not a ring-wide swap' rule Migrate Search Radius applies to an arrived holder, extended to cover a still-approaching one too. Without this, the reclaim right after release used the same unbounded nearest-search that produced the stuck/crossed assignment in the first place, so two mutually-stuck monsters could just re-pick each other's tile and keep crossing paths indefinitely.")]
     [SerializeField] private float stuckReclaimLocalWindow = 1.5f;
 
+    [Tooltip("FUNNEL BREACH. When a target (King, tower) is walled in tight — fewer than Funnel Min Open Slots standing positions exist at all, with a breakable wall within Funnel Breach Distance — overflow monsters proactively widen the breach by at least two ADJACENT tiles instead of trickling through (or eventually opening) a single knife-edge 1-wide gap. A 1-wide gap is inherently jam-prone no matter how well the crowd behaviors are tuned (two monsters can never pass each other in it); this fixes that at the geometry level instead of asking the crowd AI to squeeze harder through it. Off = the old behavior: walls near a target only ever break one at a time, purely as overflow once every open slot is already taken. Turn this off if you'd rather a player be able to wall the King down to a permanent single-file chokepoint.")]
+    [SerializeField] private bool funnelBreach = true;
+
+    [Tooltip("How close (tiles) a breakable wall must be to a target for Funnel Breach to count it as part of that target's tight defenses. Only matters together with Funnel Min Open Slots.")]
+    [SerializeField] private float funnelBreachDistance = 3f;
+
+    [Tooltip("Funnel Breach only kicks in when a target has FEWER than this many open (standable) attack slots in total — not \"free right now\", the actual count that exists. 2 means: the moment a target's defenses would only ever offer a single-file opening, monsters proactively widen it instead of settling for a knife-edge gap.")]
+    [SerializeField] private int funnelMinOpenSlots = 2;
+
     [Tooltip("Actual physics velocity below this (units/sec) counts as \"stuck\" — used to detect a monster that's committed to attacking a structure but is physically blocked (e.g. trapped behind another monster) from ever reaching it.")]
     [SerializeField] private float stuckVelocityThreshold = 0.15f;
 
@@ -1201,8 +1210,19 @@ public class MonsterAI : MonoBehaviour
             DistanceToTarget(objective) <= definition.attackRange + slotClaimDistance)
         {
             float claimReach = Time.time < preferLocalClaimUntil ? migrateSearchRadius : float.PositiveInfinity;
-            var claimed = AttackSlots.ClaimNearestSlot(objective, definition, transform.position, this,
-                                                       allowWalled: true, maxDistance: claimReach);
+
+            // Funnel breach: a target walled in tight gets a WIDER hole forced
+            // open — an adjacent second (or third...) tile, not a single
+            // knife-edge gap that jams no matter how good the crowd steering is.
+            // See funnelBreach's tooltip. Tried first, falling straight through
+            // to the ordinary claim below if it finds nothing (not under siege,
+            // feature off, or genuinely nothing free) — same net result as before.
+            Vector2Int? claimed = null;
+            if (funnelBreach && AttackSlots.NeedsWiderBreach(objective, definition, funnelMinOpenSlots, funnelBreachDistance))
+                claimed = AttackSlots.ClaimAdjacentWalledSlot(objective, definition, transform.position, this, claimReach);
+
+            claimed = claimed ?? AttackSlots.ClaimNearestSlot(objective, definition, transform.position, this,
+                                                               allowWalled: true, maxDistance: claimReach);
             if (claimed.HasValue)
             {
                 claimedSlot = claimed.Value;
