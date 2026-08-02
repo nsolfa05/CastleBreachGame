@@ -15,6 +15,11 @@ using UnityEngine.InputSystem;
 /// Arc Width stay the two Inspector knobs either way — the half-angle is
 /// just derived from them (atan2(halfWidth, reach)) so tuning them still
 /// feels like "how wide / how far", not "how many degrees".
+///
+/// The swing FLASH is the same wedge shape too — a LineRenderer traces
+/// exactly the outline OnDrawGizmosSelected draws in the Scene view (both
+/// read from BuildWedgePoints, so the two can never drift apart), replacing
+/// the old flat rectangle sprite placeholder.
 /// </summary>
 public class PlayerAttack : MonoBehaviour
 {
@@ -37,21 +42,40 @@ public class PlayerAttack : MonoBehaviour
     [Tooltip("Knockback / stun this sword applies on hit — the first user of the Guide 11 combat framework. Off by default; turn on Knockback and/or Stun and set the numbers to give the sword its shove + brief freeze.")]
     [SerializeField] private HitEffects swordEffects;
 
-    [Header("Visuals [Placeholder]")]
-    [Tooltip("Sprite briefly flashed when swinging.")]
-    [SerializeField] private SpriteRenderer swingVisual;
+    [Header("Visuals")]
+    [Tooltip("Color of the swing wedge flash.")]
+    [SerializeField] private Color swingVisualColor = new Color(1f, 0.95f, 0.4f, 0.9f);
 
+    [Tooltip("Line thickness (tiles) of the swing wedge flash.")]
+    [SerializeField] private float swingVisualWidth = 0.06f;
+
+    [Tooltip("How long the swing wedge flash stays visible, in seconds.")]
     [SerializeField] private float swingFlashSeconds = 0.12f;
+
+    private const int WedgeSegments = 16;
 
     private float nextSwingTime;
     private float swingVisualOffTime;
     private PlayerAim aim;
     private KnockbackReceiver knockback; // may be null; used only to block attacking while stunned
+    private LineRenderer swingLine;
 
     private void Awake()
     {
-        if (swingVisual != null)
-            swingVisual.enabled = false; // only visible during the swing flash
+        swingLine = GetComponent<LineRenderer>();
+        if (swingLine == null) swingLine = gameObject.AddComponent<LineRenderer>();
+        swingLine.useWorldSpace = true;
+        swingLine.loop = false;
+        swingLine.positionCount = 0;
+        swingLine.widthMultiplier = swingVisualWidth;
+        swingLine.startColor = swingVisualColor;
+        swingLine.endColor = swingVisualColor;
+        swingLine.sortingOrder = 25;
+        // Sprites/Default: the same shader every SpriteRenderer in this
+        // project already relies on, so it's guaranteed URP-compatible here
+        // — LineRenderer's own default material is not (shows up magenta).
+        swingLine.material = new Material(Shader.Find("Sprites/Default"));
+        swingLine.enabled = false;
 
         aim = GetComponent<PlayerAim>();
         knockback = GetComponent<KnockbackReceiver>();
@@ -60,6 +84,14 @@ public class PlayerAttack : MonoBehaviour
         // not Enemy — without this the sword's arc would filter it out and it
         // would take no damage. See MonsterLayers.
         hitLayers = MonsterLayers.IncludeGatePasser(hitLayers);
+    }
+
+    // Being switched away from mid-flash (or disabled on death) shouldn't
+    // leave the wedge flash frozen on screen — WeaponSwitcher only disables
+    // this component, it never touches the flash directly.
+    private void OnDisable()
+    {
+        if (swingLine != null) swingLine.enabled = false;
     }
 
     private void Update()
@@ -71,22 +103,23 @@ public class PlayerAttack : MonoBehaviour
         if (!stunned && keyboard != null && keyboard.spaceKey.wasPressedThisFrame && Time.time >= nextSwingTime)
             Swing();
 
-        if (swingVisual != null && swingVisual.enabled && Time.time >= swingVisualOffTime)
-            swingVisual.enabled = false;
+        if (swingLine.enabled && Time.time >= swingVisualOffTime)
+            swingLine.enabled = false;
     }
 
     private void Swing()
     {
         nextSwingTime = Time.time + cooldown;
 
-        if (swingVisual != null)
-        {
-            swingVisual.enabled = true;
-            swingVisualOffTime = Time.time + swingFlashSeconds;
-        }
-
         Vector2 origin = transform.position;
         Vector2 aimDir = aim != null ? aim.AimDirection : Vector2.right;
+
+        var wedgePoints = BuildWedgePoints(origin, aimDir);
+        swingLine.positionCount = wedgePoints.Length;
+        swingLine.SetPositions(wedgePoints);
+        swingLine.enabled = true;
+        swingVisualOffTime = Time.time + swingFlashSeconds;
+
         float halfAngleRad = Mathf.Atan2(arcWidth * 0.5f, Mathf.Max(0.01f, reach));
 
         var hits = Physics2D.OverlapCircleAll(origin, reach, hitLayers);
@@ -117,27 +150,37 @@ public class PlayerAttack : MonoBehaviour
         }
     }
 
-    // Draws the swing's arc (a pie-slice wedge) in the Scene view while selected.
+    // Draws the swing's arc (a pie-slice wedge outline) in the Scene view
+    // while selected — the exact same points the real swing flash uses.
     private void OnDrawGizmosSelected()
     {
         Vector2 dir = (Application.isPlaying && aim != null) ? aim.AimDirection : Vector2.right;
-        Vector3 origin = transform.position;
+        var points = BuildWedgePoints(transform.position, dir);
+
+        Gizmos.color = Color.yellow;
+        for (int i = 0; i < points.Length - 1; i++)
+            Gizmos.DrawLine(points[i], points[i + 1]);
+    }
+
+    /// <summary>Origin → near edge → arc → far edge → origin, the wedge outline
+    /// shared by the real-time swing flash (LineRenderer) and the Scene-view
+    /// gizmo, so they can never draw two different shapes.</summary>
+    private Vector3[] BuildWedgePoints(Vector2 origin, Vector2 dir)
+    {
         float halfAngleRad = Mathf.Atan2(arcWidth * 0.5f, Mathf.Max(0.01f, reach));
         float baseAngleRad = Mathf.Atan2(dir.y, dir.x);
 
-        Gizmos.color = Color.yellow;
-        const int segments = 16;
-        Vector3 prevPoint = origin + AngleToOffset(baseAngleRad - halfAngleRad, reach);
-        Gizmos.DrawLine(origin, prevPoint); // near edge of the wedge
-        for (int i = 1; i <= segments; i++)
+        var points = new Vector3[WedgeSegments + 3];
+        int idx = 0;
+        points[idx++] = origin;
+        for (int i = 0; i <= WedgeSegments; i++)
         {
-            float t = (float)i / segments;
+            float t = (float)i / WedgeSegments;
             float a = baseAngleRad - halfAngleRad + t * (2f * halfAngleRad);
-            Vector3 point = origin + AngleToOffset(a, reach);
-            Gizmos.DrawLine(prevPoint, point); // the arc itself
-            prevPoint = point;
+            points[idx++] = origin + AngleToOffset(a, reach);
         }
-        Gizmos.DrawLine(origin, prevPoint); // far edge of the wedge
+        points[idx++] = origin;
+        return points;
     }
 
     private static Vector3 AngleToOffset(float angleRad, float radius) =>

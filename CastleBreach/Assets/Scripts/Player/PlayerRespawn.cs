@@ -39,7 +39,15 @@ public class PlayerRespawn : MonoBehaviour
     private void SetAlive(bool alive)
     {
         foreach (var renderer in GetComponentsInChildren<SpriteRenderer>(true))
+        {
+            // Combat FX (a weapon's charge bar) manages its own visibility —
+            // forcing it ON here would show whatever on/off state it was
+            // frozen in the instant the player died (e.g. a charge bar
+            // stuck mid-fill). Forcing it OFF on death is still fine and
+            // instant either way, so only respawn (alive) skips it.
+            if (alive && renderer.GetComponent<CombatFxVisual>() != null) continue;
             renderer.enabled = alive;
+        }
         foreach (var collider in GetComponentsInChildren<Collider2D>(true))
             collider.enabled = alive;
 

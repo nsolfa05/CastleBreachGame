@@ -48,6 +48,7 @@ public class ChargeIndicator : MonoBehaviour
         renderer.sprite = boxSprite;
         renderer.sortingOrder = order;
         renderer.enabled = false;
+        go.AddComponent<CombatFxVisual>(); // see CombatFxVisual — exempts this from PlayerRespawn's blanket re-enable
         return renderer;
     }
 

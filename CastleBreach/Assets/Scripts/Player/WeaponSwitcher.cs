@@ -14,6 +14,17 @@ using UnityEngine.InputSystem;
 /// while the other's menu is open (see SelectingWeapon / BuildModeController.
 /// BuildingActive) so a stray number press can never fire both at once.
 /// </summary>
+// Forced to run AFTER BuildModeController every frame — Unity's default order
+// between two unrelated scripts is unspecified, and the two menus racing was
+// a real bug: on the exact frame a shared number key both equips a weapon
+// HERE and closes this menu (clearing SelectingWeapon within this same
+// Update call), BuildModeController's own guard — if it happened to run
+// AFTER this script that frame — would read the already-cleared flag and
+// process that same key too, briefly also popping a build ghost (e.g. "V
+// then 2"). Running strictly after means BuildModeController always reads
+// SelectingWeapon as it stood at the end of the PREVIOUS frame, which is
+// stable and race-free for its check.
+[DefaultExecutionOrder(100)]
 public class WeaponSwitcher : MonoBehaviour
 {
     [System.Serializable]
