@@ -371,9 +371,9 @@ public class MonsterAI : MonoBehaviour
     private void FixedUpdate()
     {
         var gm = GameManager.Instance;
-        if (definition == null || bonePileActive || gm == null || gm.State != GameState.Playing)
+        if (definition == null || bonePileActive || health.IsDead || gm == null || gm.State != GameState.Playing)
         {
-            if (rb.simulated) rb.linearVelocity = Vector2.zero; // avoid warning while a bone pile has physics off
+            if (rb.simulated) rb.linearVelocity = Vector2.zero; // avoid warning while a bone pile (or a lingering corpse) has physics off
             return;
         }
 
@@ -1883,8 +1883,21 @@ public class MonsterAI : MonoBehaviour
             drop.SetValue(definition.currencyDrop);
         }
 
+        // Wave-count bookkeeping happens NOW, not after the corpse lingers —
+        // a death effect is cosmetic and shouldn't delay wave-clear checks.
         Killed?.Invoke(this);
-        Destroy(gameObject);
+
+        // Freeze the corpse in place immediately — FixedUpdate's own
+        // health.IsDead check (above) stops movement/attacking from here on;
+        // this additionally takes it fully out of physics so it can't be
+        // shoved around or still block an ally's path while it lingers.
+        rb.simulated = false;
+        foreach (var col in GetComponentsInChildren<Collider2D>())
+            col.enabled = false;
+
+        var deathEffect = GetComponent<DeathEffect>();
+        float lingerSeconds = deathEffect != null ? deathEffect.Play() : 0f;
+        Destroy(gameObject, lingerSeconds);
     }
 
     private IEnumerator BonePileRoutine()

@@ -6,8 +6,9 @@ using UnityEngine.InputSystem;
 /// Owns which of the player's weapons (Sword, Bow, Hammer, Fire Staff — Guide
 /// 11b) is currently active, exactly one at a time. Mirrors
 /// BuildModeController's B-key convention: press V to open the weapon-select
-/// menu, a number key (1-4) picks a weapon and closes the menu, pressing V
-/// again or Esc closes it without changing anything.
+/// menu, then any number key (1-4) equips that weapon WITHOUT closing the
+/// menu — press another number to switch again, as many times as you like.
+/// Only Esc (or pressing V again) closes it.
 ///
 /// Number keys are otherwise BuildModeController's — the menu only reads them
 /// while actually open (selecting), and each side ignores its own open-key
@@ -82,8 +83,7 @@ public class WeaponSwitcher : MonoBehaviour
         {
             if (keyboard[Key.Digit1 + i].wasPressedThisFrame)
             {
-                Equip(i);
-                StopSelecting();
+                Equip(i); // stays in the menu — press another number to switch again, Esc/V to close
                 break;
             }
         }

@@ -8,6 +8,13 @@ using UnityEngine;
 /// percentage vs a flat amount without rewriting anything. (The "keep or lose
 /// upgrades on death" toggle arrives together with the upgrade system,
 /// post-slice.)
+///
+/// If a DeathEffect is attached, its red-tint + particle burst plays first —
+/// movement/collision/weapons lock immediately, but the tinted BODY stays
+/// visible for however long DeathEffect.Play() reports back (Body Lifetime
+/// Seconds) before actually being hidden. That time counts toward Respawn
+/// Delay, not on top of it — set Respawn Delay at least as long as Body
+/// Lifetime Seconds or the corpse effectively floors how soon you can respawn.
 /// </summary>
 [RequireComponent(typeof(Health))]
 public class PlayerRespawn : MonoBehaviour
@@ -62,14 +69,37 @@ public class PlayerRespawn : MonoBehaviour
 
     private IEnumerator RespawnRoutine()
     {
-        SetAlive(false);
-        yield return new WaitForSeconds(respawnDelay);
+        var deathEffect = GetComponent<DeathEffect>();
+        float lingerSeconds = deathEffect != null ? deathEffect.Play() : 0f;
+
+        // Lock movement/collision/weapons right away, but leave the sprites
+        // showing so DeathEffect's tinted corpse is actually visible.
+        LockControl(true);
+        if (lingerSeconds > 0f) yield return new WaitForSeconds(lingerSeconds);
+        SetBodyVisible(false);
+
+        float remaining = respawnDelay - lingerSeconds;
+        if (remaining > 0f) yield return new WaitForSeconds(remaining);
+
         transform.position = spawnPosition;
         health.ResetToFull();
-        SetAlive(true);
+        SetBodyVisible(true);
+        LockControl(false);
     }
 
-    private void SetAlive(bool alive)
+    private void LockControl(bool locked)
+    {
+        foreach (var collider in GetComponentsInChildren<Collider2D>(true))
+            collider.enabled = !locked;
+
+        var movement = GetComponent<PlayerMovement>();
+        if (movement != null) movement.MovementLocked = locked;
+
+        var weapons = GetComponent<WeaponSwitcher>();
+        if (weapons != null) weapons.SetCombatEnabled(!locked);
+    }
+
+    private void SetBodyVisible(bool visible)
     {
         foreach (var renderer in GetComponentsInChildren<SpriteRenderer>(true))
         {
@@ -77,17 +107,9 @@ public class PlayerRespawn : MonoBehaviour
             // forcing it ON here would show whatever on/off state it was
             // frozen in the instant the player died (e.g. a charge bar
             // stuck mid-fill). Forcing it OFF on death is still fine and
-            // instant either way, so only respawn (alive) skips it.
-            if (alive && renderer.GetComponent<CombatFxVisual>() != null) continue;
-            renderer.enabled = alive;
+            // instant either way, so only showing again skips it.
+            if (visible && renderer.GetComponent<CombatFxVisual>() != null) continue;
+            renderer.enabled = visible;
         }
-        foreach (var collider in GetComponentsInChildren<Collider2D>(true))
-            collider.enabled = alive;
-
-        var movement = GetComponent<PlayerMovement>();
-        if (movement != null) movement.MovementLocked = !alive;
-
-        var weapons = GetComponent<WeaponSwitcher>();
-        if (weapons != null) weapons.SetCombatEnabled(alive);
     }
 }
