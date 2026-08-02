@@ -183,6 +183,6 @@ public class PlayerAttack : MonoBehaviour
         return points;
     }
 
-    private static Vector3 AngleToOffset(float angleRad, float radius) =>
-        new Vector3(Mathf.Cos(angleRad), Mathf.Sin(angleRad), 0f) * radius;
+    private static Vector2 AngleToOffset(float angleRad, float radius) =>
+        new Vector2(Mathf.Cos(angleRad), Mathf.Sin(angleRad)) * radius;
 }
