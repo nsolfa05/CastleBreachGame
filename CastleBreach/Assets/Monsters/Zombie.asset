@@ -37,9 +37,9 @@ MonoBehaviour:
     knockbackStrength: 6
     stunEnabled: 1
     stunDuration: 0
-  stunResistance: 0
   currencyDrop: 3
-  tileWeight: 2
+  weight: 2
+  stunResistance: 0
   targetsOnlyKing: 0
   praiseTowerLureRange: 0
   passesThroughGates: 0

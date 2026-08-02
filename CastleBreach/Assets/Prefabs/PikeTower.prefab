@@ -443,3 +443,5 @@ MonoBehaviour:
   fill: {fileID: 6065208463004625619}
   barWidth: 1
   barHeight: 0.15
+  hideUntilDamaged: 1
+  visibleAfterDamageSeconds: 3

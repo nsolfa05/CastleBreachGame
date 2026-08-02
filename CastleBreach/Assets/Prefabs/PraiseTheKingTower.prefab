@@ -325,6 +325,8 @@ MonoBehaviour:
   fill: {fileID: 7765024767537418679}
   barWidth: 1
   barHeight: 0.15
+  hideUntilDamaged: 1
+  visibleAfterDamageSeconds: 3
 --- !u!1 &8109191669967766828
 GameObject:
   m_ObjectHideFlags: 0

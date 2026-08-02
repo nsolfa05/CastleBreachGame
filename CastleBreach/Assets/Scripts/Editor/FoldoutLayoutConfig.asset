@@ -1,0 +1,115 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8feb235dbb95b1478f590d1a9a9e394, type: 3}
+  m_Name: FoldoutLayoutConfig
+  m_EditorClassIdentifier: Assembly-CSharp-Editor::FoldoutLayoutConfig
+  types:
+  - typeName: PlayerAttack
+    sections:
+    - originalName: "Combat (design doc \xA77.2)"
+      displayName: Sword Weapon
+    - originalName: Visuals
+      displayName: Visuals
+  - typeName: BowWeapon
+    sections:
+    - originalName: Other
+      displayName: Other
+    - originalName: Bow (Guide 11b)
+      displayName: Bow Weapom
+    - originalName: 'Visuals [Placeholder]'
+      displayName: 'Visuals [Placeholder]'
+  - typeName: HammerWeapon
+    sections:
+    - originalName: Other
+      displayName: Other
+    - originalName: Hammer (Guide 11b)
+      displayName: Hammer Weapon
+    - originalName: 'Visuals [Placeholder]'
+      displayName: 'Visuals [Placeholder]'
+  - typeName: FireStaffWeapon
+    sections:
+    - originalName: Other
+      displayName: Other
+    - originalName: Fire Staff (Guide 11b)
+      displayName: Fire Staff Weapon
+    - originalName: Burn
+      displayName: Burn Effect
+    - originalName: 'Visuals [Placeholder]'
+      displayName: 'Visuals [Placeholder]'
+  - typeName: WeaponSwitcher
+    sections:
+    - originalName: "Weapons (1-4, in this order \u2014 press V to select)"
+      displayName: "Weapons (1-4, in this order \u2014 press V to select)"
+  - typeName: MonsterDefinition
+    sections:
+    - originalName: 'Identity / look [Placeholder]'
+      displayName: 'Identity / look [Placeholder]'
+    - originalName: "Movement & health (\xA77.3)"
+      displayName: Movement & health
+    - originalName: "Damage dealt (\xA77.3)"
+      displayName: 'Damage dealt '
+    - originalName: Attack timing & reach
+      displayName: Attack timing & reach
+    - originalName: "Targeting \u2014 player vs King"
+      displayName: "Targeting \u2014 player vs King"
+    - originalName: "Targeting \u2014 structures"
+      displayName: "Targeting \u2014 structures"
+    - originalName: Knockback & stun dealt (Guide 11)
+      displayName: Knockback & stun dealt (Guide 11)
+    - originalName: Economy
+      displayName: Economy
+    - originalName: Personal Defenses
+      displayName: Personal Defenses
+    - originalName: 'Special: Goblin'
+      displayName: 'Special: Goblin'
+    - originalName: "Movement \u2014 walls & gates (\xA76)"
+      displayName: "Movement \u2014 walls & gates"
+    - originalName: 'Special: Skeleton'
+      displayName: 'Special: Skeleton'
+    - originalName: "Special: Cyclops \u2014 telegraphed area attack"
+      displayName: "Special: Cyclops \u2014 telegraphed area attack"
+  - typeName: MonsterAI
+    sections:
+    - originalName: Other
+      displayName: Other
+    - originalName: Scene wiring (identical for every monster type)
+      displayName: Scene wiring (identical for every monster type)
+    - originalName: Crowd avoidance (shared behavior, not per-monster-type data)
+      displayName: Crowd avoidance (shared behavior, not per-monster-type data)
+    - originalName: Attack slots (shared behavior, not per-monster-type data)
+      displayName: Attack slots (shared behavior, not per-monster-type data)
+    - originalName: Routing around walls (shared behavior, not per-monster-type data)
+      displayName: Routing around walls (shared behavior, not per-monster-type data)
+  - typeName: HealthBar
+    sections:
+    - originalName: Other
+      displayName: Other
+    - originalName: Hide until damaged (Guide 11c)
+      displayName: Hide until damaged (Guide 11c)
+  - typeName: AttackTower
+    sections:
+    - originalName: "Stats (design doc \xA76)"
+      displayName: "Stats (design doc \xA76)"
+    - originalName: References
+      displayName: References
+  - typeName: PlayerRespawn
+    sections:
+    - originalName: Respawn
+      displayName: Respawn
+    - originalName: Gold loss on death (Guide 11c)
+      displayName: Gold loss on death (Guide 11c)
+  - typeName: DeathEffect
+    sections:
+    - originalName: Body
+      displayName: Body
+    - originalName: Particle Burst
+      displayName: Particle Burst
