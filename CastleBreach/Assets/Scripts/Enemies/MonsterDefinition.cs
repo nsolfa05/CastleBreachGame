@@ -105,23 +105,15 @@ public class MonsterDefinition : ScriptableObject
 
     // ─────────────────────────────────────────────────────────────
     [Header("Special: Faun — ranged attack")]
-    [Tooltip("Faun: fires a projectile at its target (Player or a structure — never the King) instead of dealing an instant melee hit, using the same Attack Range/Attack Interval as every other monster for \"how far / how often\". No direct hit damage — like the player's Fire Staff, all the damage comes from the burn zone the projectile leaves behind on impact.")]
+    [Tooltip("Faun: fires a straight-line arrow at its target (Player or a structure — never the King) instead of an instant melee hit, using the same Attack Range/Attack Interval as every other monster for \"how far / how often\" — Attack Range is this monster's max shoot distance, and is fully editable like any other monster's. Deals direct hit damage on impact, exactly like the player's Bow — no lingering burn/AoE.")]
     public bool usesRangedAttack = false;
-    [Tooltip("How fast the projectile travels (tiles/second). Higher makes it harder for the player to dodge.")]
+    [Tooltip("Direct hit damage dealt on impact.")]
+    public float rangedDamage = 2f;
+    [Tooltip("How fast the arrow travels (tiles/second). Higher makes it harder for the player to dodge.")]
     public float rangedProjectileSpeed = 6f;
-    [Tooltip("Burn zone damage per tick.")]
-    public float rangedBurnDamagePerTick = 1f;
-    [Tooltip("Seconds between burn zone damage ticks.")]
-    public float rangedBurnTickInterval = 1f;
-    [Tooltip("How long the burn zone lasts after landing, in seconds.")]
-    public float rangedBurnDurationSeconds = 4f;
-    [Tooltip("Burn zone radius in tiles.")]
-    public float rangedBurnRadius = 1f;
-    [Tooltip("Tint for the projectile and the burn zone it leaves behind.")]
-    public Color rangedBurnColor = new Color(0.45f, 0.75f, 0.3f, 0.6f);
-    [Tooltip("If the player is within this many tiles (edge to edge) at the moment this monster takes damage, it starts retreating — a stand-in for \"was hit by melee\", since weapon TYPE isn't tracked through the damage system, only whether the hit came from the player. Set to roughly a melee weapon's reach so a ranged hit (the player's own Bow/Fire Staff, fired from farther away) doesn't also trigger it.")]
-    public float retreatTriggerDistance = 1.5f;
-    [Tooltip("Seconds spent retreating (moving directly away from its target, still firing if in range) once triggered.")]
+    [Tooltip("Tint for the arrow.")]
+    public Color rangedBoltColor = new Color(0.45f, 0.75f, 0.3f, 1f);
+    [Tooltip("Seconds spent retreating (moving directly away from its target, still firing if in range) once triggered by a real melee hit (see MonsterAI.OnDamaged — Health.LastDamageWasMelee).")]
     public float retreatSeconds = 2f;
 
     // ─────────────────────────────────────────────────────────────

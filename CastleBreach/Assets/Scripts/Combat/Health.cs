@@ -23,6 +23,13 @@ public class Health : MonoBehaviour
     /// <summary>Whether the most recent hit came from the player specifically.</summary>
     public bool LastDamageFromPlayer { get; private set; }
 
+    /// <summary>Whether the most recent hit was a melee weapon (Sword/Hammer)
+    /// specifically, as opposed to ranged (Bow/Fire Staff) or a DoT tick
+    /// (BurnZone) — only meaningful when LastDamageFromPlayer is also true.
+    /// Used by Faun's retreat trigger (Guide 11d) to tell a real melee hit
+    /// apart from a ranged one landed at close range.</summary>
+    public bool LastDamageWasMelee { get; private set; }
+
     /// <summary>Fired every time health changes (including healing/reset).</summary>
     public event Action<Health> Damaged;
 
@@ -34,12 +41,13 @@ public class Health : MonoBehaviour
         Current = maxHealth;
     }
 
-    public void TakeDamage(float amount, bool fromPlayer = false)
+    public void TakeDamage(float amount, bool fromPlayer = false, bool isMeleeHit = false)
     {
         if (IsDead || Invulnerable) return;
         Current = Mathf.Max(0f, Current - amount);
         LastDamageTime = Time.time;
         LastDamageFromPlayer = fromPlayer;
+        LastDamageWasMelee = isMeleeHit;
         Damaged?.Invoke(this);
         if (Current <= 0f)
             Died?.Invoke(this);

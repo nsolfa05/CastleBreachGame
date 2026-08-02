@@ -164,7 +164,7 @@ public class PlayerAttack : MonoBehaviour
                 Physics2D.Linecast(origin, health.transform.position, obstructionLayers).collider != null)
                 continue;
 
-            health.TakeDamage(damage, fromPlayer: true);
+            health.TakeDamage(damage, fromPlayer: true, isMeleeHit: true);
             swordEffects.ApplyTo(hit, origin); // knockback pushes the enemy away from the player
         }
     }

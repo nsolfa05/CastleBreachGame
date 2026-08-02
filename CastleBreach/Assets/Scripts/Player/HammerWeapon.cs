@@ -77,7 +77,7 @@ public class HammerWeapon : ChargedWeapon
                 Physics2D.Linecast(origin, health.transform.position, obstructionLayers).collider != null)
                 continue;
 
-            health.TakeDamage(damage, fromPlayer: true);
+            health.TakeDamage(damage, fromPlayer: true, isMeleeHit: true);
             hammerEffects.ApplyTo(hit, origin);
 
             var monster = hit.GetComponentInParent<MonsterAI>();

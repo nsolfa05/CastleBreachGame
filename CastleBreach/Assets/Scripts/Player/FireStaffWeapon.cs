@@ -63,7 +63,7 @@ public class FireStaffWeapon : ChargedWeapon
             // Every landing spot burns — a clean hit and a missed shot that
             // simply ran out of range both leave the same zone behind.
             BurnZone.Spawn(point, burnRadius, damagePerTick, tickInterval, duration,
-                hitLayers, burnSprite, burnColor, sortingOrder: 4);
+                hitLayers, burnSprite, burnColor, sortingOrder: 4, fromPlayer: true);
         });
     }
 

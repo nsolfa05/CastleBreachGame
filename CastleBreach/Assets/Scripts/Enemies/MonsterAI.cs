@@ -70,7 +70,7 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("Layers a ranged attack's projectile can hit — set to Player + Structure. Only matters for a monster with Uses Ranged Attack on (Faun).")]
     [SerializeField] private LayerMask rangedHitLayers;
 
-    [Tooltip("The plain Square sprite (Assets/Sprites/Square) — used for a ranged attack's flying bolt and the burn zone it leaves behind. Only matters for a monster with Uses Ranged Attack on (Faun).")]
+    [Tooltip("The plain Square sprite (Assets/Sprites/Square) — used for a ranged attack's flying arrow. Only matters for a monster with Uses Ranged Attack on (Faun).")]
     [SerializeField] private Sprite rangedBoltSprite;
 
     [Header("Crowd avoidance (shared behavior, not per-monster-type data)")]
@@ -252,14 +252,8 @@ public class MonsterAI : MonoBehaviour
     private Transform committedStructureTarget; // non-null while already committed to attacking a specific structure
 
     // Ranged-attack state (Faun; see UpdateRangedAttack). retreatUntil is set
-    // by OnDamaged as a stand-in for "was just hit by melee" — see its own
-    // comment. lastZone* tracks the burn zone THIS monster most recently
-    // created, so it can step out of its own puddle rather than reacting to
-    // every BurnZone in the scene (e.g. the player's Fire Staff).
+    // by OnDamaged when a real melee hit lands (Health.LastDamageWasMelee).
     private float retreatUntil = float.NegativeInfinity;
-    private Vector2 lastZoneCenter;
-    private float lastZoneRadius;
-    private float lastZoneEndTime = float.NegativeInfinity;
 
     private TelegraphPhase telegraphPhase = TelegraphPhase.Idle;
     private float telegraphPhaseEndTime;
@@ -1084,11 +1078,12 @@ public class MonsterAI : MonoBehaviour
 
     /// <summary>
     /// Faun's ranged attack (Guide 11d): approach and fire on cooldown exactly
-    /// like a normal monster's TryAttack (same Attack Range/Attack Interval),
-    /// except the "hit" is a projectile that leaves a burn zone rather than an
-    /// instant TakeDamage. Layered on top: while RETREATING (see OnDamaged) or
-    /// standing in the burn zone it just created, movement is overridden to
-    /// step directly away instead of the normal approach/settle behavior —
+    /// like a normal monster's TryAttack (same Attack Range/Attack Interval —
+    /// Attack Range is this monster's max shoot distance, adjustable like any
+    /// other monster's), except the "hit" is a straight-line arrow instead of
+    /// an instant point-blank TakeDamage — same shape as the player's Bow.
+    /// While RETREATING (see OnDamaged) movement is overridden to step
+    /// directly away instead of the normal approach/settle behavior;
     /// everything else (routing, wall-breaking if sealed off) still goes
     /// through the same MoveToward/ResolveNavigation every other monster uses.
     /// </summary>
@@ -1097,14 +1092,9 @@ public class MonsterAI : MonoBehaviour
         if (DistanceToTarget(target) <= definition.attackRange && Time.time >= nextAttackTime)
             FireRangedAttack(target, gm);
 
-        bool retreatingFromMelee = Time.time < retreatUntil;
-        bool avoidingOwnZone = Time.time < lastZoneEndTime &&
-            ((Vector2)transform.position - lastZoneCenter).sqrMagnitude <= lastZoneRadius * lastZoneRadius;
-
-        if (retreatingFromMelee || avoidingOwnZone)
+        if (Time.time < retreatUntil)
         {
-            Vector2 awayFrom = retreatingFromMelee ? (Vector2)target.position : lastZoneCenter;
-            Vector2 away = (Vector2)transform.position - awayFrom;
+            Vector2 away = (Vector2)transform.position - (Vector2)target.position;
             Vector2 dir = away.sqrMagnitude > 0.0001f ? away.normalized : Vector2.up;
             rb.linearVelocity = dir * definition.moveSpeed;
             return;
@@ -1113,10 +1103,9 @@ public class MonsterAI : MonoBehaviour
         MoveToward(target); // same approach/settle/crowd behavior as every other monster
     }
 
-    /// <summary>Launches a straight-line bolt at target's current position;
-    /// on impact (or at max range) it leaves a burn zone rather than dealing
-    /// direct hit damage — same shape as the player's Fire Staff, and reusing
-    /// the same StraightProjectile/BurnZone the player's weapons use.</summary>
+    /// <summary>Launches a straight-line arrow at target's current position
+    /// and deals direct hit damage on impact — the same StraightProjectile
+    /// the player's Bow/Fire Staff use, just with no lingering effect.</summary>
     private void FireRangedAttack(Transform target, GameManager gm)
     {
         nextAttackTime = Time.time + definition.attackInterval;
@@ -1128,15 +1117,15 @@ public class MonsterAI : MonoBehaviour
 
         if (gm != null && target == gm.Player) lastAttackedPlayerTime = Time.time;
 
-        var go = new GameObject("FaunBolt");
+        var go = new GameObject("FaunArrow");
         go.transform.position = origin;
-        go.transform.localScale = new Vector3(0.25f, 0.25f, 1f);
+        go.transform.localScale = new Vector3(0.5f, 0.12f, 1f);
 
         if (rangedBoltSprite != null)
         {
             var renderer = go.AddComponent<SpriteRenderer>();
             renderer.sprite = rangedBoltSprite;
-            renderer.color = definition.rangedBurnColor;
+            renderer.color = definition.rangedBoltColor;
             renderer.sortingOrder = 20;
         }
 
@@ -1144,36 +1133,27 @@ public class MonsterAI : MonoBehaviour
         float range = definition.attackRange + 1f; // a little slack so it can still land if the target steps back mid-flight
         projectile.Launch(direction, definition.rangedProjectileSpeed, range, rangedHitLayers, (point, hitCollider) =>
         {
-            BurnZone.Spawn(point, definition.rangedBurnRadius, definition.rangedBurnDamagePerTick,
-                definition.rangedBurnTickInterval, definition.rangedBurnDurationSeconds, rangedHitLayers,
-                rangedBoltSprite, definition.rangedBurnColor, sortingOrder: 4, damagesPlayer: true);
-
-            lastZoneCenter = point;
-            lastZoneRadius = definition.rangedBurnRadius;
-            lastZoneEndTime = Time.time + definition.rangedBurnDurationSeconds;
+            if (hitCollider == null) return; // reached max range with nothing in the way — just vanishes
+            var hitHealth = hitCollider.GetComponentInParent<Health>();
+            if (hitHealth == null) return;
+            hitHealth.TakeDamage(definition.rangedDamage);
         });
     }
 
     /// <summary>
-    /// Faun's retreat trigger: if the player is close enough to have landed
-    /// this hit with a MELEE weapon (rather than the player's own Bow/Fire
-    /// Staff from farther out), start retreating. A distance proxy, not a
-    /// real weapon-type check — Health.TakeDamage doesn't carry that
-    /// information, and plumbing it through every attack in the game just
-    /// for this would be a much bigger change than one monster's kiting
-    /// behavior warrants. Guarded by LastDamageTime so this never fires for
-    /// the Damaged event ResetToFull/SetMax also raise (e.g. spawn-time
-    /// stat setup) — only a REAL TakeDamage call updates that timestamp.
+    /// Faun's retreat trigger: a REAL melee hit (Health.LastDamageWasMelee,
+    /// set by the Sword/Hammer specifically — see Health.TakeDamage) starts
+    /// retreating; a ranged hit (Bow/Fire Staff) does not, even at close
+    /// range. Guarded by LastDamageTime so this never fires for the Damaged
+    /// event ResetToFull/SetMax also raise (e.g. spawn-time stat setup) —
+    /// only a REAL TakeDamage call updates that timestamp.
     /// </summary>
     private void OnDamaged(Health _)
     {
         if (definition == null || !definition.usesRangedAttack) return;
         if (Time.time - health.LastDamageTime > 0.05f) return;
 
-        var gm = GameManager.Instance;
-        if (gm == null || gm.Player == null) return;
-
-        if (DistanceBetween(transform, gm.Player) <= definition.retreatTriggerDistance)
+        if (health.LastDamageFromPlayer && health.LastDamageWasMelee)
             retreatUntil = Time.time + definition.retreatSeconds;
     }
 

@@ -17,21 +17,30 @@ I went back to the two original files). Two very different monsters:
    `Targets Only Player` flag, and everything else (routing, wall-breaking
    when sealed off, Gates-as-open-tiles) is the same generic system every
    monster already uses.
-2. **Faun** — a real new mechanic. A ranged skirmisher that fires a bolt at
-   its target (Player or a structure) which leaves a damaging burn zone on
-   impact — no direct hit damage, same shape as your Fire Staff. It normally
-   just holds its firing distance like any settled monster, but if you land a
-   close-range hit on it, it starts retreating; it also steps out of the burn
-   zone it just created instead of standing in its own fire.
+2. **Faun** — a real new mechanic. A ranged skirmisher that fires a straight
+   arrow at its target (Player or a structure) and deals direct hit damage —
+   same shape as your Bow, no lingering burn/AoE. It normally just holds its
+   firing distance like any settled monster, but a REAL melee hit (the Sword
+   or Hammer specifically, not a ranged hit landed up close) makes it
+   retreat.
 
 ---
 
 ## What the code adds (already written & pushed)
 
+- `Combat/Health.cs` — **real weapon-type tracking**, replacing the earlier
+  distance-based "was that melee" guess. `TakeDamage` takes a new
+  `isMeleeHit` parameter, and a new `LastDamageWasMelee` property (alongside
+  the existing `LastDamageFromPlayer`) records it. The Sword and Hammer now
+  pass `isMeleeHit: true`; the Bow, Fire Staff, and Faun's own arrow don't
+  (defaults false). While in here, also fixed a real (unrelated) bug: the
+  Fire Staff's `BurnZone` damage never passed `fromPlayer`, so a monster
+  burned by it didn't correctly register as "recently hit by the player" for
+  aggro purposes — `BurnZone.Spawn` now takes a `fromPlayer` parameter too.
 - `Enemies/MonsterDefinition.cs` — new **Special: Redcap** section
   (`Targets Only Player`), and a new **Special: Faun — ranged attack**
-  section (`Uses Ranged Attack`, projectile speed, burn damage/tick/duration/
-  radius/color, and the two retreat tunables below).
+  section (`Uses Ranged Attack`, direct-hit damage, projectile speed, arrow
+  color, and the retreat duration).
 - `Enemies/MonsterAI.cs`:
   - `PickTarget` gets a `targetsOnlyPlayer` branch — mirrors `targetsOnlyKing`
     exactly, just inverted (always the player, King never considered; if the
@@ -40,15 +49,15 @@ I went back to the two original files). Two very different monsters:
     just stopping the monster in place).
   - New `UpdateRangedAttack` — Faun's whole behavior: fires on cooldown once
     in range (reusing the existing Attack Range/Attack Interval fields, same
-    meaning as every other monster), otherwise calls the same `MoveToward`
-    every monster uses to approach/settle/route around walls. Retreating or
-    standing in its own burn zone overrides movement to step directly away.
+    meaning as every other monster — Attack Range IS the adjustable max
+    shoot distance), otherwise calls the same `MoveToward` every monster uses
+    to approach/settle/route around walls. Retreating overrides movement to
+    step directly away.
   - New `FireRangedAttack` — spawns a `StraightProjectile` (the same one
-    your Bow/Fire Staff use) aimed at the target's current position; on
-    impact it spawns a `BurnZone` (same one the Fire Staff uses) instead of
-    dealing direct damage.
-  - New `OnDamaged` — Faun's retreat trigger. See the judgment call below on
-    how "was I hit by melee" is actually detected.
+    your Bow/Fire Staff use) aimed at the target's current position; deals
+    direct hit damage on impact, exactly like the Bow.
+  - New `OnDamaged` — Faun's retreat trigger, now a real check:
+    `health.LastDamageFromPlayer && health.LastDamageWasMelee`.
   - Two new **Scene wiring** fields (set once on the shared Monster prefab,
     like `Structure Layers` already is): **Ranged Hit Layers** and
     **Ranged Bolt Sprite**.
@@ -67,8 +76,8 @@ Console.
 1. **Project ▸ Assets/Prefabs**, double-click **`Monster`** to open it in
    Prefab Mode.
 2. Find **Monster AI ▸ Scene wiring** → **Ranged Hit Layers** → tick
-   **Player**, **Structure**, and **King** (Faun's burn zone needs to be
-   able to damage whichever of these it's aimed at).
+   **Player**, **Structure**, and **King** (Faun's arrow needs to be able to
+   hit whichever of these it's aimed at).
 3. **Ranged Bolt Sprite** → `Assets/Sprites/Square`.
 4. Save the prefab (**Ctrl/Cmd+S**) and **File ▸ Save Project**.
 
@@ -113,16 +122,12 @@ Same process, name it `Faun`, set:
 | Body Scale | 0.85 (default) |
 | Move Speed | 4 (default) |
 | Max Health | **8** |
-| Attack Range | **4** |
+| Attack Range | **4** — this is Faun's max shoot distance; raise/lower to taste, same field every monster already has |
 | Currency Drop | 3 (default) |
 | Uses Ranged Attack | **✓** |
+| Ranged Damage | **2** |
 | Ranged Projectile Speed | **6** |
-| Ranged Burn Damage Per Tick | **1** |
-| Ranged Burn Tick Interval | **1** |
-| Ranged Burn Duration Seconds | **4** |
-| Ranged Burn Radius | **1** |
-| Ranged Burn Color | forest green, semi-transparent (e.g. 100, 200, 80, alpha ~0.5) |
-| Retreat Trigger Distance | **1.5** |
+| Ranged Bolt Color | forest green (e.g. 100, 200, 80) |
 | Retreat Seconds | **2** |
 
 *(Player Target Range stays at its 6-tile default, so — like every other
@@ -142,19 +147,23 @@ targeting field at 0" pattern, no new code.)*
    should attack whatever wall/structure is sealing them in, the same way a
    King-rushing monster already breaks through a maze. Confirm it passes
    through Gates without attacking them.
-3. **Faun — normal:** let one approach until it's about 4 tiles out — it
-   should stop and start firing bolts rather than closing the rest of the
-   distance. A bolt should leave a small burn patch wherever it lands
-   (on you or on a structure), ticking damage for a few seconds.
-4. **Faun — retreat:** walk up and land a **Sword** hit on it — it should
-   immediately start backing away. Confirm a **Bow**/**Fire Staff** hit from
-   farther out does **not** trigger the retreat (only a close-range hit
-   should — see the judgment call below on how this is actually detected).
-5. **Faun — self-avoidance:** watch a Faun that's cornered/close to its own
-   target — if its own burn patch ends up under its feet, it should step out
-   of it rather than standing in its own fire.
+3. **Faun — normal:** let one approach until it's about 4 tiles out (or
+   whatever Attack Range you set) — it should stop and start firing arrows
+   rather than closing the rest of the distance. Each arrow should deal a
+   direct hit, same feel as being shot by the Bow.
+4. **Faun — retreat, real melee check:** walk up and land a **Sword** or
+   **Hammer** hit on it — it should immediately start backing away. Then
+   test the fixed case: fire a **Bow** or **Fire Staff** shot at it from up
+   close (walk right up to it first, then shoot) — it should **NOT**
+   retreat, since neither of those ever sets `isMeleeHit`, regardless of
+   how close you were standing when it landed.
+5. Let a Fire Staff burn zone tick on a monster, then check that monster's
+   recent-player-combat behavior (e.g. it should stay engaged with you
+   rather than wandering back to a structure) — confirms the `BurnZone`
+   `fromPlayer` fix actually took.
 6. Confirm nothing regressed: existing monsters (Zombie, Goblin, Skeleton,
-   Cyclops) still behave exactly as before.
+   Cyclops) still behave exactly as before, and Sword/Hammer/Bow/Fire Staff
+   all still damage normally.
 
 ---
 
@@ -167,42 +176,36 @@ targeting field at 0" pattern, no new code.)*
 - [ ] `Faun` Monster Definition created with the table above
 - [ ] Redcap rushes the player, ignores the King, breaks through a wall
       only when the player is fully sealed off
-- [ ] Faun holds its ~4-tile range and fires bolts that leave a damaging
-      burn patch on impact
-- [ ] A melee hit makes the Faun retreat; a ranged hit from farther away
-      does not
-- [ ] Faun steps out of its own burn patch rather than standing in it
-- [ ] Existing monster types unaffected
+- [ ] Faun holds its Attack Range distance and fires arrows that deal direct
+      hit damage on impact — no lingering burn/AoE
+- [ ] A Sword/Hammer hit makes the Faun retreat; a Bow/Fire Staff hit —
+      even landed at point-blank range — does not
+- [ ] A monster hit by a Fire Staff burn zone correctly counts as "recently
+      hit by the player" (the `BurnZone.fromPlayer` fix)
+- [ ] Existing monster types unaffected, all four weapons still deal damage
 - [ ] **File ▸ Save Project**, committed & pushed (verified on github.com)
 
 ---
 
 ## Notes for later — judgment calls worth knowing about
 
-- **"Hit by melee" is a distance proxy, not a real weapon-type check.**
-  `Health.TakeDamage` doesn't currently know or care which weapon dealt the
-  damage — only whether it came from the player. So Faun's retreat trigger
-  (`OnDamaged`) just checks "is the player within Retreat Trigger Distance
-  right now" at the moment damage lands. In practice this reads as "melee"
-  correctly almost always (only the Sword/Hammer can realistically land a
-  hit that close), but it's theoretically foolable — e.g. if the player
-  fires a Bow arrow and then sprints into melee range before it lands, that
-  ranged hit would register as if it were melee. Flagging this because the
-  real fix (tagging every attack with a weapon type, threading it through
-  `HitEffects`/`Health.TakeDamage`) is a much bigger, cross-cutting change
-  than one monster's kiting behavior justifies right now — say the word if
-  you want that built properly later.
-- **Retreating/zone-avoiding movement bypasses the crowd system.** While a
-  Faun is backing away or stepping out of its own burn patch, it moves with
-  a plain direct velocity instead of going through `MoveToward`'s
-  separation/give-way/stuck-recovery logic — so a retreating Faun could
-  clip through an ally for that brief window. Same category of tradeoff as
-  the Cyclops's telegraph movement, not a new kind of shortcut.
-- **Faun's own damage numbers (Player Damage, Structure Damage, etc.) are
-  unused placeholders.** All of Faun's damage comes from the burn zone
-  (`Ranged Burn Damage Per Tick`), never a direct hit — exactly like your
-  Fire Staff. The other damage fields exist because every Monster
-  Definition shares the same schema, not because Faun reads them.
-- **Redcap can still fall back to the King** if the player goes out of
-  Player Target Range (6 tiles, unchanged default) — see the callout in
-  Step 4's table if you want that closed off entirely.
+- **"Hit by melee" is now a real check, not a distance guess.** Following up
+  on your request, `Health` tracks the actual weapon type on every hit
+  (`LastDamageWasMelee`, set from a new `isMeleeHit` parameter on
+  `TakeDamage`) — the Sword and Hammer set it true, the Bow and Fire Staff
+  don't, so Faun's retreat trigger is exact regardless of how close a ranged
+  shot landed. This also means any FUTURE melee weapon should remember to
+  pass `isMeleeHit: true`, and any future ranged one shouldn't.
+- **Retreating movement bypasses the crowd system.** While a Faun is backing
+  away, it moves with a plain direct velocity instead of going through
+  `MoveToward`'s separation/give-way/stuck-recovery logic — so a retreating
+  Faun could clip through an ally for that brief window. Same category of
+  tradeoff as the Cyclops's telegraph movement, not a new kind of shortcut.
+- **Faun's own generic damage numbers (Player Damage, Structure Damage,
+  etc.) are still unused placeholders** — its real damage is **Ranged
+  Damage**, dealt directly on arrow impact. The other fields exist only
+  because every Monster Definition shares the same schema.
+- **Faun can still fall back to the King** if the player goes out of Player
+  Target Range (6 tiles, unchanged default) — see the callout in Step 4's
+  table if you want that closed off entirely. (Redcap can't — Targets Only
+  Player rules the King out unconditionally, that's the whole point of it.)

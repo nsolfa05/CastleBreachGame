@@ -294,6 +294,19 @@ built so it stays untouched.
   moves that timestamp): `HealthBar`'s Hide Until Damaged, `DeathEffect`
   timing, and Faun's melee-retreat trigger (`MonsterAI.OnDamaged`, Guide
   11d). Reuse this pattern rather than subscribing to `Damaged` directly.
+- **`Health.TakeDamage` tracks real weapon type, not just whether the player
+  dealt the hit.** `TakeDamage(amount, fromPlayer, isMeleeHit)` sets
+  `LastDamageWasMelee` alongside the existing `LastDamageFromPlayer` — the
+  Sword and Hammer pass `isMeleeHit: true`, the Bow and Fire Staff don't
+  (default false). Added for Faun's retreat trigger (Guide 11d, replacing an
+  earlier distance-based guess with the real thing, at the user's request),
+  but it's general: any future melee weapon should set it, any future ranged
+  one shouldn't, and anything needing "was I hit by melee specifically" reads
+  `LastDamageFromPlayer && LastDamageWasMelee` rather than inventing its own
+  proxy. `Combat/BurnZone.Spawn` also takes a `fromPlayer` parameter now — a
+  real bug fix found in the same pass: its DoT ticks never passed it, so a
+  monster burned by the Fire Staff didn't register as recently hit by the
+  player for aggro purposes.
 - **`DeathEffect`/`DeathParticle` (Guide 11c) is the shared "you just died"
   visual** for the Player and any monster — red tint + a burst of small
   hand-rolled square particles (deliberately not Unity's `ParticleSystem`,
@@ -322,13 +335,11 @@ built so it stays untouched.
     a wall to break if routing found the route sealed) that every other
     monster gets — so a new attack pattern still gets wall-breaking and
     crowd behavior for free, it only reimplements what happens once in
-    range. Faun's retreat/self-avoidance movement is a deliberate exception
-    to that reuse — it bypasses `MoveToward`'s crowd system for a plain
-    direct velocity while active, the same category of tradeoff the
-    Cyclops's telegraph movement already makes, not a new kind of shortcut.
-  A monster-specific mechanic that can't fit either pattern (weapon-type-
-  aware combat, anything needing new data on `Health`/`HitEffects` itself)
-  is a bigger, cross-cutting change — flag it rather than bolting it onto
-  `MonsterAI` ad hoc. (Faun's melee-vs-ranged retreat trigger is exactly this
-  kind of simplification — a distance proxy standing in for real weapon-type
-  tracking, which doesn't exist yet — noted in `guides/11d-new-enemies.md`.)
+    range. Faun's retreat movement is a deliberate exception to that reuse —
+    it bypasses `MoveToward`'s crowd system for a plain direct velocity while
+    active, the same category of tradeoff the Cyclops's telegraph movement
+    already makes, not a new kind of shortcut.
+  A monster-specific mechanic that can't fit either pattern is a bigger,
+  cross-cutting change — flag it rather than bolting it onto `MonsterAI` ad
+  hoc, the way weapon-type tracking (above) got flagged before being built
+  properly rather than staying a one-off distance guess inside Faun.

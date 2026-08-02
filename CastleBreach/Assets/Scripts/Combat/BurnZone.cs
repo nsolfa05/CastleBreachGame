@@ -19,18 +19,22 @@ public class BurnZone : MonoBehaviour
     private float nextTickTime;
     private LayerMask hitLayers;
     private bool hitsPlayer;
+    private bool fromPlayer;
 
     /// <summary>
     /// Create and configure a burn zone at worldPosition. hitLayers decides who
     /// it can even see (pass Enemy [+ GatePasser] to only ever threaten
     /// monsters); hitsPlayer additionally gates whether the Player specifically
     /// takes damage from it, for a future zone that also wants to hit the player
-    /// (only meaningful if hitLayers includes the Player layer too).
+    /// (only meaningful if hitLayers includes the Player layer too). fromPlayer
+    /// is recorded on every tick's TakeDamage call so recent-combat aggro
+    /// (Health.LastDamageFromPlayer) reacts correctly to it — pass true for a
+    /// player-caused zone (the Fire Staff), false for anything else.
     /// </summary>
     public static BurnZone Spawn(Vector2 worldPosition, float radiusTiles, float damagePerTickValue,
                                  float tickIntervalSeconds, float durationSeconds, LayerMask layers,
                                  Sprite visualSprite = null, Color visualColor = default,
-                                 int sortingOrder = 4, bool damagesPlayer = false)
+                                 int sortingOrder = 4, bool damagesPlayer = false, bool fromPlayer = false)
     {
         var go = new GameObject("BurnZone");
         go.transform.position = worldPosition;
@@ -52,6 +56,7 @@ public class BurnZone : MonoBehaviour
         zone.nextTickTime = Time.time; // first tick lands immediately, not after one full interval
         zone.hitLayers = layers;
         zone.hitsPlayer = damagesPlayer;
+        zone.fromPlayer = fromPlayer;
         return zone;
     }
 
@@ -69,7 +74,7 @@ public class BurnZone : MonoBehaviour
             var health = hit.GetComponentInParent<Health>();
             if (health == null || !damaged.Add(health)) continue;
             if (gm != null && health == gm.PlayerHealth && !hitsPlayer) continue;
-            health.TakeDamage(damagePerTick);
+            health.TakeDamage(damagePerTick, fromPlayer); // DoT tick — never counts as a melee hit
         }
     }
 
