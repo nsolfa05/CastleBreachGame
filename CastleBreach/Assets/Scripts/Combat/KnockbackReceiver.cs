@@ -19,7 +19,7 @@ using UnityEngine;
 [RequireComponent(typeof(Rigidbody2D))]
 public class KnockbackReceiver : MonoBehaviour
 {
-    [Tooltip("Heavier = knocked back LESS by the same hit (knockback speed scales by 1/weight). Matches the design-doc tile weight: most monsters 2, Cyclops & player 6. MonsterAI copies each monster's Tile Weight in here at spawn, so in practice you only set this by hand on the Player.")]
+    [Tooltip("Heavier = knocked back LESS by the same hit (knockback speed scales by 1/weight). Matches the design-doc tile weight: most monsters 2, Cyclops & player 6. MonsterAI copies each monster's Weight (Personal Defenses, on its Monster Definition) in here at spawn, so in practice you only set this by hand on the Player — tune a monster TYPE's weight on its Monster Definition asset instead, not here.")]
     [SerializeField] private float weight = 2f;
 
     [Tooltip("Flat 0..1 reduction to ALL knockback taken (0 = full knockback, 1 = immovable), independent of weight — for an entity that should specifically resist being shoved without being made heavy for other purposes.")]
@@ -49,7 +49,7 @@ public class KnockbackReceiver : MonoBehaviour
 
     private void Awake() => rb = GetComponent<Rigidbody2D>();
 
-    /// <summary>Copy in a spawn-time weight — MonsterAI passes the monster's Tile Weight so heavy types resist knockback without hand-wiring each prefab.</summary>
+    /// <summary>Copy in a spawn-time weight — MonsterAI passes the monster's Weight so heavy types resist knockback without hand-wiring each prefab.</summary>
     public void SetWeight(float newWeight) => weight = Mathf.Max(0.1f, newWeight);
 
     /// <summary>Copy in a spawn-time stun resistance — MonsterAI passes each monster's Stun Resistance so, e.g., a Cyclops can shrug off stuns a Zombie can't.</summary>

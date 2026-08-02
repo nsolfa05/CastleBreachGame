@@ -347,7 +347,7 @@ public class MonsterAI : MonoBehaviour
         health.SetMax(definition.maxHealth, refill: true);
         if (knockback != null)
         {
-            knockback.SetWeight(definition.tileWeight); // heavy types resist knockback
+            knockback.SetWeight(definition.weight); // heavy types resist knockback
             knockback.SetStunResistance(definition.stunResistance); // e.g. a Cyclops can shrug off stuns a Zombie can't
         }
         livesRemaining = definition.extraLives;

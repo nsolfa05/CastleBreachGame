@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// All stats + behavior flags for one monster type (design doc §7.3), as a
@@ -74,15 +75,19 @@ public class MonsterDefinition : ScriptableObject
     [Tooltip("What this monster's attack does on TOP of damage — knockback and/or stun, both off by default. Mainly meaningful against the player (who has a KnockbackReceiver); the King and structures don't react. The knockback shoves the player directly away from this monster. Example: give a big enemy some knockback + a short stun so a hit from it actually staggers the player.")]
     public HitEffects attackEffects;
 
-    [Header("Knockback & stun RECEIVED (Guide 11)")]
-    [Tooltip("How much THIS monster resists being stunned by the player's weapons — 0 = fully stunnable, 1 = stun-immune, 0.5 = stuns on it last half as long. Lets a big enemy shrug off a stun that would freeze a small one, even though the weapon's Stun Duration is the same for both. Does NOT affect knockback distance — see Tile Weight for that.")]
-    [Range(0f, 1f)] public float stunResistance = 0f;
+    // ─────────────────────────────────────────────────────────────
+    [Header("Economy")]
+    public int currencyDrop = 3;
 
     // ─────────────────────────────────────────────────────────────
-    [Header("Economy & weight")]
-    public int currencyDrop = 3;
-    [Tooltip("Tile weight (§7.1). Also used by the combat framework: heavier monsters are knocked back LESS (MonsterAI copies this into the monster's KnockbackReceiver at spawn).")]
-    public int tileWeight = 2;
+    [Header("Personal Defenses")]
+    [Tooltip("Weight (§7.1) — heavier monsters are knocked back LESS by the same hit (the combat framework's knockback speed scales by 1/weight). MonsterAI copies this into the monster's KnockbackReceiver at spawn. A decimal value, so knockback distance can be tuned precisely rather than only in whole steps.")]
+    [FormerlySerializedAs("tileWeight")]
+    [InspectorLabel("Weight Impact Lvl")]
+    public float weight = 2f;
+    [Tooltip("How much THIS monster resists being stunned by the player's weapons — 0 = fully stunnable, 1 = stun-immune, 0.5 = stuns on it last half as long. Lets a big enemy shrug off a stun that would freeze a small one, even though the weapon's Stun Duration is the same for both. Does NOT affect knockback distance — see Weight for that.")]
+    [InspectorLabel("Stun Impact Lvl")]
+    [Range(0f, 1f)] public float stunResistance = 0f;
 
     // ─────────────────────────────────────────────────────────────
     [Header("Special: Goblin")]
