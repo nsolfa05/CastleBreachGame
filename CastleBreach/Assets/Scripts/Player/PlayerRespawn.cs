@@ -3,14 +3,31 @@ using UnityEngine;
 
 /// <summary>
 /// Design doc §10.1: on reaching 0 HP the player disappears and respawns at
-/// their starting position after a tunable delay. (The "keep or lose upgrades
-/// on death" toggle arrives together with the upgrade system, post-slice.)
+/// their starting position after a tunable delay, losing some gold on the way
+/// (Guide 11c) — the mode is a dropdown so it's easy to try LoseAll vs a
+/// percentage vs a flat amount without rewriting anything. (The "keep or lose
+/// upgrades on death" toggle arrives together with the upgrade system,
+/// post-slice.)
 /// </summary>
 [RequireComponent(typeof(Health))]
 public class PlayerRespawn : MonoBehaviour
 {
+    private enum GoldLossMode { LoseAll, LosePercentage, LoseFixedAmount }
+
+    [Header("Respawn")]
     [Tooltip("Seconds until respawn (design doc §10.1 — tunable).")]
     [SerializeField] private float respawnDelay = 3f;
+
+    [Header("Gold loss on death (Guide 11c)")]
+    [Tooltip("How much of the player's gold is lost on death. Lose All: everything. Lose Percentage: a fraction of current gold, the rest is kept. Lose Fixed Amount: always the same flat number, floored at 0.")]
+    [SerializeField] private GoldLossMode goldLossMode = GoldLossMode.LoseAll;
+
+    [Tooltip("Used when Gold Loss Mode is Lose Percentage — 0.5 = lose half your current gold, keep the rest.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float goldLossPercentage = 0.5f;
+
+    [Tooltip("Used when Gold Loss Mode is Lose Fixed Amount — always lose exactly this much (floored at 0 gold), regardless of how much you're carrying.")]
+    [SerializeField] private int goldLossFixedAmount = 50;
 
     private Health health;
     private Vector3 spawnPosition;
@@ -24,7 +41,23 @@ public class PlayerRespawn : MonoBehaviour
 
     private void OnDied(Health _)
     {
+        ApplyGoldLoss();
         StartCoroutine(RespawnRoutine());
+    }
+
+    private void ApplyGoldLoss()
+    {
+        var gm = GameManager.Instance;
+        if (gm == null) return;
+
+        int amount = goldLossMode switch
+        {
+            GoldLossMode.LoseAll => gm.Gold,
+            GoldLossMode.LosePercentage => Mathf.RoundToInt(gm.Gold * goldLossPercentage),
+            GoldLossMode.LoseFixedAmount => goldLossFixedAmount,
+            _ => 0,
+        };
+        gm.RemoveGold(amount);
     }
 
     private IEnumerator RespawnRoutine()

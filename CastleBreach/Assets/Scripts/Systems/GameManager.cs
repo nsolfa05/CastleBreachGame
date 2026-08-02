@@ -71,6 +71,11 @@ public class GameManager : MonoBehaviour
 
     public void AddGold(int amount) => Gold += amount;
 
+    /// <summary>Unconditionally removes gold, floored at 0 — unlike TrySpendGold,
+    /// this always "succeeds" (a purchase can be refused; losing gold on death
+    /// can't). Used by PlayerRespawn's gold-loss-on-death.</summary>
+    public void RemoveGold(int amount) => Gold = Mathf.Max(0, Gold - amount);
+
     private void Update()
     {
         if (State == GameState.Playing) return;
