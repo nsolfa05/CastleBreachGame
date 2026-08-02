@@ -16,10 +16,12 @@ using UnityEngine.InputSystem;
 /// just derived from them (atan2(halfWidth, reach)) so tuning them still
 /// feels like "how wide / how far", not "how many degrees".
 ///
-/// The swing FLASH is the same wedge shape too — a LineRenderer traces
-/// exactly the outline OnDrawGizmosSelected draws in the Scene view (both
-/// read from BuildWedgePoints, so the two can never drift apart), replacing
-/// the old flat rectangle sprite placeholder.
+/// The swing FLASH is a filled, semi-transparent CRESCENT (a ring segment —
+/// hollow near the player, solid from partway out to Reach), built as a
+/// procedural mesh each swing — closer to the old rectangle's "solid patch
+/// showing where you're aiming" feel than a thin wedge outline. It's a
+/// stylized slash shape, not literally the hit area (that's still the pie
+/// slice from the player's own position — see OnDrawGizmosSelected).
 /// </summary>
 public class PlayerAttack : MonoBehaviour
 {
@@ -43,14 +45,15 @@ public class PlayerAttack : MonoBehaviour
     [SerializeField] private HitEffects swordEffects;
 
     [Header("Visuals")]
-    [Tooltip("Color of the swing wedge flash.")]
-    [SerializeField] private Color swingVisualColor = new Color(1f, 0.95f, 0.4f, 0.9f);
+    [Tooltip("Fill color of the swing crescent flash (semi-transparent, like the old rectangle).")]
+    [SerializeField] private Color swingVisualColor = new Color(1f, 0.95f, 0.4f, 0.55f);
 
-    [Tooltip("Line thickness (tiles) of the swing wedge flash.")]
-    [SerializeField] private float swingVisualWidth = 0.06f;
+    [Tooltip("How much of Reach stays hollow near the player before the crescent starts filling — 0 = a full pie slice, closer to 1 = a thin sliver right at the edge of Reach.")]
+    [Range(0f, 0.9f)]
+    [SerializeField] private float crescentInnerRadiusFraction = 0.4f;
 
-    [Tooltip("How long the swing wedge flash stays visible, in seconds.")]
-    [SerializeField] private float swingFlashSeconds = 0.12f;
+    [Tooltip("How long the swing flash stays visible, in seconds — keep this short for a snappy slash feel.")]
+    [SerializeField] private float swingFlashSeconds = 0.1f;
 
     private const int WedgeSegments = 16;
 
@@ -58,24 +61,31 @@ public class PlayerAttack : MonoBehaviour
     private float swingVisualOffTime;
     private PlayerAim aim;
     private KnockbackReceiver knockback; // may be null; used only to block attacking while stunned
-    private LineRenderer swingLine;
+    private MeshFilter swingMeshFilter;
+    private MeshRenderer swingMeshRenderer;
+    private Mesh swingMesh;
 
     private void Awake()
     {
-        swingLine = GetComponent<LineRenderer>();
-        if (swingLine == null) swingLine = gameObject.AddComponent<LineRenderer>();
-        swingLine.useWorldSpace = true;
-        swingLine.loop = false;
-        swingLine.positionCount = 0;
-        swingLine.widthMultiplier = swingVisualWidth;
-        swingLine.startColor = swingVisualColor;
-        swingLine.endColor = swingVisualColor;
-        swingLine.sortingOrder = 25;
+        swingMeshFilter = GetComponent<MeshFilter>();
+        if (swingMeshFilter == null) swingMeshFilter = gameObject.AddComponent<MeshFilter>();
+        swingMeshRenderer = GetComponent<MeshRenderer>();
+        if (swingMeshRenderer == null) swingMeshRenderer = gameObject.AddComponent<MeshRenderer>();
+
+        swingMesh = new Mesh { name = "SwordSwingCrescent" };
+        swingMeshFilter.mesh = swingMesh;
+
         // Sprites/Default: the same shader every SpriteRenderer in this
         // project already relies on, so it's guaranteed URP-compatible here
-        // — LineRenderer's own default material is not (shows up magenta).
-        swingLine.material = new Material(Shader.Find("Sprites/Default"));
-        swingLine.enabled = false;
+        // — a plain unlit shader with no assigned texture can render as
+        // solid black/undefined depending on pipeline defaults. White texture
+        // + vertex color gives a reliable flat, semi-transparent fill.
+        var material = new Material(Shader.Find("Sprites/Default")) { mainTexture = Texture2D.whiteTexture };
+        swingMeshRenderer.sharedMaterial = material;
+        swingMeshRenderer.sortingOrder = 25;
+        swingMeshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        swingMeshRenderer.receiveShadows = false;
+        swingMeshRenderer.enabled = false;
 
         aim = GetComponent<PlayerAim>();
         knockback = GetComponent<KnockbackReceiver>();
@@ -87,11 +97,11 @@ public class PlayerAttack : MonoBehaviour
     }
 
     // Being switched away from mid-flash (or disabled on death) shouldn't
-    // leave the wedge flash frozen on screen — WeaponSwitcher only disables
-    // this component, it never touches the flash directly.
+    // leave the flash frozen on screen — WeaponSwitcher only disables this
+    // component, it never touches the flash directly.
     private void OnDisable()
     {
-        if (swingLine != null) swingLine.enabled = false;
+        if (swingMeshRenderer != null) swingMeshRenderer.enabled = false;
     }
 
     private void Update()
@@ -103,8 +113,8 @@ public class PlayerAttack : MonoBehaviour
         if (!stunned && keyboard != null && keyboard.spaceKey.wasPressedThisFrame && Time.time >= nextSwingTime)
             Swing();
 
-        if (swingLine.enabled && Time.time >= swingVisualOffTime)
-            swingLine.enabled = false;
+        if (swingMeshRenderer.enabled && Time.time >= swingVisualOffTime)
+            swingMeshRenderer.enabled = false;
     }
 
     private void Swing()
@@ -114,10 +124,8 @@ public class PlayerAttack : MonoBehaviour
         Vector2 origin = transform.position;
         Vector2 aimDir = aim != null ? aim.AimDirection : Vector2.right;
 
-        var wedgePoints = BuildWedgePoints(origin, aimDir);
-        swingLine.positionCount = wedgePoints.Length;
-        swingLine.SetPositions(wedgePoints);
-        swingLine.enabled = true;
+        BuildCrescentMesh(aimDir);
+        swingMeshRenderer.enabled = true;
         swingVisualOffTime = Time.time + swingFlashSeconds;
 
         float halfAngleRad = Mathf.Atan2(arcWidth * 0.5f, Mathf.Max(0.01f, reach));
@@ -150,8 +158,56 @@ public class PlayerAttack : MonoBehaviour
         }
     }
 
-    // Draws the swing's arc (a pie-slice wedge outline) in the Scene view
-    // while selected — the exact same points the real swing flash uses.
+    /// <summary>
+    /// Builds a filled ring-segment (annular sector) in the player's own local
+    /// space — hollow from the player out to Crescent Inner Radius Fraction *
+    /// Reach, solid from there out to Reach — the "crescent/slash" look,
+    /// rather than a pointy pie slice reaching all the way back to the player.
+    /// </summary>
+    private void BuildCrescentMesh(Vector2 dir)
+    {
+        float halfAngleRad = Mathf.Atan2(arcWidth * 0.5f, Mathf.Max(0.01f, reach));
+        float baseAngleRad = Mathf.Atan2(dir.y, dir.x);
+        float outerRadius = reach;
+        float innerRadius = reach * crescentInnerRadiusFraction;
+
+        var vertices = new Vector3[(WedgeSegments + 1) * 2];
+        var colors = new Color[vertices.Length];
+        var uv = new Vector2[vertices.Length];
+
+        for (int i = 0; i <= WedgeSegments; i++)
+        {
+            float t = (float)i / WedgeSegments;
+            float a = baseAngleRad - halfAngleRad + t * (2f * halfAngleRad);
+            Vector2 radial = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+
+            vertices[i * 2] = radial * innerRadius;
+            vertices[i * 2 + 1] = radial * outerRadius;
+            colors[i * 2] = swingVisualColor;
+            colors[i * 2 + 1] = swingVisualColor;
+            uv[i * 2] = Vector2.zero;
+            uv[i * 2 + 1] = Vector2.zero;
+        }
+
+        var triangles = new int[WedgeSegments * 6];
+        int triIdx = 0;
+        for (int i = 0; i < WedgeSegments; i++)
+        {
+            int inner0 = i * 2, outer0 = i * 2 + 1, inner1 = (i + 1) * 2, outer1 = (i + 1) * 2 + 1;
+            triangles[triIdx++] = inner0; triangles[triIdx++] = inner1; triangles[triIdx++] = outer0;
+            triangles[triIdx++] = outer0; triangles[triIdx++] = inner1; triangles[triIdx++] = outer1;
+        }
+
+        swingMesh.Clear();
+        swingMesh.vertices = vertices;
+        swingMesh.colors = colors;
+        swingMesh.uv = uv;
+        swingMesh.triangles = triangles;
+        swingMesh.RecalculateBounds();
+    }
+
+    // Draws the swing's actual HIT area (a pie-slice wedge, not the stylized
+    // crescent visual) in the Scene view while selected.
     private void OnDrawGizmosSelected()
     {
         Vector2 dir = (Application.isPlaying && aim != null) ? aim.AimDirection : Vector2.right;
@@ -162,9 +218,9 @@ public class PlayerAttack : MonoBehaviour
             Gizmos.DrawLine(points[i], points[i + 1]);
     }
 
-    /// <summary>Origin → near edge → arc → far edge → origin, the wedge outline
-    /// shared by the real-time swing flash (LineRenderer) and the Scene-view
-    /// gizmo, so they can never draw two different shapes.</summary>
+    /// <summary>Origin → near edge → arc → far edge → origin — the true hit-area
+    /// wedge, used only by the gizmo now (the real-time flash is the crescent
+    /// mesh above).</summary>
     private Vector3[] BuildWedgePoints(Vector2 origin, Vector2 dir)
     {
         float halfAngleRad = Mathf.Atan2(arcWidth * 0.5f, Mathf.Max(0.01f, reach));
