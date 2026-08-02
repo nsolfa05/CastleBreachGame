@@ -66,10 +66,15 @@ public abstract class FoldoutHeaderEditor : Editor
 
             if (sectionName != openSection)
             {
-                if (openSection != null) EditorGUILayout.EndFoldoutHeaderGroup();
                 openSection = sectionName;
                 EditorGUILayout.Space(4);
-                openExpanded = EditorGUILayout.BeginFoldoutHeaderGroup(GetFoldoutState(openSection), openSection);
+                // A plain Foldout styled like a header, NOT BeginFoldoutHeaderGroup —
+                // that API tracks a single globally-exclusive open group and throws
+                // ("can't nest Foldout Headers") the instant anything drawn inside it
+                // (e.g. Unity's own built-in header-style foldout for a List<T> field,
+                // as introduced in Unity 6) tries to open one of its own. A plain
+                // Foldout has no such restriction and nests freely.
+                openExpanded = EditorGUILayout.Foldout(GetFoldoutState(openSection), openSection, true, EditorStyles.foldoutHeader);
                 SetFoldoutState(openSection, openExpanded);
             }
 
@@ -80,8 +85,6 @@ public abstract class FoldoutHeaderEditor : Editor
                 EditorGUI.indentLevel--;
             }
         }
-
-        if (openSection != null) EditorGUILayout.EndFoldoutHeaderGroup();
 
         serializedObject.ApplyModifiedProperties();
     }
