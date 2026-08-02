@@ -67,6 +67,12 @@ public class MonsterAI : MonoBehaviour
     [Tooltip("The tinted body renderer. Leave empty to use the SpriteRenderer on this object.")]
     [SerializeField] private SpriteRenderer body;
 
+    [Tooltip("Layers a ranged attack's projectile can hit — set to Player + Structure. Only matters for a monster with Uses Ranged Attack on (Faun).")]
+    [SerializeField] private LayerMask rangedHitLayers;
+
+    [Tooltip("The plain Square sprite (Assets/Sprites/Square) — used for a ranged attack's flying bolt and the burn zone it leaves behind. Only matters for a monster with Uses Ranged Attack on (Faun).")]
+    [SerializeField] private Sprite rangedBoltSprite;
+
     [Header("Crowd avoidance (shared behavior, not per-monster-type data)")]
     [Tooltip("Monsters within this distance (tiles) push each other apart. A little more than one body-width, so neighbors start spreading before they physically wedge together, but small enough that a crowd still packs in around a target. Applied every physics step as an omnidirectional shove — so a neighbor pressing in from the side or behind counts too, not just one directly ahead.")]
     [SerializeField] private float separationRadius = 0.85f;
@@ -244,6 +250,17 @@ public class MonsterAI : MonoBehaviour
     private static int EnemyCrowdMask;
     private float lastAttackedPlayerTime = float.NegativeInfinity;
     private Transform committedStructureTarget; // non-null while already committed to attacking a specific structure
+
+    // Ranged-attack state (Faun; see UpdateRangedAttack). retreatUntil is set
+    // by OnDamaged as a stand-in for "was just hit by melee" — see its own
+    // comment. lastZone* tracks the burn zone THIS monster most recently
+    // created, so it can step out of its own puddle rather than reacting to
+    // every BurnZone in the scene (e.g. the player's Fire Staff).
+    private float retreatUntil = float.NegativeInfinity;
+    private Vector2 lastZoneCenter;
+    private float lastZoneRadius;
+    private float lastZoneEndTime = float.NegativeInfinity;
+
     private TelegraphPhase telegraphPhase = TelegraphPhase.Idle;
     private float telegraphPhaseEndTime;
     private Vector2 lockedBoxCenter;
@@ -283,6 +300,7 @@ public class MonsterAI : MonoBehaviour
         telegraph = GetComponent<TelegraphedAreaAttack>();
         knockback = GetComponent<KnockbackReceiver>();
         health.Died += OnDied;
+        health.Damaged += OnDamaged;
         if (body == null) body = GetComponent<SpriteRenderer>();
         avoidSide = UnityEngine.Random.value < 0.5f ? -1f : 1f;
         standDownKey = UnityEngine.Random.value;
@@ -417,6 +435,12 @@ public class MonsterAI : MonoBehaviour
         if (definition.usesTelegraphedAreaAttack)
         {
             UpdateTelegraphedAttack(gm, target);
+            return;
+        }
+
+        if (definition.usesRangedAttack)
+        {
+            UpdateRangedAttack(gm, target);
             return;
         }
 
@@ -1056,6 +1080,101 @@ public class MonsterAI : MonoBehaviour
             // centre, so everything caught in the slam is thrown outward from it.
             definition.attackEffects.ApplyTo(hit, lockedBoxCenter);
         }
+    }
+
+    /// <summary>
+    /// Faun's ranged attack (Guide 11d): approach and fire on cooldown exactly
+    /// like a normal monster's TryAttack (same Attack Range/Attack Interval),
+    /// except the "hit" is a projectile that leaves a burn zone rather than an
+    /// instant TakeDamage. Layered on top: while RETREATING (see OnDamaged) or
+    /// standing in the burn zone it just created, movement is overridden to
+    /// step directly away instead of the normal approach/settle behavior —
+    /// everything else (routing, wall-breaking if sealed off) still goes
+    /// through the same MoveToward/ResolveNavigation every other monster uses.
+    /// </summary>
+    private void UpdateRangedAttack(GameManager gm, Transform target)
+    {
+        if (DistanceToTarget(target) <= definition.attackRange && Time.time >= nextAttackTime)
+            FireRangedAttack(target, gm);
+
+        bool retreatingFromMelee = Time.time < retreatUntil;
+        bool avoidingOwnZone = Time.time < lastZoneEndTime &&
+            ((Vector2)transform.position - lastZoneCenter).sqrMagnitude <= lastZoneRadius * lastZoneRadius;
+
+        if (retreatingFromMelee || avoidingOwnZone)
+        {
+            Vector2 awayFrom = retreatingFromMelee ? (Vector2)target.position : lastZoneCenter;
+            Vector2 away = (Vector2)transform.position - awayFrom;
+            Vector2 dir = away.sqrMagnitude > 0.0001f ? away.normalized : Vector2.up;
+            rb.linearVelocity = dir * definition.moveSpeed;
+            return;
+        }
+
+        MoveToward(target); // same approach/settle/crowd behavior as every other monster
+    }
+
+    /// <summary>Launches a straight-line bolt at target's current position;
+    /// on impact (or at max range) it leaves a burn zone rather than dealing
+    /// direct hit damage — same shape as the player's Fire Staff, and reusing
+    /// the same StraightProjectile/BurnZone the player's weapons use.</summary>
+    private void FireRangedAttack(Transform target, GameManager gm)
+    {
+        nextAttackTime = Time.time + definition.attackInterval;
+
+        Vector2 origin = transform.position;
+        Vector2 direction = (Vector2)target.position - origin;
+        if (direction.sqrMagnitude < 0.0001f) return;
+        direction.Normalize();
+
+        if (gm != null && target == gm.Player) lastAttackedPlayerTime = Time.time;
+
+        var go = new GameObject("FaunBolt");
+        go.transform.position = origin;
+        go.transform.localScale = new Vector3(0.25f, 0.25f, 1f);
+
+        if (rangedBoltSprite != null)
+        {
+            var renderer = go.AddComponent<SpriteRenderer>();
+            renderer.sprite = rangedBoltSprite;
+            renderer.color = definition.rangedBurnColor;
+            renderer.sortingOrder = 20;
+        }
+
+        var projectile = go.AddComponent<StraightProjectile>();
+        float range = definition.attackRange + 1f; // a little slack so it can still land if the target steps back mid-flight
+        projectile.Launch(direction, definition.rangedProjectileSpeed, range, rangedHitLayers, (point, hitCollider) =>
+        {
+            BurnZone.Spawn(point, definition.rangedBurnRadius, definition.rangedBurnDamagePerTick,
+                definition.rangedBurnTickInterval, definition.rangedBurnDurationSeconds, rangedHitLayers,
+                rangedBoltSprite, definition.rangedBurnColor, sortingOrder: 4, damagesPlayer: true);
+
+            lastZoneCenter = point;
+            lastZoneRadius = definition.rangedBurnRadius;
+            lastZoneEndTime = Time.time + definition.rangedBurnDurationSeconds;
+        });
+    }
+
+    /// <summary>
+    /// Faun's retreat trigger: if the player is close enough to have landed
+    /// this hit with a MELEE weapon (rather than the player's own Bow/Fire
+    /// Staff from farther out), start retreating. A distance proxy, not a
+    /// real weapon-type check — Health.TakeDamage doesn't carry that
+    /// information, and plumbing it through every attack in the game just
+    /// for this would be a much bigger change than one monster's kiting
+    /// behavior warrants. Guarded by LastDamageTime so this never fires for
+    /// the Damaged event ResetToFull/SetMax also raise (e.g. spawn-time
+    /// stat setup) — only a REAL TakeDamage call updates that timestamp.
+    /// </summary>
+    private void OnDamaged(Health _)
+    {
+        if (definition == null || !definition.usesRangedAttack) return;
+        if (Time.time - health.LastDamageTime > 0.05f) return;
+
+        var gm = GameManager.Instance;
+        if (gm == null || gm.Player == null) return;
+
+        if (DistanceBetween(transform, gm.Player) <= definition.retreatTriggerDistance)
+            retreatUntil = Time.time + definition.retreatSeconds;
     }
 
     /// <summary>
@@ -1741,6 +1860,16 @@ public class MonsterAI : MonoBehaviour
                 if (bestLure != null) return bestLure;
             }
             return gm.King;
+        }
+
+        if (definition.targetsOnlyPlayer)
+        {
+            // Redcap: the King is never even considered. If the player isn't
+            // targetable right now (dead, mid-respawn), returning null makes
+            // FixedUpdate's own null-objective handling stop the monster in
+            // place rather than falling back to the King.
+            bool alive = gm.Player != null && gm.PlayerHealth != null && !gm.PlayerHealth.IsDead;
+            return alive ? gm.Player : null;
         }
 
         var player = gm.Player;
