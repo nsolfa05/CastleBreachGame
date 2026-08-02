@@ -45,14 +45,17 @@ public class PlayerAttack : MonoBehaviour
     [SerializeField] private HitEffects swordEffects;
 
     [Header("Visuals")]
-    [Tooltip("Fill color of the swing crescent flash (semi-transparent, like the old rectangle).")]
-    [SerializeField] private Color swingVisualColor = new Color(1f, 0.95f, 0.4f, 0.55f);
+    [Tooltip("Idle color of the aim crescent — always shown, semi-transparent grey by default, so you can see where you're aiming even between swings.")]
+    [SerializeField] private Color idleVisualColor = new Color(0.7f, 0.7f, 0.7f, 0.25f);
+
+    [Tooltip("Color the crescent flashes to for Swing Flash Seconds after you actually attack.")]
+    [SerializeField] private Color activeVisualColor = new Color(1f, 0.9f, 0.2f, 0.75f);
 
     [Tooltip("How much of Reach stays hollow near the player before the crescent starts filling — 0 = a full pie slice, closer to 1 = a thin sliver right at the edge of Reach.")]
     [Range(0f, 0.9f)]
     [SerializeField] private float crescentInnerRadiusFraction = 0.4f;
 
-    [Tooltip("How long the swing flash stays visible, in seconds — keep this short for a snappy slash feel.")]
+    [Tooltip("How long the crescent stays in Active Visual Color after a swing before fading back to idle grey.")]
     [SerializeField] private float swingFlashSeconds = 0.1f;
 
     private const int WedgeSegments = 16;
@@ -85,7 +88,7 @@ public class PlayerAttack : MonoBehaviour
         swingMeshRenderer.sortingOrder = 25;
         swingMeshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         swingMeshRenderer.receiveShadows = false;
-        swingMeshRenderer.enabled = false;
+        swingMeshRenderer.enabled = false; // OnEnable turns it on — keeps Awake/OnEnable symmetric with OnDisable
 
         aim = GetComponent<PlayerAim>();
         knockback = GetComponent<KnockbackReceiver>();
@@ -96,12 +99,20 @@ public class PlayerAttack : MonoBehaviour
         hitLayers = MonsterLayers.IncludeGatePasser(hitLayers);
     }
 
-    // Being switched away from mid-flash (or disabled on death) shouldn't
-    // leave the flash frozen on screen — WeaponSwitcher only disables this
-    // component, it never touches the flash directly.
+    // Only hides the crescent (this weapon isn't the one you're holding right
+    // now, or the player is dead) — the reverse of OnEnable below.
     private void OnDisable()
     {
         if (swingMeshRenderer != null) swingMeshRenderer.enabled = false;
+    }
+
+    // Re-equipping the Sword (WeaponSwitcher) or respawning both flip this
+    // component's own enabled flag back on — Unity calls this automatically
+    // whenever that happens, so the idle aim crescent reappears immediately
+    // rather than waiting for the next swing.
+    private void OnEnable()
+    {
+        if (swingMeshRenderer != null) swingMeshRenderer.enabled = true;
     }
 
     private void Update()
@@ -113,20 +124,20 @@ public class PlayerAttack : MonoBehaviour
         if (!stunned && keyboard != null && keyboard.spaceKey.wasPressedThisFrame && Time.time >= nextSwingTime)
             Swing();
 
-        if (swingMeshRenderer.enabled && Time.time >= swingVisualOffTime)
-            swingMeshRenderer.enabled = false;
+        // Always tracks aim, live — grey while idle, briefly yellow right
+        // after a swing (see Swing() setting swingVisualOffTime).
+        Vector2 aimDir = aim != null ? aim.AimDirection : Vector2.right;
+        bool flashing = Time.time < swingVisualOffTime;
+        BuildCrescentMesh(aimDir, flashing ? activeVisualColor : idleVisualColor);
     }
 
     private void Swing()
     {
         nextSwingTime = Time.time + cooldown;
+        swingVisualOffTime = Time.time + swingFlashSeconds; // Update() picks up the color flip next frame
 
         Vector2 origin = transform.position;
         Vector2 aimDir = aim != null ? aim.AimDirection : Vector2.right;
-
-        BuildCrescentMesh(aimDir);
-        swingMeshRenderer.enabled = true;
-        swingVisualOffTime = Time.time + swingFlashSeconds;
 
         float halfAngleRad = Mathf.Atan2(arcWidth * 0.5f, Mathf.Max(0.01f, reach));
 
@@ -164,7 +175,7 @@ public class PlayerAttack : MonoBehaviour
     /// Reach, solid from there out to Reach — the "crescent/slash" look,
     /// rather than a pointy pie slice reaching all the way back to the player.
     /// </summary>
-    private void BuildCrescentMesh(Vector2 dir)
+    private void BuildCrescentMesh(Vector2 dir, Color color)
     {
         float halfAngleRad = Mathf.Atan2(arcWidth * 0.5f, Mathf.Max(0.01f, reach));
         float baseAngleRad = Mathf.Atan2(dir.y, dir.x);
@@ -183,8 +194,8 @@ public class PlayerAttack : MonoBehaviour
 
             vertices[i * 2] = radial * innerRadius;
             vertices[i * 2 + 1] = radial * outerRadius;
-            colors[i * 2] = swingVisualColor;
-            colors[i * 2 + 1] = swingVisualColor;
+            colors[i * 2] = color;
+            colors[i * 2 + 1] = color;
             uv[i * 2] = Vector2.zero;
             uv[i * 2 + 1] = Vector2.zero;
         }
