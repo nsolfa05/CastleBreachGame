@@ -8,7 +8,7 @@ of any other project.
 
 | Path | What it is |
 |---|---|
-| `guides/` | Ordered, click-by-click beginner guides (00 → 09, plus 9.5 for playtesting-driven edits). **Start at `guides/00-unity-setup.md`.** Also see `guides/saving-and-committing.md` — a checklist to re-run every session, not a one-time guide. |
+| `guides/` | Ordered, click-by-click beginner guides (00 → 10, plus 9.5 for playtesting-driven edits, and 11a → 11d for the in-progress Combat & More phase). **Start at `guides/00-unity-setup.md`.** Also see `guides/saving-and-committing.md` — a checklist to re-run every session, not a one-time guide. |
 | `unity-scripts/` | The vertical slice's C# code, staged for import. Guide 00 moves it into the Unity project (`CastleBreach/Assets/Scripts`), after which this folder is deleted — the code's permanent home is inside the project. |
 | `CastleBreach/` | The Unity project itself. Created on the designer's machine by Unity Hub in Guide 00 (Unity 6 LTS, Universal 2D template), then committed. `.gitignore` here already excludes `Library/`, `Temp/`, logs, and IDE files. |
 
@@ -45,14 +45,39 @@ of any other project.
       impact mark. Everything in it is now confirmed pushed and correctly
       wired, including the Cyclops telegraph and Catapult impact mark
       pieces that were blocked pending Guide 09.
-- [ ] Guide 10 — Phase 4: Walls, Gates & real pathfinding (code pushed).
-      Monsters route around player-built mazes via `Core/PathGrid.cs` and
-      break through only when no route exists. Editor work pending: add the
-      PathGrid object, build the Wall and Gate prefabs, register them in
-      Build Options.
+- [x] Guide 10 — Phase 4: Walls, Gates & real pathfinding. Monsters route
+      around player-built mazes via `Core/PathGrid.cs` and break through only
+      when no route exists. PathGrid object, Wall/Gate prefabs, and Build
+      Options entries all confirmed in and pushed.
+- [x] Guide 11a — **Combat & More** (an inserted phase, prioritized ahead of
+      Phase 5 at the user's request — see the callout below). Core combat
+      framework: `HitEffects`/`KnockbackReceiver` (knockback + stun, usable by
+      any attack — weapon, monster, or tower), collapsible Inspector foldout
+      sections (`FoldoutHeaderEditor`), per-enemy Stun Resistance.
+- [x] Guide 11b — Weapons: the Sword reworked to a true angular arc (was a
+      rectangle), plus three new weapons (Bow, Hammer, Fire Staff) sharing a
+      `ChargedWeapon` hold-to-charge base class, and `WeaponSwitcher` (the `V`
+      weapon-select menu, mutually exclusive with `B`/build mode).
+- [x] Guide 11c — Combat UI: health bars hide until damaged (`HealthBar`),
+      configurable gold loss on death (`PlayerRespawn`), a top-left
+      Weapon-Choice/Building-Choice text indicator, and `DeathEffect` (red
+      tint + particle burst + lingering corpse on death, Player and every
+      monster).
+- [x] Guide 11d — New enemies: **Redcap** (`targetsOnlyPlayer` — the mirror
+      of Goblin's `targetsOnlyKing`) and **Faun** (a new ranged-attack
+      pattern: fires a projectile that leaves a damaging burn zone, retreats
+      when hit at melee range).
+- [ ] Guide 11e — Oil & Flame tower (directional, arrow-key rotation at
+      placement) + a click-to-select-a-tower system (for future upgrades/
+      deletion). Not started.
 
-**Next up:** the full build order is in [`ROADMAP.md`](ROADMAP.md). Work
-through Guide 10, then ask Claude for Phase 5 (shop huts & player upgrades).
+**Next up:** finish Guide 11 with **11e**, then the full build order in
+[`ROADMAP.md`](ROADMAP.md) resumes at **Phase 5** (shop huts & player
+upgrades) — Guide 11 (Combat & More) was inserted ahead of it, not part of
+the original phase numbering; see ROADMAP.md's own callout. Weapon
+aim-preview "ghost visuals" (a range/strike-zone preview for Bow/Hammer/Fire
+Staff, matching the Sword's grey-idle/yellow-on-swing crescent) were
+explicitly deferred during 11c/11b follow-ups — ask for them whenever wanted.
 Note that Phase 4's Tile Weight Rule was deliberately skipped — the current
 physical crowding between monsters is the preferred feel, and routing was
 built so it stays untouched.
@@ -203,3 +228,107 @@ built so it stays untouched.
   ever become a target when routing reports no route exists at all (§6). Any
   future monster meant to smash walls on sight opts back in — it should not
   change that rule for everyone.
+- **Knockback/stun (Guide 11a) is one shared framework, not per-attack code.**
+  `Combat/HitEffects` is a small embeddable struct (Knockback Enabled/
+  Strength, Stun Enabled/Duration) dropped into anything that deals a hit — a
+  weapon, a `MonsterDefinition`'s Attack Effects, a future tower. It applies
+  via `HitEffects.ApplyTo(target, sourcePosition)`, radiating outward from
+  wherever the hit came from. The receiving side is `Combat/KnockbackReceiver`
+  — while active it takes over the Rigidbody2D's velocity and the entity's own
+  mover (`PlayerMovement`/`MonsterAI`) checks `ControlSuppressed` and yields,
+  so the two never fight over the body. Everything defaults OFF. A monster's
+  Weight (Personal Defenses on its `MonsterDefinition` — a decimal, not an
+  int) and Stun Resistance both get copied into its `KnockbackReceiver` at
+  spawn by `MonsterAI.Start()`; don't hand-set them on the shared Monster
+  prefab's own `KnockbackReceiver`, it gets overwritten every spawn.
+- **Inspector sections are collapsible AND user-renamable/reorderable, not
+  just code-declared.** `Editor/FoldoutHeaderEditor` groups every
+  `[Header("...")]` into a foldout automatically — any script inheriting it
+  (most do by now) gets this for free, no maintenance needed when new fields
+  are added. On top of that, "Edit Section Layout" (a toggle at the top of
+  the Inspector) lets the section TITLE and ORDER be changed by hand, per
+  target TYPE (not per asset — renaming a Monster Definition section applies
+  to every monster), persisted in the git-tracked
+  `Editor/FoldoutLayoutConfig.asset`. Grouping and expand/collapse state
+  always key off the original code-side `[Header]` text, never the
+  user-renamed display text, so renaming never loses state and a later code
+  change still lands in the right section. A field's DISPLAYED LABEL can
+  also be overridden independently of its C# name via `[InspectorLabel("...")]`
+  (`Core/InspectorLabelAttribute`) — used so `MonsterDefinition.weight` reads
+  "Weight Impact Lvl" without an actual rename (which would risk losing
+  already-tuned per-monster values without a `FormerlySerializedAs`).
+- **The player's weapon system (Guide 11b) is one shared aim + charge
+  pipeline, not four separate weapons.** `Player/PlayerAim` is the single
+  source of "which way is the player aiming" (mouse direction), read by all
+  four weapons. Three of the four (Bow, Hammer, Fire Staff) share
+  `Player/ChargedWeapon`, an abstract "hold Space to charge, release to fire"
+  base class — a new charged weapon only implements `Fire()` and its charge-
+  bar size. `Player/WeaponSwitcher` owns which ONE weapon component is
+  `.enabled` at a time and drives the `V` menu; it's forced to run AFTER
+  `Structures/BuildModeController` every frame via
+  `[DefaultExecutionOrder(100)]` — without that, a shared number key could
+  equip a weapon AND pop a build ghost on the same keypress, since Unity's
+  default script execution order between two unrelated scripts is
+  unspecified (see `WeaponSwitcher`'s own class doc for the exact race). `V`
+  (`WeaponSwitcher.SelectingWeapon`) and `B`/carrying
+  (`BuildModeController.BuildingActive`) are mutually exclusive by design —
+  neither menu can open while the other is active. Two attack primitives are
+  shared, not weapon-specific: `Combat/StraightProjectile` (fixed-direction
+  flight, distinct from the pre-existing homing `Structures/Projectile` used
+  by towers) and `Combat/BurnZone` (a generic ground DoT patch) — both the
+  Fire Staff and Faun's ranged attack (11d) reuse the same two scripts rather
+  than each rolling their own projectile/DoT code, and any future
+  projectile-plus-lingering-effect weapon or monster should reuse them too.
+- **`Combat/CombatFxVisual`** marks a SpriteRenderer that a combat effect (a
+  charge bar, previously the sword's swing flash) owns and toggles itself.
+  `PlayerRespawn`'s respawn step skips anything carrying this marker rather
+  than blindly force-showing every child renderer — without it, a charge bar
+  frozen mid-fill at the moment of death would flash back on at respawn. Any
+  new transient combat-FX SpriteRenderer that shouldn't survive a respawn
+  should carry this marker too.
+- **`Health.LastDamageTime`-gating, not the `Damaged` event, for anything
+  that needs "was this entity ACTUALLY just hit."** `Health.Damaged` also
+  fires from `ResetToFull`/`SetMax` (e.g. a monster's spawn-time stat setup),
+  which is never a real hit. Three places rely on checking
+  `Time.time - health.LastDamageTime` instead (only a real `TakeDamage` call
+  moves that timestamp): `HealthBar`'s Hide Until Damaged, `DeathEffect`
+  timing, and Faun's melee-retreat trigger (`MonsterAI.OnDamaged`, Guide
+  11d). Reuse this pattern rather than subscribing to `Damaged` directly.
+- **`DeathEffect`/`DeathParticle` (Guide 11c) is the shared "you just died"
+  visual** for the Player and any monster — red tint + a burst of small
+  hand-rolled square particles (deliberately not Unity's `ParticleSystem`,
+  to match every other effect in this project and keep the Inspector fields
+  simple). It owns ONLY how long the corpse visually lingers: `Play()` tints
+  the body, fires the burst, and returns Body Lifetime Seconds: the CALLER
+  (`MonsterAI.OnDied` / `PlayerRespawn.RespawnRoutine`) is still the one that
+  freezes movement/physics immediately and decides when to actually
+  hide/destroy, waiting however long `Play()` reported back. A monster
+  freezes (stops moving/attacking) via a `health.IsDead` check in
+  `MonsterAI.FixedUpdate`, separate from and immediate regardless of how
+  long the cosmetic corpse lingers afterward.
+- **Two established patterns for a monster with genuinely different
+  behavior**, both worth reusing before inventing a third way:
+  - **Exclusive targeting** (Goblin's `targetsOnlyKing`, Redcap's
+    `targetsOnlyPlayer`, Guide 11d) — a single bool branch at the top of
+    `MonsterAI.PickTarget`, returning one fixed target (or `null` if it's
+    currently untargetable, which `ChooseTarget`/`FixedUpdate` already
+    handle gracefully) and skipping every other targeting rule entirely.
+  - **A monster-type-specific attack loop** (Cyclops's
+    `usesTelegraphedAreaAttack` → `UpdateTelegraphedAttack`, Faun's
+    `usesRangedAttack` → `UpdateRangedAttack`, Guide 11d) — a bool flag on
+    `MonsterDefinition` that makes `MonsterAI.FixedUpdate` delegate to a
+    dedicated `UpdateXAttack(gm, target)` method instead of the generic
+    approach/`TryAttack` path, called with the SAME `target` (objective, or
+    a wall to break if routing found the route sealed) that every other
+    monster gets — so a new attack pattern still gets wall-breaking and
+    crowd behavior for free, it only reimplements what happens once in
+    range. Faun's retreat/self-avoidance movement is a deliberate exception
+    to that reuse — it bypasses `MoveToward`'s crowd system for a plain
+    direct velocity while active, the same category of tradeoff the
+    Cyclops's telegraph movement already makes, not a new kind of shortcut.
+  A monster-specific mechanic that can't fit either pattern (weapon-type-
+  aware combat, anything needing new data on `Health`/`HitEffects` itself)
+  is a bigger, cross-cutting change — flag it rather than bolting it onto
+  `MonsterAI` ad hoc. (Faun's melee-vs-ranged retreat trigger is exactly this
+  kind of simplification — a distance proxy standing in for real weapon-type
+  tracking, which doesn't exist yet — noted in `guides/11d-new-enemies.md`.)

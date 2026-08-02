@@ -11,14 +11,19 @@ playtests; commit + push at every checkpoint.
 
 ---
 
-> **Status:** Phases 1–3 are **code-complete, pushed, and confirmed in the
-> Editor** — guides 07 (foundations), 08 (monster roster), and 09 (easy
-> structures) are all done, plus Guide 9.5's playtesting-driven edits
-> (King damage, Cyclops telegraph + pause/ramp, targeting tuning, the
-> structure-targeting rework, Tower/Monster DPS readouts, Catapult impact
-> mark). See README.md's Status section for the full breakdown. Phase 4
-> can start whenever the user's ready.
-> Phase 4 code starts once Guide 09 is confirmed in and verified.
+> **Status:** Phases 1–4 are **code-complete, pushed, and confirmed in the
+> Editor** — guides 07 (foundations), 08 (monster roster), 09 (easy
+> structures, plus Guide 9.5's playtesting-driven edits), and 10 (walls,
+> gates, pathfinding) are all done. See README.md's Status section for the
+> full breakdown.
+>
+> **Guide 11 — Combat & More is currently running, INSERTED ahead of Phase
+> 5** at the user's explicit request (a full combat pass — knockback/stun,
+> real weapons, combat UI, two new enemies, a new tower — felt more valuable
+> to build now than shop huts). It is not part of this roadmap's original
+> phase numbering; see its own writeup below, between Phase 4 and Phase 5.
+> 11a–11d are done; 11e (Oil & Flame tower) is the last piece before Phase 5
+> resumes.
 
 ## Phase 1 — Foundations: monster stats as ScriptableObjects ✅ code / guide 07
 
@@ -111,6 +116,71 @@ variety and Phase 3's build-mode selection.*
   properly when wanted: one breadth-first sweep outward *from the King* per
   movement class, refreshed only when `PathGrid.Version` changes, yields route
   distance for every tile at once.
+
+## Guide 11 — Combat & More (inserted ahead of Phase 5)
+
+*Not in the design doc's own phase list — the user chose to prioritize a full
+combat pass (knockback/stun, real weapons beyond the placeholder sword swing,
+combat feedback UI, two new enemies, a directional tower) before Phase 5's
+shop huts. Built sub-guide by sub-guide, same rhythm as every other phase.
+Full detail lives in `guides/11a`–`11d` and the two ideation docs the user
+originally provided (not in this repo) — this is a compressed index, not a
+replacement for reading the actual guides if picking this back up.*
+
+1. **11a — Core framework + knockback/stun** ✅ code / guide 11a
+   - `Combat/HitEffects` (embeddable knockback+stun struct, any attacker) +
+     `Combat/KnockbackReceiver` (the receiving side; owns the Rigidbody2D
+     while active, hands control back via `ControlSuppressed`).
+   - Collapsible Inspector foldout sections (`Editor/FoldoutHeaderEditor`) —
+     applies automatically to every `[Header]` on any inheriting script.
+   - Per-enemy Stun Resistance.
+2. **11b — Weapons** ✅ code / guide 11b
+   - Sword reworked from a rectangle to a true angular arc (`PlayerAttack` +
+     new `Player/PlayerAim` for shared aim direction).
+   - Three new weapons — Bow, Hammer, Fire Staff — sharing a
+     `Player/ChargedWeapon` hold-to-charge base class.
+   - `Player/WeaponSwitcher` (the `V` weapon-select menu), mutually exclusive
+     with `B`/build mode by design (see README.md's Conventions for the
+     execution-order race this needed fixing).
+   - Two new shared attack primitives: `Combat/StraightProjectile`
+     (fixed-direction flight) and `Combat/BurnZone` (a generic ground DoT
+     patch) — both explicitly built for reuse (Fire Staff, and later Faun in
+     11d and the Oil & Flame tower in 11e).
+3. **11c — Combat UI** ✅ code / guide 11c
+   - `HealthBar` gets a Hide Until Damaged mode (monsters/towers now hide
+     their bar at full health, opt-in per prefab).
+   - Configurable gold loss on death (`PlayerRespawn`: Lose All / Percentage
+     / Fixed Amount).
+   - Top-left text indicator for which selection menu (`V`/`B`) is open.
+   - `DeathEffect`/`DeathParticle` — shared death visual (red tint + a small
+     hand-rolled particle burst) for the Player and any monster; the corpse
+     visually lingers for a tunable duration before disappearing.
+   - Deferred (explicitly, not forgotten): weapon aim-preview "ghost
+     visuals" for Bow/Hammer/Fire Staff, matching the Sword's grey-idle/
+     yellow-on-swing crescent (added as a follow-up fix, not originally
+     part of 11b).
+4. **11d — New enemies** ✅ code / guide 11d
+   - **Redcap** — `MonsterDefinition.targetsOnlyPlayer`, the exact mirror of
+     Goblin's existing `targetsOnlyKing`. Needed almost no new code — reuses
+     the same routing/wall-breaking fallback every King-rushing monster
+     already has.
+   - **Faun** — a real new pattern: `MonsterAI.usesRangedAttack` →
+     `UpdateRangedAttack`, firing a `StraightProjectile` that leaves a
+     `BurnZone` on impact (no direct hit damage, matching the Fire Staff),
+     retreating when hit at melee range (a distance-based proxy for "hit by
+     melee" — real weapon-type tracking doesn't exist yet, flagged as a
+     simplification), and stepping out of its own freshly-placed burn zone.
+5. **11e — Oil & Flame tower** ⬜ not started
+   - A directional 2×2 tower: rotate with arrow keys at placement, ghost
+     preview shows the attack range dynamically as it's rotated. Attack
+     pattern: 3 tiles forward, then expands to 3-wide × 2-deep; if a wall/
+     structure blocks it before max range, the expansion point moves closer
+     so the flame still forms correctly against the obstacle. Burn damage
+     (reuse `Combat/BurnZone` — this is exactly the reuse case it was built
+     for), with a toggle for whether it can also damage the player.
+   - Also brings the **click-to-select-a-tower system** the user asked for
+     (so a future upgrade/delete-tower feature has something to click on) —
+     scoped for whenever placement/rotation is being built anyway.
 
 ## Phase 5 — Shop huts & player upgrades (§3.6 + §5)
 
