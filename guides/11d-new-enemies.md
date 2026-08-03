@@ -128,6 +128,7 @@ Same process, name it `Faun`, set:
 | Ranged Damage | **2** |
 | Ranged Projectile Speed | **6** |
 | Ranged Bolt Color | forest green (e.g. 100, 200, 80) |
+| Preferred Min Range | **2** |
 | Retreat Seconds | **2** |
 
 *(Player Target Range stays at its 6-tile default, so — like every other
@@ -136,6 +137,28 @@ player's out of range; the doc's "Attacks Player/Structures" reads as what
 it does once engaged, not a hard restriction. Say the word if you'd rather
 it ignore the King entirely too — that'd just be reusing the same "leave a
 targeting field at 0" pattern, no new code.)*
+
+### Preferred Min Range — Faun's standing kiting preference
+
+New, following up on a design question you asked: Faun now actively tries to
+stay **Preferred Min Range** tiles away from its target at all times (backing
+off on its own if something — the crowd, a corner — pushes it closer), not
+just when melee-retreating. `2` means it'll hold roughly halfway between
+melee range and its 4-tile Attack Range — close enough to reliably land
+shots, far enough that a player has to actually close distance to threaten it.
+
+**The corridor-blocking concern** — a Faun trying to hold a stand-off
+distance INSIDE a 1-wide maze corridor could otherwise camp mid-corridor and
+permanently block every ally behind it from ever reaching the King/player,
+since there's no room to step aside in a 1-wide path. Fix: both the kiting
+backoff and the melee-retreat reuse the same "ally pressure building up
+behind me toward the same target" signal the crowd system already computes
+for its "flood like water & surround" behavior (`RearCrowdPressure` /
+`Rear Pressure Threshold`, tunable under **Crowd avoidance** on the Monster
+prefab). The instant that pressure crosses the threshold, Faun stops trying
+to back away and just holds/advances like an ordinary monster — so it only
+kites when it actually has room to, and a jammed corridor clears instead of
+staying permanently plugged by a Faun that refuses to budge.
 
 ---
 
@@ -151,17 +174,29 @@ targeting field at 0" pattern, no new code.)*
    whatever Attack Range you set) — it should stop and start firing arrows
    rather than closing the rest of the distance. Each arrow should deal a
    direct hit, same feel as being shot by the Bow.
-4. **Faun — retreat, real melee check:** walk up and land a **Sword** or
+4. **Faun — kiting:** walk toward a Faun that's already holding its range —
+   once you close to within Preferred Min Range (2 tiles by default) it
+   should back away on its own, without needing to hit it. Keep approaching
+   and it should keep retreating (still firing) until it runs out of open
+   ground to retreat into.
+5. **Faun — retreat, real melee check:** walk up and land a **Sword** or
    **Hammer** hit on it — it should immediately start backing away. Then
    test the fixed case: fire a **Bow** or **Fire Staff** shot at it from up
    close (walk right up to it first, then shoot) — it should **NOT**
    retreat, since neither of those ever sets `isMeleeHit`, regardless of
    how close you were standing when it landed.
-5. Let a Fire Staff burn zone tick on a monster, then check that monster's
+6. **Faun — corridor test (the design question you asked about):** put a
+   Faun and at least one other monster in a 1-wide maze corridor together,
+   with the Faun in front. As the group backs up toward the corridor mouth
+   trying to reach you or the King, confirm the Faun does NOT permanently
+   camp mid-corridor blocking everyone behind it — once an ally is actually
+   queued up pressing in from behind, the Faun should stop kiting and just
+   hold/advance like a normal monster so the queue keeps moving.
+7. Let a Fire Staff burn zone tick on a monster, then check that monster's
    recent-player-combat behavior (e.g. it should stay engaged with you
    rather than wandering back to a structure) — confirms the `BurnZone`
    `fromPlayer` fix actually took.
-6. Confirm nothing regressed: existing monsters (Zombie, Goblin, Skeleton,
+8. Confirm nothing regressed: existing monsters (Zombie, Goblin, Skeleton,
    Cyclops) still behave exactly as before, and Sword/Hammer/Bow/Fire Staff
    all still damage normally.
 
@@ -180,6 +215,10 @@ targeting field at 0" pattern, no new code.)*
       hit damage on impact — no lingering burn/AoE
 - [ ] A Sword/Hammer hit makes the Faun retreat; a Bow/Fire Staff hit —
       even landed at point-blank range — does not
+- [ ] Faun backs away on its own once you're within Preferred Min Range,
+      without needing to hit it
+- [ ] A Faun leading a group through a 1-wide corridor stops kiting and
+      holds/advances once an ally is actually queued up behind it
 - [ ] A monster hit by a Fire Staff burn zone correctly counts as "recently
       hit by the player" (the `BurnZone.fromPlayer` fix)
 - [ ] Existing monster types unaffected, all four weapons still deal damage

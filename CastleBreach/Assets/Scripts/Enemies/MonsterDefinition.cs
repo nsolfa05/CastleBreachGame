@@ -113,7 +113,9 @@ public class MonsterDefinition : ScriptableObject
     public float rangedProjectileSpeed = 6f;
     [Tooltip("Tint for the arrow.")]
     public Color rangedBoltColor = new Color(0.45f, 0.75f, 0.3f, 1f);
-    [Tooltip("Seconds spent retreating (moving directly away from its target, still firing if in range) once triggered by a real melee hit (see MonsterAI.OnDamaged — Health.LastDamageWasMelee).")]
+    [Tooltip("Faun tries to stay at least this many tiles (edge to edge) from its target, backing away on its own if something pushes it closer than this — its standing kiting preference, separate from the melee-retreat trigger below. 0 = never backs off just for being close, only a real melee hit triggers a retreat. Automatically suppressed while real ally pressure is building up behind it toward the same target (e.g. queued in a 1-wide maze corridor) so it doesn't back into — or block — an ally trying to get past; see MonsterAI.UpdateRangedAttack.")]
+    public float preferredMinRange = 2f;
+    [Tooltip("Seconds spent retreating (moving directly away from its target, still firing if in range) once triggered by a real melee hit (see MonsterAI.OnDamaged — Health.LastDamageWasMelee). Same ally-pressure suppression as Preferred Min Range applies here too.")]
     public float retreatSeconds = 2f;
 
     // ─────────────────────────────────────────────────────────────

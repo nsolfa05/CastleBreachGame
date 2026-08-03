@@ -1082,22 +1082,43 @@ public class MonsterAI : MonoBehaviour
     /// Attack Range is this monster's max shoot distance, adjustable like any
     /// other monster's), except the "hit" is a straight-line arrow instead of
     /// an instant point-blank TakeDamage — same shape as the player's Bow.
-    /// While RETREATING (see OnDamaged) movement is overridden to step
-    /// directly away instead of the normal approach/settle behavior;
-    /// everything else (routing, wall-breaking if sealed off) still goes
+    /// Two things push it into stepping directly away instead of the normal
+    /// approach/settle behavior: RETREATING (a real melee hit — see
+    /// OnDamaged) and simply being closer than Preferred Min Range, its
+    /// standing kiting preference.
+    ///
+    /// BOTH are suppressed while real ally pressure is building up behind it
+    /// toward the SAME target (RearCrowdPressure — the same signal
+    /// MoveToward already uses for the "flood like water & surround"
+    /// pressure gradient) — the case that matters is a 1-wide maze corridor:
+    /// backing away there doesn't open space, it just shoves into whichever
+    /// ally is queued up behind trying to get past. Under that pressure Faun
+    /// just holds/advances like an ordinary monster instead of fighting the
+    /// queue; it only kites/retreats when it actually has room to.
+    /// Everything else (routing, wall-breaking if sealed off) still goes
     /// through the same MoveToward/ResolveNavigation every other monster uses.
     /// </summary>
     private void UpdateRangedAttack(GameManager gm, Transform target)
     {
-        if (DistanceToTarget(target) <= definition.attackRange && Time.time >= nextAttackTime)
+        float distance = DistanceToTarget(target);
+        if (distance <= definition.attackRange && Time.time >= nextAttackTime)
             FireRangedAttack(target, gm);
 
-        if (Time.time < retreatUntil)
+        bool retreatingFromMelee = Time.time < retreatUntil;
+        bool tooClose = definition.preferredMinRange > 0f && distance < definition.preferredMinRange;
+
+        if (retreatingFromMelee || tooClose)
         {
-            Vector2 away = (Vector2)transform.position - (Vector2)target.position;
-            Vector2 dir = away.sqrMagnitude > 0.0001f ? away.normalized : Vector2.up;
-            rb.linearVelocity = dir * definition.moveSpeed;
-            return;
+            float rearPressure = RearCrowdPressure(target);
+            bool pressured = rearPressureThreshold > 0f && rearPressure >= rearPressureThreshold;
+
+            if (!pressured)
+            {
+                Vector2 away = (Vector2)transform.position - (Vector2)target.position;
+                Vector2 dir = away.sqrMagnitude > 0.0001f ? away.normalized : Vector2.up;
+                rb.linearVelocity = dir * definition.moveSpeed;
+                return;
+            }
         }
 
         MoveToward(target); // same approach/settle/crowd behavior as every other monster
