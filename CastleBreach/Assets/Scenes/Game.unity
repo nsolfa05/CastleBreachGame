@@ -425,10 +425,10 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 128
   arrowEffects:
-    knockbackEnabled: 0
-    knockbackStrength: 0
-    stunEnabled: 0
-    stunDuration: 0
+    knockbackEnabled: 1
+    knockbackStrength: 2
+    stunEnabled: 1
+    stunDuration: 0.3
   arrowSprite: {fileID: -2413806693520163455, guid: 572c6ce757ef43340b82f198b239eccb, type: 3}
   arrowColor: {r: 1, g: 1, b: 1, a: 1}
   arrowSize: {x: 0.5, y: 0.12}
@@ -17277,8 +17277,13 @@ MonoBehaviour:
   waves:
   - name: Wave 1
     groups:
-    - monster: {fileID: 11400000, guid: 6fe60844812a72742aff85d0566e5ce6, type: 2}
-      count: 5
+    - monster: {fileID: 11400000, guid: de86c080ea3d40048a8d04da7187ad7c, type: 2}
+      count: 2
+      gate: 3
+      secondsBetweenSpawns: 1.5
+      startDelay: 10
+    - monster: {fileID: 11400000, guid: 6996da42607de1e4c8591d23eecbf22b, type: 2}
+      count: 3
       gate: 3
       secondsBetweenSpawns: 1.5
       startDelay: 10

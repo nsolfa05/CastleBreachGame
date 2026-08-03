@@ -77,6 +77,10 @@ MonoBehaviour:
       displayName: 'Special: Skeleton'
     - originalName: "Special: Cyclops \u2014 telegraphed area attack"
       displayName: "Special: Cyclops \u2014 telegraphed area attack"
+    - originalName: 'Special: Redcap'
+      displayName: 'Special: Redcap'
+    - originalName: "Special: Faun \u2014 ranged attack"
+      displayName: "Special: Faun \u2014 ranged attack"
   - typeName: MonsterAI
     sections:
     - originalName: Other

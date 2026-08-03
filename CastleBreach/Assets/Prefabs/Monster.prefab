@@ -250,6 +250,10 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 256
   body: {fileID: 0}
+  rangedHitLayers:
+    serializedVersion: 2
+    m_Bits: 832
+  rangedBoltSprite: {fileID: 7482667652216324306, guid: 40439bb77c28ba0449cc3a93ddc46bbf, type: 3}
   separationRadius: 1.2
   separationStrength: 0.8
   giveWayRadius: 1.1
@@ -358,7 +362,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DeathEffect
   deathTint: {r: 0.75, g: 0.15, b: 0.15, a: 1}
-  bodyLifetimeSeconds: 1
+  bodyLifetimeSeconds: 0.6
   particleCount: 10
   knockbackAmount: 3
   particleGravity: 4
