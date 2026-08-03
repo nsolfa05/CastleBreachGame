@@ -1095,6 +1095,19 @@ public class MonsterAI : MonoBehaviour
     /// ally is queued up behind trying to get past. Under that pressure Faun
     /// just holds/advances like an ordinary monster instead of fighting the
     /// queue; it only kites/retreats when it actually has room to.
+    ///
+    /// ALSO suppressed the instant retreating is physically failing — e.g. a
+    /// wall right behind it, or (very commonly) the player's own body
+    /// bumping into it while chasing a fleeing target — checked via last
+    /// physics step's actual velocity (the same stuckVelocityThreshold
+    /// signal used elsewhere in this class for "is this monster genuinely
+    /// moving"). Without this, a blocked retreat kept re-commanding velocity
+    /// into whatever was stopping it every single FixedUpdate, fighting the
+    /// collision response each step — the visible jitter this was added to
+    /// fix. The retreat direction is always away from currentTarget (the
+    /// real threat — player/King/structure), never the target parameter,
+    /// which can be a wall mid-route; fleeing "away from a wall" makes no
+    /// sense even though attacking it (below) does.
     /// Everything else (routing, wall-breaking if sealed off) still goes
     /// through the same MoveToward/ResolveNavigation every other monster uses.
     /// </summary>
@@ -1104,17 +1117,19 @@ public class MonsterAI : MonoBehaviour
         if (distance <= definition.attackRange && Time.time >= nextAttackTime)
             FireRangedAttack(target, gm);
 
+        float threatDistance = DistanceToTarget(currentTarget);
         bool retreatingFromMelee = Time.time < retreatUntil;
-        bool tooClose = definition.preferredMinRange > 0f && distance < definition.preferredMinRange;
+        bool tooClose = definition.preferredMinRange > 0f && threatDistance < definition.preferredMinRange;
 
         if (retreatingFromMelee || tooClose)
         {
-            float rearPressure = RearCrowdPressure(target);
+            float rearPressure = RearCrowdPressure(currentTarget);
             bool pressured = rearPressureThreshold > 0f && rearPressure >= rearPressureThreshold;
+            bool blocked = rb.linearVelocity.sqrMagnitude < stuckVelocityThreshold * stuckVelocityThreshold;
 
-            if (!pressured)
+            if (!pressured && !blocked)
             {
-                Vector2 away = (Vector2)transform.position - (Vector2)target.position;
+                Vector2 away = (Vector2)transform.position - (Vector2)currentTarget.position;
                 Vector2 dir = away.sqrMagnitude > 0.0001f ? away.normalized : Vector2.up;
                 rb.linearVelocity = dir * definition.moveSpeed;
                 return;

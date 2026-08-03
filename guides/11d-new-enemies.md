@@ -235,11 +235,24 @@ staying permanently plugged by a Faun that refuses to budge.
   don't, so Faun's retreat trigger is exact regardless of how close a ranged
   shot landed. This also means any FUTURE melee weapon should remember to
   pass `isMeleeHit: true`, and any future ranged one shouldn't.
-- **Retreating movement bypasses the crowd system.** While a Faun is backing
-  away, it moves with a plain direct velocity instead of going through
-  `MoveToward`'s separation/give-way/stuck-recovery logic — so a retreating
-  Faun could clip through an ally for that brief window. Same category of
-  tradeoff as the Cyclops's telegraph movement, not a new kind of shortcut.
+- **Retreating movement bypasses the crowd system — but only while it's
+  actually working.** While backing away, Faun moves with a plain direct
+  velocity instead of going through `MoveToward`'s separation/give-way/
+  stuck-recovery logic. Originally this looked like the Faun was "fighting
+  itself" after being hit — jittering in place instead of smoothly fleeing.
+  Root cause: the retreat velocity kept getting re-commanded into whatever
+  was physically stopping it (a wall behind it, or very commonly just the
+  player's own body bumping into it while chasing) every single physics
+  step, fighting the collision response each time. Fixed by checking last
+  step's actual velocity (`stuckVelocityThreshold`, the same "is this
+  monster genuinely moving" signal used elsewhere in `MonsterAI`) — the
+  instant a retreat attempt isn't producing real movement, Faun yields to
+  `MoveToward` instead of continuing to push into the obstacle. Also fixed
+  in the same pass: the retreat direction was computed away from whatever
+  `MoveToward`/routing was CURRENTLY resolving as the thing to walk toward
+  (which can be a wall it's forced to break through, not the real target) —
+  it now always flees the real threat (`currentTarget` — player/King/
+  structure), never a routing waypoint.
 - **Faun's own generic damage numbers (Player Damage, Structure Damage,
   etc.) are still unused placeholders** — its real damage is **Ranged
   Damage**, dealt directly on arrow impact. The other fields exist only
