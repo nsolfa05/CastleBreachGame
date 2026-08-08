@@ -362,7 +362,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DeathEffect
   deathTint: {r: 0.75, g: 0.15, b: 0.15, a: 1}
-  bodyLifetimeSeconds: 0.6
+  bodyLifetimeSeconds: 0.4
   particleCount: 10
   knockbackAmount: 3
   particleGravity: 4

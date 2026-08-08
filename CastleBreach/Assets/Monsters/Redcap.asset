@@ -34,12 +34,12 @@ MonoBehaviour:
   recentPlayerCombatWindow: 3
   attackEffects:
     knockbackEnabled: 1
-    knockbackStrength: 3
-    stunEnabled: 0
-    stunDuration: 0
+    knockbackStrength: 6
+    stunEnabled: 1
+    stunDuration: 0.2
   currencyDrop: 3
-  weight: 2
-  stunResistance: 0
+  weight: 1.5
+  stunResistance: 0.1
   targetsOnlyKing: 0
   praiseTowerLureRange: 0
   passesThroughGates: 1

@@ -721,7 +721,7 @@ MonoBehaviour:
   playerHealth: {fileID: 196378517}
   king: {fileID: 631245342}
   kingHealth: {fileID: 631245341}
-  startingGold: 300
+  startingGold: 1000
 --- !u!4 &501334487
 Transform:
   m_ObjectHideFlags: 0

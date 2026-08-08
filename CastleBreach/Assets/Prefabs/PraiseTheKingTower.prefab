@@ -272,7 +272,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 03d1ef6615c417242a9e3420df35c8d1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PraiseTheKingTower
-  goldPerTick: 5
+  goldPerTick: 10
   secondsPerTick: 4
 --- !u!1 &6760019258672494399
 GameObject:
