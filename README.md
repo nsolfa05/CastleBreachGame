@@ -8,7 +8,7 @@ of any other project.
 
 | Path | What it is |
 |---|---|
-| `guides/` | Ordered, click-by-click beginner guides (00 → 10, plus 9.5 for playtesting-driven edits, and 11a → 11d for the in-progress Combat & More phase). **Start at `guides/00-unity-setup.md`.** Also see `guides/saving-and-committing.md` — a checklist to re-run every session, not a one-time guide. |
+| `guides/` | Ordered, click-by-click beginner guides (00 → 10, plus 9.5 for playtesting-driven edits, 11a → 11d for the Combat & More phase, and 12a → 12b for the placeholder-art pipeline). **Start at `guides/00-unity-setup.md`.** Also see `guides/saving-and-committing.md` — a checklist to re-run every session, not a one-time guide. |
 | `unity-scripts/` | The vertical slice's C# code, staged for import. Guide 00 moves it into the Unity project (`CastleBreach/Assets/Scripts`), after which this folder is deleted — the code's permanent home is inside the project. |
 | `CastleBreach/` | The Unity project itself. Created on the designer's machine by Unity Hub in Guide 00 (Unity 6 LTS, Universal 2D template), then committed. `.gitignore` here already excludes `Library/`, `Temp/`, logs, and IDE files. |
 
@@ -64,20 +64,29 @@ of any other project.
       tint + particle burst + lingering corpse on death, Player and every
       monster).
 - [x] Guide 11d — New enemies: **Redcap** (`targetsOnlyPlayer` — the mirror
-      of Goblin's `targetsOnlyKing`) and **Faun** (a new ranged-attack
-      pattern: fires a projectile that leaves a damaging burn zone, retreats
-      when hit at melee range).
+      of Goblin's `targetsOnlyKing`) and **Faun** (ranged attack, since
+      refined — see below: a direct-hit arrow, not a burn zone).
 - [ ] Guide 11e — Oil & Flame tower (directional, arrow-key rotation at
       placement) + a click-to-select-a-tower system (for future upgrades/
-      deletion). Not started.
+      deletion). **Paused** at the user's request in favor of the art-asset
+      work below — not cancelled, just not current priority.
+- [x] Guide 12a — Placeholder art: ground/grass tileset. Free **Gentle
+      Forest** tileset (Seliel the Shaper, `v01` "rabite forest" palette)
+      wired into `GroundTile.asset`, no code changes needed. See
+      `guides/12a-ground-tileset-import.md`.
+- [ ] Guide 12b — Placeholder art: castle walls. Not started — likely reuses
+      the same Gentle Forest sheet's stone cliff/wall tiles for visual
+      consistency with 12a.
 
-**Next up:** finish Guide 11 with **11e**, then the full build order in
-[`ROADMAP.md`](ROADMAP.md) resumes at **Phase 5** (shop huts & player
-upgrades) — Guide 11 (Combat & More) was inserted ahead of it, not part of
-the original phase numbering; see ROADMAP.md's own callout. Weapon
-aim-preview "ghost visuals" (a range/strike-zone preview for Bow/Hammer/Fire
-Staff, matching the Sword's grey-idle/yellow-on-swing crescent) were
-explicitly deferred during 11c/11b follow-ups — ask for them whenever wanted.
+**Next up:** **12b** (castle wall placeholders), then real RuleTile
+autotiling once both placeholders are in. Guide 11e and the rest of
+[`ROADMAP.md`](ROADMAP.md)'s build order (resuming at **Phase 5** — shop
+huts & player upgrades) are paused, not cancelled — Guide 11 (Combat &
+More) was inserted ahead of Phase 5, not part of the original phase
+numbering; see ROADMAP.md's own callout. Weapon aim-preview "ghost visuals"
+(a range/strike-zone preview for Bow/Hammer/Fire Staff, matching the
+Sword's grey-idle/yellow-on-swing crescent) were explicitly deferred during
+11c/11b follow-ups — ask for them whenever wanted.
 Note that Phase 4's Tile Weight Rule was deliberately skipped — the current
 physical crowding between monsters is the preferred feel, and routing was
 built so it stays untouched.
