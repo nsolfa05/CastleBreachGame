@@ -111,12 +111,44 @@ starting set, per the "keep it simple for now" call.
 
 ---
 
+## Fixing it if you painted on the wrong layer
+
+Easy mistake: the Tile Palette paints onto whatever Tilemap is selected in
+the Hierarchy, and if `Walls` or `Gates` was selected instead of `Ground`
+when you painted, those tiles will vanish on Play — `Walls`/`Gates` still
+fully regenerate from their region lists every time (unchanged, intentional
+— see "Why your painting was disappearing" above). You'll notice this
+because tiles you just painted disappear the moment you press Play, while
+tiles painted on the real `Ground` layer don't.
+
+No need to re-paint by hand — a new **Tools → Castle Breach → Move Tiles
+Between Layers** tool fixes it:
+
+1. **Tools → Castle Breach → Move Tiles Between Layers.**
+2. **Source Tilemap** ← whichever layer you painted onto by mistake (e.g.
+   `Walls`). **Target Tilemap** ← `Ground`.
+3. **Tile To Preserve** ← the real tile for that layer (`WallTile.asset` for
+   `Walls`, `GateTile.asset` for `Gates`). This is the important part: it's
+   what tells the tool "leave the actual border walls/gates alone, only
+   move the other stuff." Without it, the tool would move every tile
+   including your real walls.
+4. Click **Move Tiles**. Check the Console for `moved N tile(s)`.
+5. Press Play once (or right-click `CastleMapGenerator` → **Generate Walls
+   && Gates**) — this rebuilds `Walls`/`Gates` cleanly from the region data,
+   restoring any real wall/gate tile that got overwritten by the mistake in
+   the first place. `Ground` (now holding your moved tiles) is untouched by
+   this, same as always.
+6. Confirm in the Scene view: your painted variety is now on the ground,
+   the border walls/gates look correct, and Play no longer wipes anything.
+
+---
+
 ## Step 4 — Save and commit
 
 Follow `saving-and-committing.md`: File → Save, File → Save Project, check
 GitHub Desktop's Changes tab (expect the `Game` scene, the new
-`CreateGroundTileVariants.cs` + its `.meta`, and your new Tile `.asset` +
-`.meta` files), commit, push.
+`CreateGroundTileVariants.cs`/`MoveTilesBetweenLayers.cs` + their `.meta`
+files, and your new Tile `.asset` + `.meta` files), commit, push.
 
 ---
 
