@@ -82,7 +82,18 @@ of any other project.
       turns any sprite into a paintable Tile asset without the
       drag-into-Hierarchy trap. See `guides/12c-ground-hand-painting.md`.
       (Numbered out of sequence, same as `09.5` — inserted right after
-      `12a` since it builds on that art and doesn't depend on walls.)
+      `12a` since it builds on that art and doesn't depend on walls.) Also
+      added a **Move Tiles Between Layers** Editor tool, recovering tiles
+      accidentally painted onto `Walls`/`Gates` instead of `Ground` without
+      re-painting by hand.
+- [x] Guide 12d — Camera pixel snapping. Fixed a shimmering seam between
+      Tilemap tiles while the camera moved/settled — `CameraFollow` now
+      rounds its smoothed position to the nearest on-screen pixel each
+      frame, computed from the *current* zoom so it holds at any zoom
+      level. Deliberately not Unity's official Pixel Perfect Camera
+      component — that takes over `orthographicSize`, which would fight
+      `CameraFollow`'s own mouse-wheel zoom. See
+      `guides/12d-camera-pixel-snapping.md`.
 - [ ] Guide 12b — Placeholder art: castle walls. Not started — likely reuses
       the same Gentle Forest sheet's stone cliff/wall tiles for visual
       consistency with 12a.

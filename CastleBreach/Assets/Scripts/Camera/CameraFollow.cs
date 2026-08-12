@@ -61,6 +61,28 @@ public class CameraFollow : MonoBehaviour
         float followSpeed = followSpeedByZoom.Evaluate(zoomT);
 
         Vector3 desired = new Vector3(target.position.x, target.position.y, transform.position.z);
-        transform.position = Vector3.Lerp(transform.position, desired, 1f - Mathf.Exp(-followSpeed * dt));
+        Vector3 smoothed = Vector3.Lerp(transform.position, desired, 1f - Mathf.Exp(-followSpeed * dt));
+        transform.position = SnapToScreenPixel(smoothed);
+    }
+
+    /// <summary>
+    /// Rounds x/y to the nearest on-screen pixel at the current zoom. The
+    /// Lerp above almost never lands the camera exactly on the art's pixel
+    /// grid, so adjacent Tilemap tiles (each their own quad) round their
+    /// shared edge independently and leave a hairline gap that shows as a
+    /// shimmering seam while the camera eases toward the player. Snapping
+    /// only the camera (not individual sprites) is enough to fix that,
+    /// since static tiles don't have seams with themselves — only with
+    /// their neighbors, which this keeps aligned. Uses the CURRENT
+    /// orthographic size rather than the art's fixed Pixels Per Unit, so it
+    /// stays correct through the mouse-wheel zoom above instead of only
+    /// being exact at one specific zoom level.
+    /// </summary>
+    private Vector3 SnapToScreenPixel(Vector3 position)
+    {
+        float worldUnitsPerScreenPixel = 2f * cam.orthographicSize / Screen.height;
+        position.x = Mathf.Round(position.x / worldUnitsPerScreenPixel) * worldUnitsPerScreenPixel;
+        position.y = Mathf.Round(position.y / worldUnitsPerScreenPixel) * worldUnitsPerScreenPixel;
+        return position;
     }
 }
