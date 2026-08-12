@@ -213,10 +213,16 @@ monster, structure, and rule built above.*
 - Level data as files (ScriptableObject or JSON per §10.5): grid size, wall/
   gate/obstacle regions, King spawn, waves, King HP, starting gold.
   (This is where the README's deferred per-level items — King position, grid
-  size, rock obstacles, per-level tile themes — all land.)
+  size, rock obstacles, per-level tile themes — all land.) Also where the
+  README's fuller tile-*properties* vision naturally lands: water (blocking
+  to ground units, shootable-over for ranged), breakable environment tiles
+  (trees), and unbreakable rocks, as one coherent tile-type system rather
+  than one-off features — ground hand-painting itself (visuals only, no
+  gameplay behavior yet) is already live via Guide `12c`.
 - The designer-only builder tool: start/stop test rounds, unlimited gold,
   spawn-rate/gate controls (§3.5) — and the long-deferred **hand-editing of
-  map tiles**.
+  map tiles** (Editor-time hand-painting of ground already works via `12c`;
+  this is the in-game/runtime version).
 - Campaign levels load from these files; level-select slots point at them.
 
 ---
