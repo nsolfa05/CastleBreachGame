@@ -97,16 +97,30 @@ of any other project.
 - [ ] Guide 12b — Placeholder art: castle walls. Not started — likely reuses
       the same Gentle Forest sheet's stone cliff/wall tiles for visual
       consistency with 12a.
+- [x] Guide 13a — Phase 6 begins: Title scene (Campaign/Survival-button-
+      only/Test/Settings), Settings scene (Master Volume, Cursor Speed —
+      both `PlayerPrefs`-backed via new `GameSettings.cs`), and a custom
+      on-screen cursor (`CustomCursor.cs`) replacing the OS pointer
+      everywhere, deliberately structured so a future gamepad-driven
+      cursor can slot in later without rework. See
+      `guides/13a-title-and-settings.md`.
 
-**Next up:** **12b** (castle wall placeholders), then real RuleTile
-autotiling once both placeholders are in. Guide 11e and the rest of
-[`ROADMAP.md`](ROADMAP.md)'s build order (resuming at **Phase 5** — shop
-huts & player upgrades) are paused, not cancelled — Guide 11 (Combat &
-More) was inserted ahead of Phase 5, not part of the original phase
-numbering; see ROADMAP.md's own callout. Weapon aim-preview "ghost visuals"
-(a range/strike-zone preview for Bow/Hammer/Fire Staff, matching the
-Sword's grey-idle/yellow-on-swing crescent) were explicitly deferred during
-11c/11b follow-ups — ask for them whenever wanted.
+**Next up:** **13b** (Campaign map screen — scrollable, zigzagging,
+splined dashed trail connecting named, moveable level nodes), then **13c**
+(win/lose screens' "back to menu" + full scene-transition pass), which
+finishes Phase 6. After that, Phase 7 starts with the variable-grid-size
+refactor (`14a`) and level data as files (`14b`), then the in-Editor Map
+Builder tool itself (`15a`–`15c`) — full breakdown in `ROADMAP.md`. `12b`
+(castle wall placeholders), RuleTile autotiling, Guide 11e (Oil & Flame
+tower), and the rest of `ROADMAP.md`'s original build order (resuming at
+**Phase 5** — shop huts & player upgrades) all stay paused behind this
+work, not cancelled — Guide 11 (Combat & More) was inserted ahead of
+Phase 5, not part of the original phase numbering; see ROADMAP.md's own
+callout. Weapon aim-preview "ghost visuals" (a range/strike-zone preview
+for Bow/Hammer/Fire Staff, matching the Sword's grey-idle/yellow-on-swing
+crescent) were explicitly deferred during 11c/11b follow-ups — ask for
+them whenever wanted.
+
 Note that Phase 4's Tile Weight Rule was deliberately skipped — the current
 physical crowding between monsters is the preferred feel, and routing was
 built so it stays untouched.
