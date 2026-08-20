@@ -201,23 +201,83 @@ experience is feature-complete.*
 *Light, mostly-independent work — a good breather after Phases 4–5, and a
 prerequisite for campaign structure. Teaches Unity scene management.*
 
-- Title scene: Campaign / Survival (button only, §2) / Test / Settings.
-- Campaign level-select screen (10 placeholder slots), Back buttons.
-- Settings: sound + cursor speed. Win/lose screens gain "back to menu".
+- [x] **`13a`** — Title scene (Campaign/Survival-button-only/Test/Settings),
+  Settings scene (Master Volume + Cursor Speed, both `PlayerPrefs`-backed),
+  and a custom on-screen cursor replacing the OS pointer everywhere
+  (`CustomCursor.cs`) — deliberately built so a future gamepad-driven
+  cursor can slot in later (position integrated from stick input instead of
+  eased toward a mouse target) without rework. See
+  `guides/13a-title-and-settings.md`.
+- [ ] **`13b`** — Campaign level-select screen: scrollable left→right world
+  view, level nodes **zigzagging up/down at varying heights** (not a
+  straight line), connected by a **splined (curved), not straight-angled,
+  dashed trail**. Nodes are **named** (not just numbered slots) and
+  **moveable** in the Editor — same drag-to-reposition pattern as the
+  portfolio site's tree editor (click node, drag, save position). Starts as
+  10 placeholder nodes at hand-set positions; migrates onto real campaign
+  data once `14b` exists (small, expected rework moment, not a redo).
+- [ ] **`13c`** — Win/lose screens gain "back to menu"; full scene-
+  transition pass once Campaign exists too (Title ↔ Campaign ↔ Game ↔
+  Settings, Back buttons everywhere they're needed).
 
 ## Phase 7 — Map Builder & level data (§3.5 + §10.5)
 
-*Last because it consumes everything: it authors levels that reference every
-monster, structure, and rule built above.*
+*Split into two passes at the user's request — level data as files first
+(unblocks having more than one real level + Phase 6's level-select), then
+the in-Editor designer tool itself soon after, not deferred long. Expect
+ongoing follow-up passes whenever a new monster/structure/tile type is
+added later — not a build-once phase, and that's fine; see the
+extensibility note below.*
 
-- Level data as files (ScriptableObject or JSON per §10.5): grid size, wall/
-  gate/obstacle regions, King spawn, waves, King HP, starting gold.
-  (This is where the README's deferred per-level items — King position, grid
-  size, rock obstacles, per-level tile themes — all land.)
-- The designer-only builder tool: start/stop test rounds, unlimited gold,
-  spawn-rate/gate controls (§3.5) — and the long-deferred **hand-editing of
-  map tiles**.
-- Campaign levels load from these files; level-select slots point at them.
+**Pass 1 — foundation:**
+
+- [ ] **`14a`** — Variable grid size, built **immediately** (not deferred
+  — explicitly wanted for map variety from the start, unlike the original
+  plan to keep a fixed 40×30 grid). Real refactor: `Columns`/`Rows` are
+  currently global `public const int` in `GridMath.cs`, shared by
+  `CastleMapGenerator`, `TileRef`'s bounds-checking, `WaveSpawner`'s
+  fallback spawn point, and `BuildModeController`'s placement bounds check
+  — all of those need grid size to become per-level instance data instead
+  of a compile-time constant.
+- [ ] **`14b`** — Level data as files (ScriptableObject or JSON per
+  §10.5): grid size (now variable, per `14a`), wall/gate/obstacle regions,
+  King spawn, waves, King HP, starting gold, level **name**, and campaign
+  **trail position** (for `13b`'s nodes). (This is where the README's
+  deferred per-level items — King position, grid size, rock obstacles,
+  per-level tile themes — all land.) Also where the README's fuller
+  tile-*properties* vision naturally lands: water (blocking to ground
+  units, shootable-over for ranged), breakable environment tiles (trees),
+  and unbreakable rocks, as one coherent tile-type system rather than
+  one-off features — ground hand-painting itself (visuals only, no
+  gameplay behavior yet) is already live via Guide `12c`. Campaign levels
+  load from these files; `13b`'s level-select nodes point at them for real.
+
+**Pass 2 — the designer tool itself:**
+
+- [ ] **`15a`** — Builder scaffold. **Editor-only** (same `Editor/`-folder
+  pattern already used for `CreateGroundTileVariants`/
+  `MoveTilesBetweenLayers`), so it's automatically stripped from real
+  player builds and never reachable by players — this is the concrete
+  mechanism behind "separate from the player's actual game." Create/load/
+  save a level-data asset (`14b`), basic brush painting hooked to the now-
+  variable grid (`14a`).
+- [ ] **`15b`** — Builder power tools: **box/drag select**, **paint
+  bucket** (flood fill), **line/drag tool** — on top of the basic brush
+  from `15a`.
+- [ ] **`15c`** — Live designer controls (start/stop test rounds, unlimited
+  gold, spawn-rate/gate controls, §3.5 — Editor-time-only, same reasoning
+  as `15a`) plus campaign customization UI: add/remove/reorder/move level
+  nodes on the `13b` trail, easy to swap which level data asset a node
+  points at.
+
+**Extensibility (why "not a build-once tool" is fine):** the builder's
+palette of placeable things should scan for definition assets (same
+pattern `MonsterDefinition` already uses, and `BuildModeController`'s Build
+Options list) rather than hardcode a list — adding a new monster/tower/
+tile type later means creating a new definition asset, which then just
+shows up in the builder. No builder code changes needed for ordinary new
+content; only a genuinely new *category* of thing (not just a new instance
+of an existing category) would need real builder work.
 
 ---
 

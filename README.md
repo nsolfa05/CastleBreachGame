@@ -74,31 +74,95 @@ of any other project.
       Forest** tileset (Seliel the Shaper, `v01` "rabite forest" palette)
       wired into `GroundTile.asset`, no code changes needed. See
       `guides/12a-ground-tileset-import.md`.
+- [x] Guide 12c — Ground hand-painting. `CastleMapGenerator.Start()` no
+      longer auto-regenerates the ground layer (only walls/gates still do,
+      unchanged) — ground is now hand-painted per level via the Tile
+      Palette and actually persists through Play Mode. New
+      `Tools > Castle Breach > Create Ground Tile Variants` Editor tool
+      turns any sprite into a paintable Tile asset without the
+      drag-into-Hierarchy trap. See `guides/12c-ground-hand-painting.md`.
+      (Numbered out of sequence, same as `09.5` — inserted right after
+      `12a` since it builds on that art and doesn't depend on walls.) Also
+      added a **Move Tiles Between Layers** Editor tool, recovering tiles
+      accidentally painted onto `Walls`/`Gates` instead of `Ground` without
+      re-painting by hand.
+- [x] Guide 12d — Camera pixel snapping. Fixed a shimmering seam between
+      Tilemap tiles while the camera moved/settled — `CameraFollow` now
+      rounds its smoothed position to the nearest on-screen pixel each
+      frame, computed from the *current* zoom so it holds at any zoom
+      level. Deliberately not Unity's official Pixel Perfect Camera
+      component — that takes over `orthographicSize`, which would fight
+      `CameraFollow`'s own mouse-wheel zoom. See
+      `guides/12d-camera-pixel-snapping.md`.
 - [ ] Guide 12b — Placeholder art: castle walls. Not started — likely reuses
       the same Gentle Forest sheet's stone cliff/wall tiles for visual
       consistency with 12a.
+- [x] Guide 13a — Phase 6 begins: Title scene (Campaign/Survival-button-
+      only/Test/Settings), Settings scene (Master Volume, Cursor Speed —
+      both `PlayerPrefs`-backed via new `GameSettings.cs`), and a custom
+      on-screen cursor (`CustomCursor.cs`) replacing the OS pointer
+      everywhere, deliberately structured so a future gamepad-driven
+      cursor can slot in later without rework. See
+      `guides/13a-title-and-settings.md`.
 
-**Next up:** **12b** (castle wall placeholders), then real RuleTile
-autotiling once both placeholders are in. Guide 11e and the rest of
-[`ROADMAP.md`](ROADMAP.md)'s build order (resuming at **Phase 5** — shop
-huts & player upgrades) are paused, not cancelled — Guide 11 (Combat &
-More) was inserted ahead of Phase 5, not part of the original phase
-numbering; see ROADMAP.md's own callout. Weapon aim-preview "ghost visuals"
-(a range/strike-zone preview for Bow/Hammer/Fire Staff, matching the
-Sword's grey-idle/yellow-on-swing crescent) were explicitly deferred during
-11c/11b follow-ups — ask for them whenever wanted.
+**Next up:** **13b** (Campaign map screen — scrollable, zigzagging,
+splined dashed trail connecting named, moveable level nodes), then **13c**
+(win/lose screens' "back to menu" + full scene-transition pass), which
+finishes Phase 6. After that, Phase 7 starts with the variable-grid-size
+refactor (`14a`) and level data as files (`14b`), then the in-Editor Map
+Builder tool itself (`15a`–`15c`) — full breakdown in `ROADMAP.md`. `12b`
+(castle wall placeholders), RuleTile autotiling, Guide 11e (Oil & Flame
+tower), and the rest of `ROADMAP.md`'s original build order (resuming at
+**Phase 5** — shop huts & player upgrades) all stay paused behind this
+work, not cancelled — Guide 11 (Combat & More) was inserted ahead of
+Phase 5, not part of the original phase numbering; see ROADMAP.md's own
+callout. Weapon aim-preview "ghost visuals" (a range/strike-zone preview
+for Bow/Hammer/Fire Staff, matching the Sword's grey-idle/yellow-on-swing
+crescent) were explicitly deferred during 11c/11b follow-ups — ask for
+them whenever wanted.
+
 Note that Phase 4's Tile Weight Rule was deliberately skipped — the current
 physical crowding between monsters is the preferred feel, and routing was
 built so it stays untouched.
 
 ## Deferred — noted for later
 
-- **Hand-building/editing the map directly** (not just via coordinate-list
-  regions in the Inspector). Right now `CastleMapGenerator` only takes typed
-  doc coordinates (e.g. `B14`–`B17`); there's no click-to-paint tile editing.
-  The user wants this eventually — likely folds into the **Map Builder tool**
-  (design doc §3.5/§10.5) rather than being its own thing. Revisit when that
-  gets built.
+- **Hand-building/editing the map directly — partially done (`12c`).** Ground
+  is now hand-painted per level via Unity's own Tile Palette (Editor-time,
+  not in-game) and survives Play Mode; `CastleMapGenerator` still generates
+  walls/gates from typed doc coordinates (e.g. `B14`–`B17`), unchanged and
+  intentional — that stays data-driven so future levels get walls/gates for
+  free from region lists. The **in-game, designer-facing** version of this
+  (click-to-paint tile editing as part of a runtime tool, with test-round
+  controls etc.) is still the **Map Builder tool** (design doc §3.5/§10.5,
+  `ROADMAP.md` Phase 7) — `12c` is a lighter stepping stone that doesn't
+  block or replace that, it just means level-shaping work doesn't have to
+  wait for Phase 7 to start.
+- **Tile *properties*, not just visuals — the bigger vision behind `12c`.**
+  Every ground tile painted today is purely cosmetic. The intended end state
+  (per the user, captured here for whenever this gets built): a handful of
+  named tile *types*, each with its own game-relevant behavior, not just a
+  different sprite —
+  - **Ground** — the base layer everything else sits on/in front of; mostly
+    cosmetic variety (grass, dirt, flowers, etc., what `12c` adds).
+  - **Border/wall tiles** — already exist as `Walls`/`Gates` (`CastleMapGenerator.
+    IsWall`/`IsGate`); represents the level boundary for player and monsters.
+  - **Water** — blocks ground-based movement (player, most monsters) but
+    specifically stays targetable/shootable-over for ranged attackers — a
+    new case PathGrid's blocking rules don't have yet (today a tile is
+    either fully walkable or fully blocking for everyone).
+  - **Breakable environment tiles** (e.g. trees) — an obstacle with HP that
+    player or monsters can destroy, unlike Walls (player-built, §6) or Rocks
+    (below, no HP at all).
+  - **Unbreakable rocks** — mechanically simplest of the four: this is
+    exactly the "immovable obstacles" bullet already in the *Per-level map
+    data* item below — just a permanent physical blocker, no HP, nothing
+    special beyond that.
+  Worth designing as one coherent tile-type system (a Tile Type enum or
+  similar, each cell's gameplay behavior driven by which type painted it)
+  rather than four unrelated one-off features — natural fit either
+  alongside or as part of Phase 7's level data work, since that's already
+  where obstacle regions were headed.
 - **Gates showing open/closed state visually** (e.g. opacity change). Not in
   the vertical slice yet. When built: this is a *runtime* change, not
   Editor-authored state, so it's unaffected by the tile-coloring rule below —
