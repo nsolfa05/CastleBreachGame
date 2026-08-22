@@ -28,12 +28,17 @@ public class CampaignTrail : MonoBehaviour
 
     private LineRenderer line;
     private Vector3[] lastPositions;
+    private bool loggedMissingNodeWarning;
 
     private void OnEnable()
     {
         line = GetComponent<LineRenderer>();
         line.textureMode = LineTextureMode.Tile;
-        line.material = BuildDashMaterial();
+        // sharedMaterial, not material: this material is never shared with
+        // anything else anyway (freshly built just for this line), and
+        // accessing .material in edit mode instantiates a new copy every
+        // time it's touched, leaking orphaned materials into the scene.
+        line.sharedMaterial = BuildDashMaterial();
         Redraw();
     }
 
@@ -58,11 +63,24 @@ public class CampaignTrail : MonoBehaviour
     private void Redraw()
     {
         if (line == null) line = GetComponent<LineRenderer>();
-        if (nodesInOrder.Count < 2)
+
+        bool hasUnassignedNode = false;
+        foreach (var node in nodesInOrder)
+            if (node == null) hasUnassignedNode = true;
+
+        if (nodesInOrder.Count < 2 || hasUnassignedNode)
         {
             line.positionCount = 0;
+            if (hasUnassignedNode && !loggedMissingNodeWarning)
+            {
+                Debug.LogWarning(
+                    "CampaignTrail: one or more slots in Nodes In Order shows \"None\" — " +
+                    "fill every slot with a node before the trail can draw.", this);
+                loggedMissingNodeWarning = true;
+            }
             return;
         }
+        loggedMissingNodeWarning = false;
 
         lastPositions = new Vector3[nodesInOrder.Count];
         for (int i = 0; i < nodesInOrder.Count; i++)
@@ -90,7 +108,7 @@ public class CampaignTrail : MonoBehaviour
 
         line.positionCount = points.Count;
         line.SetPositions(points.ToArray());
-        line.material.mainTextureScale = new Vector2(totalLength / Mathf.Max(dashWorldSize, 0.01f), 1f);
+        line.sharedMaterial.mainTextureScale = new Vector2(totalLength / Mathf.Max(dashWorldSize, 0.01f), 1f);
     }
 
     private static Vector3 CatmullRom(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
