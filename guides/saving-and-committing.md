@@ -29,6 +29,16 @@ there's no visible warning, only a silent gap.
 
 Run through this every time, in order, no skipping:
 
+0. **Before you open Unity at all, check GitHub Desktop's "Current branch"
+   dropdown (top of the window).** It should say
+   `claude/ground-hand-painting-12c` — not `main`. This has already bitten
+   the project once: real Editor work (`Title.unity`, `Settings.unity`,
+   `Cursor.prefab`) landed as a direct commit on `main` instead of the
+   feature branch, because the branch wasn't checked before committing.
+   Check it again right before you commit too, not just at the start of
+   the session — switching branches mid-session (even by accident, e.g.
+   GitHub Desktop prompting you to a different branch after a pull) is
+   easy to miss otherwise.
 1. **Finish your Editor changes.**
 2. **File → Save, then File → Save Project** — both, in that order, every
    time, from the menu bar (not just Ctrl+S). Confirmed directly, not just
@@ -78,6 +88,18 @@ Run through this every time, in order, no skipping:
   commits on remote" dialog. Not harmful (it just means a merge is needed
   before pushing), but easy to avoid: **Fetch, then Pull, before opening
   Unity** at the start of a session.
+
+## Finding guides on GitHub before merging to `main`
+
+GitHub's repo page always shows whatever branch is set as the "default"
+(that's `main` here) — pushing to the feature branch commits the files for
+real, but they won't show up on the plain repo URL until you either merge
+to `main` or explicitly look at the other branch. To browse the feature
+branch's guides directly, without merging anything yet:
+`https://github.com/nsolfa05/CastleBreachGame/tree/claude/ground-hand-painting-12c/guides`
+— bookmark that, it always reflects whatever's currently pushed to the
+branch. (Or use the branch dropdown on the repo's normal page and switch it
+manually each time — the direct link is just less to remember.)
 
 ## If you're ever unsure
 
