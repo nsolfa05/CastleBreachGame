@@ -81,6 +81,18 @@ visual layer on top, not a rewire of how aiming or building placement works.
 2. Hierarchy → **UI → Canvas** (name it `TitleCanvas` is fine, default is
    too). Add an **EventSystem** if Unity doesn't prompt to create one
    automatically alongside the Canvas (it usually does).
+2a. On the Canvas's **Canvas Scaler** component: set **UI Scale Mode** to
+   **Scale With Screen Size**, **Reference Resolution** to `1920 x 1080`,
+   **Screen Match Mode** to **Match Width Or Height**, **Match** `0.5`.
+   Without this, the default **Constant Pixel Size** mode makes every UI
+   element a fixed pixel size regardless of the actual window/resolution —
+   fine at one specific size, inconsistent at any other. Do this on every
+   Canvas you build from here on (Settings below, and Campaign in `13b`).
+   To preview accurately while you work: Game view's aspect ratio dropdown
+   (top-left of that tab) defaults to **Free Aspect**, which just stretches
+   to fill the Editor panel — switch it to a fixed ratio like **16:9**, or
+   add an exact resolution (`+` in that dropdown) matching `1920x1080`, so
+   what you see actually represents a real player's screen.
 3. Under the Canvas, add **four Buttons** (`UI → Button - TextMeshPro`),
    stacked vertically, labeled (via each Button's child TMP text)
    **Campaign**, **Survival**, **Test**, **Settings**.
@@ -102,9 +114,12 @@ visual layer on top, not a rewire of how aiming or building placement works.
 ## Step 4 — Build the Settings scene
 
 1. **File → New Scene** → **File → Save As** → `Assets/Scenes/Settings.unity`.
-2. **UI → Canvas**, then under it: two **Sliders** (`UI → Slider`) with a
-   TMP label above each (`Master Volume`, `Cursor Speed`), and a **Back**
-   Button.
+2. **UI → Canvas** — set its Canvas Scaler the same way as Step 3.2a above
+   (Scale With Screen Size, 1920x1080, Match Width Or Height, 0.5). Then
+   under it add: two **Sliders** (`UI → Slider`) with a TMP label above
+   each (`Master Volume`, `Cursor Speed`), and a **Back** Button
+   (`UI → Button - TextMeshPro`, rename it `Back`, change its child TMP
+   text to say "Back").
 3. **Master Volume** Slider — Inspector: **Min Value 0**, **Max Value 1**.
 4. **Cursor Speed** Slider — Inspector: **Min Value 2**, **Max Value 50**
    (2 = a visibly laggy trailing cursor, 50 = effectively instant; the
