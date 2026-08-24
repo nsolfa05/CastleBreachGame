@@ -26,6 +26,9 @@ public class CampaignTrail : MonoBehaviour
     [Tooltip("Nodes in trail order, left to right — drag Transforms in, in order.")]
     [SerializeField] private List<Transform> nodesInOrder = new List<Transform>();
 
+    [Tooltip("Optional per-segment bend point: element i bends the curve between Nodes In Order[i] and [i+1] toward this Transform. Leave a slot empty (None) for the default smooth automatic curve through that segment instead.")]
+    [SerializeField] private List<Transform> curveHandles = new List<Transform>();
+
     [Tooltip("Interpolated points per segment between two nodes — higher = smoother curve.")]
     [SerializeField] private int segmentsPerNode = 20;
 
@@ -113,15 +116,29 @@ public class CampaignTrail : MonoBehaviour
         var points = new List<Vector3>();
         for (int i = 0; i < nodesInOrder.Count - 1; i++)
         {
-            Vector3 p0 = nodesInOrder[Mathf.Max(i - 1, 0)].position;
             Vector3 p1 = nodesInOrder[i].position;
             Vector3 p2 = nodesInOrder[i + 1].position;
-            Vector3 p3 = nodesInOrder[Mathf.Min(i + 2, nodesInOrder.Count - 1)].position;
+            Transform handle = i < curveHandles.Count ? curveHandles[i] : null;
 
             for (int s = 0; s < segmentsPerNode; s++)
             {
                 float t = s / (float)segmentsPerNode;
-                points.Add(CatmullRom(p0, p1, p2, p3, t));
+                Vector3 point;
+                if (handle != null)
+                {
+                    // Manually bent segment: quadratic Bezier through the
+                    // handle instead of the automatic spline, so dragging
+                    // the handle directly controls how this one segment
+                    // curves, independent of every other segment.
+                    point = QuadraticBezier(p1, handle.position, p2, t);
+                }
+                else
+                {
+                    Vector3 p0 = nodesInOrder[Mathf.Max(i - 1, 0)].position;
+                    Vector3 p3 = nodesInOrder[Mathf.Min(i + 2, nodesInOrder.Count - 1)].position;
+                    point = CatmullRom(p0, p1, p2, p3, t);
+                }
+                points.Add(point);
             }
         }
         points.Add(nodesInOrder[nodesInOrder.Count - 1].position);
@@ -130,9 +147,9 @@ public class CampaignTrail : MonoBehaviour
         line.SetPositions(points.ToArray());
         // dashCount dashes across the whole line, however long it is right
         // now — tiling the texture exactly dashCount times does that
-        // directly, no length math needed (unlike the old world-unit-sized
-        // dash/gap approach, where dash count was a side effect of total
-        // trail length instead of something you set).
+        // directly, no length math needed (unlike an earlier world-unit-
+        // sized dash/gap approach, where dash count was a side effect of
+        // total trail length instead of something you set directly).
         line.sharedMaterial.mainTextureScale = new Vector2(dashCount, 1f);
     }
 
@@ -146,6 +163,12 @@ public class CampaignTrail : MonoBehaviour
             + (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2
             + (3f * p1 - 3f * p2 + p3 - p0) * t3
         );
+    }
+
+    private static Vector3 QuadraticBezier(Vector3 a, Vector3 control, Vector3 b, float t)
+    {
+        float u = 1f - t;
+        return u * u * a + 2f * u * t * control + t * t * b;
     }
 
     // Instance method, not static — needs dashToGapRatio to bake the actual
@@ -168,6 +191,31 @@ public class CampaignTrail : MonoBehaviour
         texture.SetPixels(pixels);
         texture.Apply();
 
-        return new Material(Shader.Find("Sprites/Default")) { mainTexture = texture };
+        // Clone the shader from one of the node sprites rather than
+        // guessing a shader name (e.g. "Sprites/Default") that may not
+        // resolve the same way in every render pipeline setup — this
+        // guarantees compatibility with whatever this project actually
+        // uses, since it's the exact shader already rendering correctly
+        // on the nodes themselves. Falls back to Sprites/Default only if
+        // no node sprite exists yet to copy from.
+        Material baseMaterial = FindReferenceSpriteMaterial();
+        Material material = baseMaterial != null
+            ? new Material(baseMaterial)
+            : new Material(Shader.Find("Sprites/Default"));
+        material.mainTexture = texture;
+        material.color = Color.white;
+        return material;
+    }
+
+    private Material FindReferenceSpriteMaterial()
+    {
+        foreach (var node in nodesInOrder)
+        {
+            if (node == null) continue;
+            var renderer = node.GetComponentInChildren<SpriteRenderer>();
+            if (renderer != null && renderer.sharedMaterial != null)
+                return renderer.sharedMaterial;
+        }
+        return null;
     }
 }

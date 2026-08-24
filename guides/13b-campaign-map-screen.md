@@ -156,6 +156,15 @@ maybe ±2 units. Adjust freely.
      line with periodic breaks); push it down for short dashes with long
      gaps.
    - **Width** — line thickness.
+4a. **To manually bend a specific segment of the curve** (instead of
+   relying on the automatic smooth curve through your nodes): create an
+   empty GameObject, position it wherever you want that stretch of trail
+   to bend toward, and drag it into **Curve Handles** at the matching
+   index — element `0` bends the curve between `Node 1` and `Node 2`,
+   element `1` between `Node 2` and `Node 3`, and so on. Leave a slot
+   empty (`None`) for any segment you're happy leaving on the default
+   automatic curve — you don't need a handle for every segment, only the
+   ones you want to hand-shape.
 5. Back on **Main Camera**'s **Campaign Camera And Input** component: set
    **Min X** to roughly `Node 1`'s X position minus a couple units, **Max
    X** to roughly `Node 10`'s X position plus a couple units — enough
