@@ -23,8 +23,11 @@ public class CampaignTrail : MonoBehaviour
     [Tooltip("Interpolated points per segment between two nodes — higher = smoother curve.")]
     [SerializeField] private int segmentsPerNode = 20;
 
-    [Tooltip("World-space length of one dash+gap pair.")]
-    [SerializeField] private float dashWorldSize = 1f;
+    [Tooltip("World-space length of one visible dash. Smaller relative to Gap Length = shorter, more spaced-out dashes.")]
+    [SerializeField] private float dashLength = 0.5f;
+
+    [Tooltip("World-space length of the gap between dashes. Larger Dash+Gap together = fewer dashes over the same trail length.")]
+    [SerializeField] private float gapLength = 0.5f;
 
     private LineRenderer line;
     private Vector3[] lastPositions;
@@ -46,6 +49,17 @@ public class CampaignTrail : MonoBehaviour
     {
         if (NodesMoved())
             Redraw();
+    }
+
+    // Fires automatically whenever a field changes in the Inspector (Editor
+    // only) — rebuilds the dash texture and redraws immediately, so tuning
+    // Dash Length/Gap Length/Segments Per Node updates live instead of only
+    // reacting the next time a node happens to move.
+    private void OnValidate()
+    {
+        line = GetComponent<LineRenderer>();
+        line.sharedMaterial = BuildDashMaterial();
+        Redraw();
     }
 
     private bool NodesMoved()
@@ -108,7 +122,8 @@ public class CampaignTrail : MonoBehaviour
 
         line.positionCount = points.Count;
         line.SetPositions(points.ToArray());
-        line.sharedMaterial.mainTextureScale = new Vector2(totalLength / Mathf.Max(dashWorldSize, 0.01f), 1f);
+        float pairLength = Mathf.Max(dashLength + gapLength, 0.01f);
+        line.sharedMaterial.mainTextureScale = new Vector2(totalLength / pairLength, 1f);
     }
 
     private static Vector3 CatmullRom(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
@@ -123,14 +138,26 @@ public class CampaignTrail : MonoBehaviour
         );
     }
 
-    private static Material BuildDashMaterial()
+    // Instance method now, not static — needs dashLength/gapLength to bake
+    // the actual dash:gap ratio into the texture (used to be a fixed 50/50
+    // split). Resolution is fixed at 64 pixels, enough to represent most
+    // ratios without visibly blocky edges given Point filtering anyway.
+    private Material BuildDashMaterial()
     {
-        var texture = new Texture2D(4, 1, TextureFormat.RGBA32, false)
+        const int resolution = 64;
+        float pairLength = Mathf.Max(dashLength + gapLength, 0.01f);
+        int dashPixels = Mathf.Clamp(Mathf.RoundToInt(resolution * dashLength / pairLength), 1, resolution - 1);
+
+        var texture = new Texture2D(resolution, 1, TextureFormat.RGBA32, false)
         {
             wrapMode = TextureWrapMode.Repeat,
             filterMode = FilterMode.Point
         };
-        texture.SetPixels(new[] { Color.white, Color.white, new Color(1, 1, 1, 0), new Color(1, 1, 1, 0) });
+
+        var pixels = new Color[resolution];
+        for (int i = 0; i < resolution; i++)
+            pixels[i] = i < dashPixels ? Color.white : new Color(1, 1, 1, 0);
+        texture.SetPixels(pixels);
         texture.Apply();
 
         return new Material(Shader.Find("Sprites/Default")) { mainTexture = texture };

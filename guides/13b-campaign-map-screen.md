@@ -143,6 +143,15 @@ maybe ±2 units. Adjust freely.
    not by scanning positions.
 4. You should immediately see a curved dashed line connecting all 10 nodes
    in the Scene view, live-updating as you drag any node around (try it).
+   To tune how it looks, all of these update live as you change them in
+   the Inspector (no need to re-enter Play mode):
+   - **Line width** — the `Line Renderer` component's own **Width** field
+     (not on `Campaign Trail`).
+   - **Dash Length** / **Gap Length** (on `Campaign Trail`) — each is a
+     real world-space size. Bigger **Gap Length** relative to **Dash
+     Length** = fewer, more spaced-out dashes; equal values = the classic
+     even dash-dash-dash look; a big **Dash Length** with a small **Gap
+     Length** starts to look like a solid line with periodic breaks.
 5. Back on **Main Camera**'s **Campaign Camera And Input** component: set
    **Min X** to roughly `Node 1`'s X position minus a couple units, **Max
    X** to roughly `Node 10`'s X position plus a couple units — enough
