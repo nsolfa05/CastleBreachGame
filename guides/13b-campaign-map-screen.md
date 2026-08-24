@@ -129,29 +129,33 @@ maybe ±2 units. Adjust freely.
 ## Step 5 — Wire up the trail and camera bounds
 
 1. Hierarchy → **Create Empty**, name it **`Trail`**.
-2. **Add Component → Line Renderer**. On it: set **Width** to something
-   thin like `0.1` (both start and end width). **Confirm Use World Space
-   is CHECKED** (Unity's default — it should already be on, just verify).
+2. **Add Component → Line Renderer**. **Confirm Use World Space is
+   CHECKED** (Unity's default — it should already be on, just verify).
    This matters: node positions are real world-space coordinates, and if
    this ends up unchecked, the line gets drawn as if those numbers were
    local offsets from `Trail`'s own transform instead — putting it
    somewhere completely different from your nodes, which looks exactly
-   like "no line is showing up at all."
+   like "no line is showing up at all." Leave **Width** alone — `Campaign
+   Trail` (next step) drives it directly, so there's one place to tune the
+   whole look instead of two.
 3. **Add Component → Campaign Trail** (also on `Trail`). Expand **Nodes In
    Order** and drag in `Node 1` through `Node 10`, **in that exact
    left-to-right order** — the spline is drawn through them in list order,
    not by scanning positions.
 4. You should immediately see a curved dashed line connecting all 10 nodes
    in the Scene view, live-updating as you drag any node around (try it).
-   To tune how it looks, all of these update live as you change them in
-   the Inspector (no need to re-enter Play mode):
-   - **Line width** — the `Line Renderer` component's own **Width** field
-     (not on `Campaign Trail`).
-   - **Dash Length** / **Gap Length** (on `Campaign Trail`) — each is a
-     real world-space size. Bigger **Gap Length** relative to **Dash
-     Length** = fewer, more spaced-out dashes; equal values = the classic
-     even dash-dash-dash look; a big **Dash Length** with a small **Gap
-     Length** starts to look like a solid line with periodic breaks.
+   Everything about how it looks lives on **`Campaign Trail`** itself, and
+   all of it updates live as you drag the sliders (no need to re-enter Play
+   mode):
+   - **Dash Count** — literally how many dashes appear across the whole
+     trail, whatever shape it's in right now. This is the direct answer to
+     "I want fewer/more dashes" — no length math to reverse-engineer.
+   - **Dash To Gap Ratio** — a 0–1 slider for how chunky each dash is
+     relative to its gap. `0.5` is even dash-dash-dash spacing; push it up
+     for long dashes with short gaps (starts to look like a mostly-solid
+     line with periodic breaks); push it down for short dashes with long
+     gaps.
+   - **Width** — line thickness.
 5. Back on **Main Camera**'s **Campaign Camera And Input** component: set
    **Min X** to roughly `Node 1`'s X position minus a couple units, **Max
    X** to roughly `Node 10`'s X position plus a couple units — enough

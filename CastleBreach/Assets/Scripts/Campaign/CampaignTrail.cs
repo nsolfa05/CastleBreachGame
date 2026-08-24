@@ -8,6 +8,12 @@ using UnityEngine;
 /// generated tiling dash texture for the dashed look — no external image
 /// asset needed, matching this project's placeholder-first approach.
 ///
+/// Every trail-look setting (dash count, dash chunkiness, line width)
+/// lives here on one component rather than being split across this script
+/// and the Line Renderer's own fields — this script drives Line Renderer's
+/// width directly, so there's exactly one place to look when tuning how
+/// the trail appears.
+///
 /// [ExecuteAlways] so dragging a node around in the Scene view redraws the
 /// trail live in the Editor, not just at runtime — that's what makes
 /// "drag a node, watch the trail follow" actually work while laying the
@@ -23,11 +29,14 @@ public class CampaignTrail : MonoBehaviour
     [Tooltip("Interpolated points per segment between two nodes — higher = smoother curve.")]
     [SerializeField] private int segmentsPerNode = 20;
 
-    [Tooltip("World-space length of one visible dash. Smaller relative to Gap Length = shorter, more spaced-out dashes.")]
-    [SerializeField] private float dashLength = 0.5f;
+    [Tooltip("How many dashes to spread evenly across the whole trail, regardless of how long it is — dragging nodes further apart makes each dash longer, not more numerous.")]
+    [SerializeField, Range(2, 60)] private int dashCount = 15;
 
-    [Tooltip("World-space length of the gap between dashes. Larger Dash+Gap together = fewer dashes over the same trail length.")]
-    [SerializeField] private float gapLength = 0.5f;
+    [Tooltip("How much of each dash+gap cycle is solid line vs. empty gap. 0.5 = even dashes. Higher = longer dashes/shorter gaps. Lower = shorter dashes/longer gaps.")]
+    [SerializeField, Range(0.05f, 0.95f)] private float dashToGapRatio = 0.5f;
+
+    [Tooltip("Line thickness. Drives the Line Renderer's own width — no need to edit that component directly.")]
+    [SerializeField] private float width = 0.1f;
 
     private LineRenderer line;
     private Vector3[] lastPositions;
@@ -52,9 +61,9 @@ public class CampaignTrail : MonoBehaviour
     }
 
     // Fires automatically whenever a field changes in the Inspector (Editor
-    // only) — rebuilds the dash texture and redraws immediately, so tuning
-    // Dash Length/Gap Length/Segments Per Node updates live instead of only
-    // reacting the next time a node happens to move.
+    // only) — rebuilds the dash texture and redraws immediately, so every
+    // slider here updates live instead of only reacting the next time a
+    // node happens to move.
     private void OnValidate()
     {
         line = GetComponent<LineRenderer>();
@@ -77,6 +86,7 @@ public class CampaignTrail : MonoBehaviour
     private void Redraw()
     {
         if (line == null) line = GetComponent<LineRenderer>();
+        line.widthMultiplier = width;
 
         bool hasUnassignedNode = false;
         foreach (var node in nodesInOrder)
@@ -101,7 +111,6 @@ public class CampaignTrail : MonoBehaviour
             lastPositions[i] = nodesInOrder[i].position;
 
         var points = new List<Vector3>();
-        float totalLength = 0f;
         for (int i = 0; i < nodesInOrder.Count - 1; i++)
         {
             Vector3 p0 = nodesInOrder[Mathf.Max(i - 1, 0)].position;
@@ -112,18 +121,19 @@ public class CampaignTrail : MonoBehaviour
             for (int s = 0; s < segmentsPerNode; s++)
             {
                 float t = s / (float)segmentsPerNode;
-                Vector3 point = CatmullRom(p0, p1, p2, p3, t);
-                if (points.Count > 0) totalLength += Vector3.Distance(points[points.Count - 1], point);
-                points.Add(point);
+                points.Add(CatmullRom(p0, p1, p2, p3, t));
             }
         }
         points.Add(nodesInOrder[nodesInOrder.Count - 1].position);
-        totalLength += Vector3.Distance(points[points.Count - 2], points[points.Count - 1]);
 
         line.positionCount = points.Count;
         line.SetPositions(points.ToArray());
-        float pairLength = Mathf.Max(dashLength + gapLength, 0.01f);
-        line.sharedMaterial.mainTextureScale = new Vector2(totalLength / pairLength, 1f);
+        // dashCount dashes across the whole line, however long it is right
+        // now — tiling the texture exactly dashCount times does that
+        // directly, no length math needed (unlike the old world-unit-sized
+        // dash/gap approach, where dash count was a side effect of total
+        // trail length instead of something you set).
+        line.sharedMaterial.mainTextureScale = new Vector2(dashCount, 1f);
     }
 
     private static Vector3 CatmullRom(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
@@ -138,15 +148,13 @@ public class CampaignTrail : MonoBehaviour
         );
     }
 
-    // Instance method now, not static — needs dashLength/gapLength to bake
-    // the actual dash:gap ratio into the texture (used to be a fixed 50/50
-    // split). Resolution is fixed at 64 pixels, enough to represent most
-    // ratios without visibly blocky edges given Point filtering anyway.
+    // Instance method, not static — needs dashToGapRatio to bake the actual
+    // split into the texture. Resolution is fixed at 64 pixels, enough to
+    // represent the ratio without visibly blocky edges given Point filtering.
     private Material BuildDashMaterial()
     {
         const int resolution = 64;
-        float pairLength = Mathf.Max(dashLength + gapLength, 0.01f);
-        int dashPixels = Mathf.Clamp(Mathf.RoundToInt(resolution * dashLength / pairLength), 1, resolution - 1);
+        int dashPixels = Mathf.Clamp(Mathf.RoundToInt(resolution * dashToGapRatio), 1, resolution - 1);
 
         var texture = new Texture2D(resolution, 1, TextureFormat.RGBA32, false)
         {
