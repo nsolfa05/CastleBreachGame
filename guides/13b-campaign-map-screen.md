@@ -145,17 +145,19 @@ maybe ±2 units. Adjust freely.
 4. You should immediately see a curved dashed line connecting all 10 nodes
    in the Scene view, live-updating as you drag any node around (try it).
    Everything about how it looks lives on **`Campaign Trail`** itself, and
-   all of it updates live as you drag the sliders (no need to re-enter Play
-   mode):
-   - **Dash Count** — literally how many dashes appear across the whole
-     trail, whatever shape it's in right now. This is the direct answer to
-     "I want fewer/more dashes" — no length math to reverse-engineer.
-   - **Dash To Gap Ratio** — a 0–1 slider for how chunky each dash is
-     relative to its gap. `0.5` is even dash-dash-dash spacing; push it up
-     for long dashes with short gaps (starts to look like a mostly-solid
-     line with periodic breaks); push it down for short dashes with long
-     gaps.
+   all of it updates live as you edit it (no need to re-enter Play mode):
+   - **Dash Length** — real world-space size of each solid dash. Changing
+     **Gap Length** never changes this — a dash set to `0.5` stays `0.5`
+     units long no matter how spaced-out the gaps are.
+   - **Gap Length** — real world-space size of the empty space between
+     dashes. Bigger = more spread-out dashes; smaller = tighter/denser
+     dashes. Doesn't touch Dash Length's own size either — the two are
+     fully independent, so there's nothing to fight over: Dash Length
+     controls dash size, Gap Length controls spacing, that's the whole
+     relationship between them.
    - **Width** — line thickness.
+   - Fewer dashes overall = increase either one (or both) — bigger
+     dash+gap pairs means fewer of them fit along the same trail.
 4a. **To manually bend a specific segment of the curve** (instead of
    relying on the automatic smooth curve through your nodes): create an
    empty GameObject, position it wherever you want that stretch of trail
