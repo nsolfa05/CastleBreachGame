@@ -130,9 +130,13 @@ maybe ±2 units. Adjust freely.
 
 1. Hierarchy → **Create Empty**, name it **`Trail`**.
 2. **Add Component → Line Renderer**. On it: set **Width** to something
-   thin like `0.1` (both start and end width). Uncheck **Use World Space**
-   if it isn't already checked — it should be (Unity's default), since
-   node positions are in world space.
+   thin like `0.1` (both start and end width). **Confirm Use World Space
+   is CHECKED** (Unity's default — it should already be on, just verify).
+   This matters: node positions are real world-space coordinates, and if
+   this ends up unchecked, the line gets drawn as if those numbers were
+   local offsets from `Trail`'s own transform instead — putting it
+   somewhere completely different from your nodes, which looks exactly
+   like "no line is showing up at all."
 3. **Add Component → Campaign Trail** (also on `Trail`). Expand **Nodes In
    Order** and drag in `Node 1` through `Node 10`, **in that exact
    left-to-right order** — the spline is drawn through them in list order,
