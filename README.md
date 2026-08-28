@@ -129,6 +129,15 @@ of any other project.
       so it can't drift out of date). Numbered `13d` because `13c` is
       still reserved for its planned job. See
       `guides/13d-controls-and-rebinding.md`.
+- [x] Guide 13e — Custom cursor art & alignment. `CustomCursor` no longer
+      eases toward the pointer (it pinned the visible cursor *behind* where
+      aiming/building actually read from — an accuracy bug, since
+      `PlayerAim`/`BuildModeController` use the raw mouse position); it now
+      tracks exactly, with no smoothing to tune. Guide covers swapping in
+      real cursor art and setting the RectTransform **pivot** as the
+      hotspot so the sprite's tip sits on the true click point, plus what
+      to do with the now-dormant Cursor Speed slider. See
+      `guides/13e-custom-cursor-art.md`.
 
 **Next up:** **13c** (wires the win screen to actually call
 `CampaignProgress.UnlockNext()` on victory, gives win/lose screens a real

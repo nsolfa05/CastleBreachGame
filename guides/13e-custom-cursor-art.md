@@ -1,0 +1,173 @@
+# Guide 13e — Custom cursor art, alignment, and the cursor setting
+
+**Goal:** swap the placeholder circle for real cursor art, aligned so the
+part of the sprite that *looks* like the click point actually sits on the
+click point. Also resolves what happens to the Cursor Speed setting, which
+is now dormant.
+
+Numbered `13e` because `13c` is still reserved for its planned job
+(win/lose "back to menu" + the scene-transition pass), and `13d` is the
+rebindable-controls guide. Same out-of-sequence precedent as `09.5`/`12c`.
+
+The cursor itself was built in `13a` Step 2 — this guide picks up from
+there and doesn't repeat it.
+
+---
+
+## What changed since 13a (already committed)
+
+`CustomCursor` originally eased toward the pointer at
+`GameSettings.CursorSpeed`. That was wrong on its own terms, not just
+sluggish: **aiming and building read the raw mouse position** (`PlayerAim`,
+`BuildModeController`), so a smoothed cursor drew itself somewhere other
+than where the player was actually aiming or placing a structure. An
+accuracy bug, not a feel preference.
+
+It now pins to the pointer exactly, every frame, in `LateUpdate`, with no
+smoothing at all. Nothing to tune — there is no lag left to dial out.
+
+While confirming that, one claim in `13a` turned out to be wrong and has
+been corrected there: the Cursor Speed slider's max of `50` was described
+as "effectively instant." At 60fps it closed only ~57% of the gap per
+frame, so even maxed it visibly trailed. The whole range was short of what
+it claimed.
+
+---
+
+## The settings side — what to do with the Cursor Speed slider
+
+Since the cursor no longer smooths, that slider stores a value nothing
+reads. Three options, all defensible:
+
+1. **Leave it** — design doc §2 asks for a cursor speed setting, and it's
+   the natural home for a gamepad-driven cursor later, where a speed value
+   genuinely means something (a stick gives a direction, not a position).
+   Costs nothing but a control that currently does nothing.
+2. **Hide it** — uncheck the Slider GameObject's active checkbox in the
+   `Settings` scene. Re-enable it when gamepad support lands. This is the
+   recommended option: a visible control that does nothing reads as a bug
+   to anyone testing the game.
+3. **Delete it** — also fine. `GameSettings.CursorSpeed` stays in code
+   either way and would just need a new slider wired to it later.
+
+If you hide or delete it, also remove its label text so you don't leave an
+orphaned "Cursor Speed" heading above nothing.
+
+---
+
+## Step 1 — Import the cursor sprite
+
+1. Drop your cursor art into `Assets/Sprites/UI` (create the folder if
+   needed).
+2. In the Inspector: **Texture Type: Sprite (2D and UI)**.
+3. **Filter Mode** — `Point (no filter)` if it's pixel art, `Bilinear` if
+   it's a painterly/smooth image. Same rule as the backgrounds.
+4. Leave the sprite's own **Pivot** import setting alone. It governs
+   `SpriteRenderer` and world-space sprites and is **ignored** by UI
+   `Image` — the RectTransform pivot in Step 3 is what actually matters
+   here. This is an easy hour to lose.
+
+## Step 2 — Point the cursor at it
+
+1. Open the `CursorCanvas` prefab (`Assets/Prefabs`).
+2. Select its **`Cursor`** child, and set the **Image** component's
+   **Source Image** to your new sprite.
+3. Set the RectTransform's **Width/Height** to the sprite's real pixel
+   dimensions, or an exact multiple of them (e.g. `32 × 32` for a 32×32
+   sprite, or `64 × 64` to draw it at 2×). This matters for Step 3 — the
+   pivot is a *fraction* of this rectangle, so a mismatched size puts your
+   computed pivot on the wrong part of the art.
+4. Confirm **Raycast Target** is still unchecked (from `13a`). The cursor
+   sits under the pointer at all times, so with it checked it intercepts
+   every UI click meant for whatever's underneath.
+
+## Step 3 — Align the tip (the important part)
+
+`CustomCursor` sets `rectTransform.position = mouse.position`, and a
+RectTransform places its **pivot** at that position. So the pivot *is* the
+cursor's hotspot: whatever fraction you set is the part of the sprite that
+lands exactly on the real pointer.
+
+The placeholder circle used pivot `(0.5, 0.5)` — correct, since a circle's
+click point is its middle. Most cursor art is not like that.
+
+| Cursor shape | Pivot |
+|---|---|
+| Crosshair / dot / circle | `0.5, 0.5` |
+| Classic arrow, tip at top-left | `0, 1` |
+| Arrow pointing up, tip at top-centre | `0.5, 1` |
+| Tip anywhere else | compute it below |
+
+For a tip at pixel `(tipX, tipY)` measured from the sprite's **top-left**
+corner:
+
+```
+pivotX = tipX / spriteWidth
+pivotY = 1 - (tipY / spriteHeight)
+```
+
+The `1 -` is because RectTransform pivot Y counts up from the bottom while
+image pixels count down from the top. Example: a 32×32 arrow whose tip is
+at pixel (4, 2) → pivot `(0.125, 0.9375)`.
+
+Set this on the **`Cursor`** child's RectTransform (the Pivot field is
+right there in the Inspector) — not on the Canvas.
+
+## Step 4 — Verify it's actually aligned
+
+Eyeballing this is unreliable. Compare against the real pointer directly:
+
+1. In `CustomCursor.cs`, temporarily comment out `Cursor.visible = false;`
+   in `Awake()`.
+2. Press Play. You'll see the OS arrow *and* your sprite at once.
+3. Move around and check the two tips coincide. Adjust the pivot until
+   they do.
+4. **Restore the line** when you're done.
+
+A functional check too: hover the very edge of a button. It should
+highlight exactly when your cursor's tip touches it, not before or after.
+
+**Note:** clicks were always accurate — nothing reads the custom cursor's
+position, so a misaligned pivot never actually broke clicking. What it
+broke was the visual telling you the truth about where you were clicking.
+
+---
+
+## Step 5 — Save and commit
+
+Follow `saving-and-committing.md`: check your branch first, File → Save,
+File → Save Project, review the Changes tab (expect the new sprite + its
+`.meta`, the `CursorCanvas` prefab, and the `Settings` scene if you hid the
+slider), commit, push.
+
+---
+
+## ✅ Checkpoint
+
+- [ ] Cursor sprite imported with the right Filter Mode for its art style
+- [ ] `CursorCanvas` prefab points at it, Width/Height match the sprite
+- [ ] Raycast Target still off
+- [ ] Pivot set so the tip sits on the real pointer, verified against the
+      OS cursor with the hide line temporarily commented out
+- [ ] `Cursor.visible = false;` restored afterwards
+- [ ] Cursor Speed slider hidden, deleted, or deliberately left in place
+- [ ] Committed and pushed
+
+## Notes for later
+
+- **Per-state cursors** (a build-mode cursor, an aiming reticle, a
+  different look over UI) are easy from here: swap the Image's sprite at
+  runtime, and set the pivot to match that sprite's own hotspot at the
+  same time. Two sprites with different tips need two different pivots —
+  changing only the sprite will silently misalign it.
+- **Animated cursors** work too, since this is an ordinary UI Image —
+  an Animator, or just swapping sprites on a timer.
+- **If the ~1 frame of software-cursor latency ever bothers you:** a
+  Canvas-drawn cursor is composited with the rest of the frame, so during
+  fast flicks it can trail the hardware pointer slightly. That's inherent
+  to the approach, not leftover smoothing. `Cursor.SetCursor(texture,
+  hotspot, CursorMode.Auto)` replaces the actual OS cursor bitmap and has
+  literally zero latency — and takes the hotspot directly in **pixels**
+  rather than as a pivot fraction. The cost is it's no longer a scene
+  object you can scale, tint, animate, or drive with shaders, which is why
+  it wasn't the default choice here.

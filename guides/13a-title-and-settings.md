@@ -209,17 +209,10 @@ push.
   anywhere in the project. Nothing to redo when real sound effects show up.
 - **Cursor Speed is dormant, and that's deliberate.** The cursor
   originally eased toward the pointer at this speed, which meant the
-  visible cursor sat *behind* where you were actually aiming — `PlayerAim`
-  and `BuildModeController` both read the raw mouse position, so easing
-  the visual made it disagree with real aim/placement. That's an accuracy
-  bug, not a style choice, so `CustomCursor` now pins to the pointer
-  exactly, every frame, with no smoothing at all. The setting still saves
-  a value and is reserved for a future gamepad-driven cursor, where speed
-  genuinely means something (a stick gives a direction, not a position).
-- **Residual latency, if you ever chase it:** a Canvas-drawn cursor is a
-  *software* cursor, so it's composited with the rest of the frame and can
-  still trail the hardware pointer by about a frame during fast flicks —
-  that's inherent to the approach, not leftover smoothing. If that ever
-  matters, `Cursor.SetCursor()` swaps the actual OS cursor bitmap and has
-  literally zero latency, at the cost of not being a scene object you can
-  scale, tint, animate, or drive with shaders.
+  visible cursor sat *behind* where you were actually aiming — an accuracy
+  bug, not a style choice. `CustomCursor` now pins to the pointer exactly,
+  with no smoothing. **See `guides/13e-custom-cursor-art.md`** for the full
+  reasoning, what to do with the now-dead slider, and how to swap in real
+  cursor art aligned so its tip sits on the actual click point.
+- **Rebindable controls** (including a controls screen that explains the
+  current keys) came later — see `guides/13d-controls-and-rebinding.md`.
