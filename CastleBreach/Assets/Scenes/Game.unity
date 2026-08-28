@@ -935,7 +935,7 @@ MonoBehaviour:
   target: {fileID: 196378522}
   minZoom: 5
   maxZoom: 16
-  zoomStep: 1
+  zoomStepFactor: 100
   zoomSmoothing: 8
   followSpeedByZoom:
     serializedVersion: 2
@@ -961,6 +961,7 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  pixelSnap: 0
 --- !u!1 &528603454
 GameObject:
   m_ObjectHideFlags: 0
