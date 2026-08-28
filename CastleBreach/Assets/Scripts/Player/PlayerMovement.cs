@@ -35,10 +35,10 @@ public class PlayerMovement : MonoBehaviour
         }
 
         moveInput = Vector2.zero;
-        if (keyboard.wKey.isPressed) moveInput.y += 1f;
-        if (keyboard.sKey.isPressed) moveInput.y -= 1f;
-        if (keyboard.aKey.isPressed) moveInput.x -= 1f;
-        if (keyboard.dKey.isPressed) moveInput.x += 1f;
+        if (KeyBindings.IsPressed(KeyBindings.Action.MoveUp)) moveInput.y += 1f;
+        if (KeyBindings.IsPressed(KeyBindings.Action.MoveDown)) moveInput.y -= 1f;
+        if (KeyBindings.IsPressed(KeyBindings.Action.MoveLeft)) moveInput.x -= 1f;
+        if (KeyBindings.IsPressed(KeyBindings.Action.MoveRight)) moveInput.x += 1f;
         moveInput = moveInput.normalized; // diagonal movement isn't faster
     }
 

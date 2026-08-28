@@ -65,7 +65,7 @@ public class WeaponSwitcher : MonoBehaviour
         var keyboard = Keyboard.current;
         if (keyboard == null || !combatEnabled) return;
 
-        if (keyboard.vKey.wasPressedThisFrame && !BuildModeController.BuildingActive)
+        if (KeyBindings.WasPressed(KeyBindings.Action.WeaponMenu) && !BuildModeController.BuildingActive)
         {
             if (selecting) StopSelecting();
             else StartSelecting();
@@ -73,15 +73,15 @@ public class WeaponSwitcher : MonoBehaviour
 
         if (!selecting) return;
 
-        if (keyboard.escapeKey.wasPressedThisFrame)
+        if (KeyBindings.WasPressed(KeyBindings.Action.Cancel))
         {
             StopSelecting();
             return;
         }
 
-        for (int i = 0; i < weapons.Count && i < 4; i++)
+        for (int i = 0; i < weapons.Count && i < KeyBindings.MaxSlots; i++)
         {
-            if (keyboard[Key.Digit1 + i].wasPressedThisFrame)
+            if (KeyBindings.WeaponSlotPressed(i))
             {
                 Equip(i); // stays in the menu — press another number to switch again, Esc/V to close
                 break;

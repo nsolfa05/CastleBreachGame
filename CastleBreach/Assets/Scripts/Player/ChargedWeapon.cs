@@ -66,7 +66,7 @@ public abstract class ChargedWeapon : MonoBehaviour
             return;
         }
 
-        if (!charging && keyboard.spaceKey.wasPressedThisFrame && Time.time >= nextChargeAllowedTime)
+        if (!charging && KeyBindings.WasPressed(KeyBindings.Action.Attack) && Time.time >= nextChargeAllowedTime)
         {
             charging = true;
             chargeStartTime = Time.time;
@@ -79,7 +79,7 @@ public abstract class ChargedWeapon : MonoBehaviour
         float fraction = windUpTime > 0f ? Mathf.Clamp01((Time.time - chargeStartTime) / windUpTime) : 1f;
         if (chargeIndicator != null) chargeIndicator.Tick(transform.position, direction, fraction);
 
-        if (keyboard.spaceKey.wasReleasedThisFrame)
+        if (KeyBindings.WasReleased(KeyBindings.Action.Attack))
         {
             if (Time.time - chargeStartTime >= windUpTime)
             {

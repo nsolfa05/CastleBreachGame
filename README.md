@@ -116,6 +116,19 @@ of any other project.
       by default so both states are visible before any real win-hookup
       exists). Also added `BackButton.cs`, a small reusable Back-button
       handler. See `guides/13b-campaign-map-screen.md`.
+- [x] Guide 13d — Rebindable controls + a controls screen. Every keyboard
+      control was hardcoded across six scripts; they now all route through
+      `Systems/KeyBindings.cs` (PlayerPrefs-persisted, in-memory cached
+      since movement polls every frame). Rebinding **swaps** on conflict
+      rather than clearing, so no control is ever left unbound; Escape
+      cancels a rebind rather than being bindable. Weapon/building slot
+      keys are indexed rather than enum entries, so adding a weapon or
+      structure needs no code change. UI: `KeyRebindRow` (one row),
+      `KeyRebindMenu` (spawns all ~19 rows from one prefab, plus reset),
+      `ControlsDisplay` (live controls summary, reads from `KeyBindings`
+      so it can't drift out of date). Numbered `13d` because `13c` is
+      still reserved for its planned job. See
+      `guides/13d-controls-and-rebinding.md`.
 
 **Next up:** **13c** (wires the win screen to actually call
 `CampaignProgress.UnlockNext()` on victory, gives win/lose screens a real

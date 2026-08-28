@@ -120,8 +120,7 @@ public class PlayerAttack : MonoBehaviour
         // A stunned player can't swing (matches losing movement control).
         bool stunned = knockback != null && knockback.IsStunned;
 
-        var keyboard = Keyboard.current;
-        if (!stunned && keyboard != null && keyboard.spaceKey.wasPressedThisFrame && Time.time >= nextSwingTime)
+        if (!stunned && KeyBindings.WasPressed(KeyBindings.Action.Attack) && Time.time >= nextSwingTime)
             Swing();
 
         // Always tracks aim, live — grey while idle, briefly yellow right

@@ -80,8 +80,7 @@ public class GameManager : MonoBehaviour
     {
         if (State == GameState.Playing) return;
 
-        var keyboard = Keyboard.current;
-        if (keyboard != null && keyboard.rKey.wasPressedThisFrame)
+        if (KeyBindings.WasPressed(KeyBindings.Action.Restart))
         {
             Time.timeScale = 1f;
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);

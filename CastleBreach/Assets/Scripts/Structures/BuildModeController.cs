@@ -98,9 +98,9 @@ public class BuildModeController : MonoBehaviour
         if (WeaponSwitcher.SelectingWeapon) return;
 
         // Number keys pick up a specific structure (and switch mid-carry).
-        for (int i = 0; i < buildOptions.Count && i < 9; i++)
+        for (int i = 0; i < buildOptions.Count && i < KeyBindings.MaxSlots; i++)
         {
-            if (keyboard[Key.Digit1 + i].wasPressedThisFrame)
+            if (KeyBindings.BuildSlotPressed(i))
             {
                 selectedIndex = i;
                 StopBuilding();
@@ -110,14 +110,14 @@ public class BuildModeController : MonoBehaviour
         }
 
         // B toggles carrying the last-used option.
-        if (keyboard.bKey.wasPressedThisFrame)
+        if (KeyBindings.WasPressed(KeyBindings.Action.BuildMenu))
         {
             if (building) StopBuilding();
             else StartBuilding();
         }
         if (!building) return;
 
-        if (keyboard.escapeKey.wasPressedThisFrame || mouse.rightButton.wasPressedThisFrame)
+        if (KeyBindings.WasPressed(KeyBindings.Action.Cancel) || mouse.rightButton.wasPressedThisFrame)
         {
             StopBuilding();
             return;
