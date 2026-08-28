@@ -121,10 +121,11 @@ visual layer on top, not a rewire of how aiming or building placement works.
    (`UI → Button - TextMeshPro`, rename it `Back`, change its child TMP
    text to say "Back").
 3. **Master Volume** Slider — Inspector: **Min Value 0**, **Max Value 1**.
-4. **Cursor Speed** Slider — Inspector: **Min Value 2**, **Max Value 50**
-   (2 = a visibly laggy trailing cursor, 50 = effectively instant; the
-   default from `GameSettings` is 20, right in between — feel free to
-   retune these bounds once you've actually tried it).
+4. **Cursor Speed** Slider — Inspector: **Min Value 2**, **Max Value 50**.
+   **This setting is now dormant — see the note at the bottom.** The
+   cursor tracks the mouse exactly, so this slider stores a value but has
+   no visible effect until gamepad support exists. Leave it in place (the
+   design doc §2 calls for it) or hide it for now — your call.
 5. Empty GameObject, name it **`SettingsMenu`**, **Add Component →
    Settings Menu**. Drag the two Sliders into its **Volume Slider**/
    **Cursor Speed Slider** fields. Leave **Title Scene Name** at its
@@ -166,8 +167,8 @@ Open `Title`, press Play:
 - **Campaign** — will throw a Console error ("Scene ... couldn't be
   loaded"). **Expected until `13b`** builds that scene — not a bug.
 - Everywhere: the OS arrow pointer should be invisible, replaced by the
-  small circle cursor, trailing slightly behind fast mouse movement at the
-  default Cursor Speed.
+  small circle cursor, pinned exactly to where the real pointer is with no
+  visible lag.
 
 ---
 
@@ -206,6 +207,19 @@ push.
 - **Sound is fully wired, just silent** — `AudioListener.volume` responds
   to the slider right now, there just aren't any audio clips playing yet
   anywhere in the project. Nothing to redo when real sound effects show up.
-- **Cursor Speed default/range (20, bounds 2–50) is a first guess** — tune
-  the Slider's Min/Max (Step 4) once it's actually in front of you, no code
-  changes needed either way.
+- **Cursor Speed is dormant, and that's deliberate.** The cursor
+  originally eased toward the pointer at this speed, which meant the
+  visible cursor sat *behind* where you were actually aiming — `PlayerAim`
+  and `BuildModeController` both read the raw mouse position, so easing
+  the visual made it disagree with real aim/placement. That's an accuracy
+  bug, not a style choice, so `CustomCursor` now pins to the pointer
+  exactly, every frame, with no smoothing at all. The setting still saves
+  a value and is reserved for a future gamepad-driven cursor, where speed
+  genuinely means something (a stick gives a direction, not a position).
+- **Residual latency, if you ever chase it:** a Canvas-drawn cursor is a
+  *software* cursor, so it's composited with the rest of the frame and can
+  still trail the hardware pointer by about a frame during fast flicks —
+  that's inherent to the approach, not leftover smoothing. If that ever
+  matters, `Cursor.SetCursor()` swaps the actual OS cursor bitmap and has
+  literally zero latency, at the cost of not being a scene object you can
+  scale, tint, animate, or drive with shaders.
