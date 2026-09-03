@@ -130,7 +130,7 @@ public class KeyRebindRow : MonoBehaviour
     /// </summary>
     private static void RefreshAllRows()
     {
-        foreach (var row in FindObjectsByType<KeyRebindRow>(FindObjectsSortMode.None))
+        foreach (var row in FindObjectsByType<KeyRebindRow>(FindObjectsInactive.Exclude))
             row.Refresh();
     }
 
