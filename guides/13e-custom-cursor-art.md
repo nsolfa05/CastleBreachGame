@@ -117,8 +117,8 @@ right there in the Inspector) — not on the Canvas.
 
 Eyeballing this is unreliable. Compare against the real pointer directly:
 
-1. In `CustomCursor.cs`, temporarily comment out `Cursor.visible = false;`
-   in `Awake()`.
+1. In `CustomCursor.cs`, temporarily comment out the `Cursor.visible =
+   false;` line in `LateUpdate()`.
 2. Press Play. You'll see the OS arrow *and* your sprite at once.
 3. Move around and check the two tips coincide. Adjust the pivot until
    they do.
@@ -130,6 +130,70 @@ highlight exactly when your cursor's tip touches it, not before or after.
 **Note:** clicks were always accurate — nothing reads the custom cursor's
 position, so a misaligned pivot never actually broke clicking. What it
 broke was the visual telling you the truth about where you were clicking.
+
+---
+
+## Update — reliable OS-cursor hiding, and an in-game skin picker
+
+Two gaps found after this guide originally shipped.
+
+**The OS cursor could reappear and stay stuck.** `Cursor.visible = false`
+was only ever called once, in `Awake()`. Losing/regaining window focus,
+alt-tabbing, or a scene transition's `OnDisable` (which does the opposite,
+deliberately, so the Editor's own cursor comes back when you stop Play)
+could all bring the real arrow back with nothing left to hide it again.
+Fixed by moving that line into `LateUpdate()`, so it's re-asserted every
+single frame instead of once — whatever brought the OS cursor back gets
+immediately overridden the very next frame.
+
+**There was no way to change the cursor sprite without opening Unity.**
+`CustomCursor` now holds a list of **`CursorSkin`** entries (a sprite +
+its own pivot, since different shapes need different hotspots — swapping
+skins without swapping pivots would misalign the new one), and Settings
+gets a dropdown to pick between them at runtime, persisted like every
+other setting.
+
+### Required Editor steps
+
+**1. Add skins to the `CursorCanvas` prefab:**
+
+1. Open `Assets/Prefabs/CursorCanvas.prefab`, select the **`Cursor`**
+   child, find the **Custom Cursor** component.
+2. Expand **Skins**. Add one entry for what's already there — **Display
+   Name** `"Circle"` (or whatever you're calling it), **Sprite** ← the
+   sprite currently on the Image component, **Pivot** ← whatever pivot
+   you already worked out in Steps 1-4 above.
+3. Add another entry per additional cursor you want selectable — your
+   dagger, say. Same three fields each: name, sprite, and *that sprite's
+   own* pivot (recompute it per Steps 2-4, don't reuse the circle's).
+4. Index `0` is what shows before the player ever opens Settings — put
+   whichever skin you want as the default first.
+
+**2. Add the dropdown to `Settings.unity`:**
+
+1. Under the Canvas, add **UI → Dropdown - TextMeshPro**, name it
+   `CursorSkinDropdown`, with a label above it same as the other settings.
+2. On **`SettingsMenu`**, assign **Cursor Skin Dropdown** ← that object.
+3. Wire the Dropdown's **On Value Changed (Int32)** → `SettingsMenu` →
+   `OnCursorSkinChanged`.
+
+You don't need to type the skin names into the Dropdown yourself —
+`SettingsMenu.Start()` reads them from `CustomCursor.Skins` and populates
+the list automatically, so the two can never disagree about what skins
+exist.
+
+### Test
+
+- Open `Settings`: the dropdown lists every skin by name, showing the
+  currently-saved one selected.
+- Pick a different one: the cursor **in the Settings scene itself**
+  changes immediately (Settings has its own `CustomCursor` instance, same
+  prefab as everywhere else) — you're previewing the real thing, not a
+  mockup.
+- Go to `Game`: same skin shows there too.
+- Quit and relaunch: your choice persisted.
+- Alt-tab away and back, or click off the game window and back, while
+  playing — the OS arrow should never reappear and stick.
 
 ---
 
@@ -151,6 +215,12 @@ slider), commit, push.
       OS cursor with the hide line temporarily commented out
 - [ ] `Cursor.visible = false;` restored afterwards
 - [ ] Cursor Speed slider hidden, deleted, or deliberately left in place
+- [ ] `Skins` populated on `CursorCanvas`'s Custom Cursor, each with its
+      own correct pivot
+- [ ] `CursorSkinDropdown` wired on `SettingsMenu`, lists every skin,
+      switching one previews live in the Settings scene itself
+- [ ] Skin choice persists after quitting and relaunching
+- [ ] OS cursor stays hidden through alt-tab / focus loss and regain
 - [ ] Committed and pushed
 
 ## Notes for later

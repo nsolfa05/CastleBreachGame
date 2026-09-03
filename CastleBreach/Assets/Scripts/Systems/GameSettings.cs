@@ -10,14 +10,18 @@ public static class GameSettings
 {
     private const string MasterVolumeKey = "MasterVolume";
     private const string CursorSpeedKey = "CursorSpeed";
+    private const string CursorSkinIndexKey = "CursorSkinIndex";
 
     public const float DefaultMasterVolume = 1f;
 
     [Tooltip("How fast the custom cursor eases toward the mouse — see CustomCursor.")]
     public const float DefaultCursorSpeed = 20f;
 
+    public const int DefaultCursorSkinIndex = 0;
+
     private static float? masterVolume;
     private static float? cursorSpeed;
+    private static int? cursorSkinIndex;
 
     public static float MasterVolume
     {
@@ -37,6 +41,17 @@ public static class GameSettings
         {
             cursorSpeed = value;
             PlayerPrefs.SetFloat(CursorSpeedKey, value);
+        }
+    }
+
+    /// <summary>Which entry in CustomCursor's Skins list is active, by index.</summary>
+    public static int CursorSkinIndex
+    {
+        get => cursorSkinIndex ??= PlayerPrefs.GetInt(CursorSkinIndexKey, DefaultCursorSkinIndex);
+        set
+        {
+            cursorSkinIndex = value;
+            PlayerPrefs.SetInt(CursorSkinIndexKey, value);
         }
     }
 
