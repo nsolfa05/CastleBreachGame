@@ -204,7 +204,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1321688450}
         m_TargetAssemblyTypeName: TitleMenu, Assembly-CSharp
-        m_MethodName: OnTestPressed
+        m_MethodName: OnSettingsPressed
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -804,7 +804,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 5
+  orthographic size: 500
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -829,7 +829,7 @@ Transform:
   m_GameObject: {fileID: 1039215260}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -10}
+  m_LocalPosition: {x: 973, y: 515, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1358,7 +1358,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1321688450}
         m_TargetAssemblyTypeName: TitleMenu, Assembly-CSharp
-        m_MethodName: OnTestPressed
+        m_MethodName: OnCampaignPressed
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -1813,6 +1813,22 @@ PrefabInstance:
       propertyPath: m_Name
       value: CursorCanvas
       objectReference: {fileID: 0}
+    - target: {fileID: 3151906932653471851, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 3151906932653471851, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 3151906932653471851, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 3151906932653471851, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: -200
+      objectReference: {fileID: 0}
     - target: {fileID: 5711969644942762530, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
       propertyPath: m_Pivot.x
       value: 0
@@ -1892,6 +1908,22 @@ PrefabInstance:
     - target: {fileID: 5711969644942762530, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7171105876966193974, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: 907366570984558189, guid: fec634b9551eaca499b77f406c00ed17, type: 3}
+    - target: {fileID: 7171105876966193974, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
+      propertyPath: m_Color.b
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7171105876966193974, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
+      propertyPath: m_Color.g
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7171105876966193974, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
+      propertyPath: m_Color.r
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
