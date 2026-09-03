@@ -1909,10 +1909,46 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
+      propertyPath: skins.Array.size
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
+      propertyPath: skins.Array.data[0].sprite
+      value: 
+      objectReference: {fileID: 907366570984558189, guid: fec634b9551eaca499b77f406c00ed17, type: 3}
+    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
+      propertyPath: skins.Array.data[1].sprite
+      value: 
+      objectReference: {fileID: -2629865453749720453, guid: 6326ce5e3961e714c9f3f70d509928aa, type: 3}
+    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
+      propertyPath: skins.Array.data[0].pivot.x
+      value: 0.03
+      objectReference: {fileID: 0}
+    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
+      propertyPath: skins.Array.data[0].pivot.y
+      value: 0.99
+      objectReference: {fileID: 0}
+    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
+      propertyPath: skins.Array.data[1].pivot.x
+      value: 0.03
+      objectReference: {fileID: 0}
+    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
+      propertyPath: skins.Array.data[1].pivot.y
+      value: 0.99
+      objectReference: {fileID: 0}
+    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
+      propertyPath: skins.Array.data[0].displayName
+      value: Dagger
+      objectReference: {fileID: 0}
+    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
+      propertyPath: skins.Array.data[1].displayName
+      value: Dagger_Small
+      objectReference: {fileID: 0}
     - target: {fileID: 7171105876966193974, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
       propertyPath: m_Sprite
       value: 
-      objectReference: {fileID: 907366570984558189, guid: fec634b9551eaca499b77f406c00ed17, type: 3}
+      objectReference: {fileID: 0}
     - target: {fileID: 7171105876966193974, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
       propertyPath: m_Color.b
       value: 1
