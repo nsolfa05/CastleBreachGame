@@ -11,6 +11,7 @@ public static class GameSettings
     private const string MasterVolumeKey = "MasterVolume";
     private const string CursorSpeedKey = "CursorSpeed";
     private const string CursorSkinIndexKey = "CursorSkinIndex";
+    private const string CursorScaleKey = "CursorScale";
 
     public const float DefaultMasterVolume = 1f;
 
@@ -19,9 +20,13 @@ public static class GameSettings
 
     public const int DefaultCursorSkinIndex = 0;
 
+    [Tooltip("Multiplies every cursor skin's own Base Size — see CursorSkin.")]
+    public const float DefaultCursorScale = 1f;
+
     private static float? masterVolume;
     private static float? cursorSpeed;
     private static int? cursorSkinIndex;
+    private static float? cursorScale;
 
     public static float MasterVolume
     {
@@ -52,6 +57,17 @@ public static class GameSettings
         {
             cursorSkinIndex = value;
             PlayerPrefs.SetInt(CursorSkinIndexKey, value);
+        }
+    }
+
+    /// <summary>Multiplies every cursor skin's own Base Size — see CursorSkin.</summary>
+    public static float CursorScale
+    {
+        get => cursorScale ??= PlayerPrefs.GetFloat(CursorScaleKey, DefaultCursorScale);
+        set
+        {
+            cursorScale = value;
+            PlayerPrefs.SetFloat(CursorScaleKey, value);
         }
     }
 

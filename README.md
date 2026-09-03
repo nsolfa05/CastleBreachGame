@@ -136,8 +136,15 @@ of any other project.
       tracks exactly, with no smoothing to tune. Guide covers swapping in
       real cursor art and setting the RectTransform **pivot** as the
       hotspot so the sprite's tip sits on the true click point, plus what
-      to do with the now-dormant Cursor Speed slider. See
-      `guides/13e-custom-cursor-art.md`.
+      to do with the now-dormant Cursor Speed slider. Later additions to
+      the same guide: `Cursor.visible` is now reasserted every frame
+      (`LateUpdate`, not a one-time `Awake` call) so alt-tab/focus changes
+      can't leave the OS arrow stuck visible; `CustomCursor` holds a
+      `CursorSkin` list (sprite + pivot + its own **Base Size**, so
+      differently-shaped skins don't stretch to fit a shared size) with a
+      Settings dropdown to pick one and a slider (`GameSettings.
+      CursorScale`) to resize whichever is active, both previewing live
+      and persisting. See `guides/13e-custom-cursor-art.md`.
 
 **Next up:** **13c** (wires the win screen to actually call
 `CampaignProgress.UnlockNext()` on victory, gives win/lose screens a real

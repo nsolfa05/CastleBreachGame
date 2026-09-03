@@ -44,6 +44,7 @@ public class CustomCursor : MonoBehaviour
     [SerializeField] private Image image;
 
     private RectTransform rectTransform;
+    private int currentSkinIndex;
 
     public IReadOnlyList<CursorSkin> Skins => skins;
 
@@ -61,22 +62,41 @@ public class CustomCursor : MonoBehaviour
     }
 
     /// <summary>
-    /// Switches the visible sprite and its hotspot pivot, and persists the
-    /// choice via GameSettings — called on startup and by Settings' skin
-    /// picker. Out-of-range/empty-list indexes are clamped rather than
-    /// erroring, since a skin removed from the list shouldn't crash a
-    /// save that still references its old index.
+    /// Switches the visible sprite, its hotspot pivot, and its base size,
+    /// and persists the choice via GameSettings — called on startup and by
+    /// Settings' skin picker. Out-of-range/empty-list indexes are clamped
+    /// rather than erroring, since a skin removed from the list shouldn't
+    /// crash a save that still references its old index.
     /// </summary>
     public void ApplySkin(int index)
     {
         if (skins.Count == 0) return;
 
         index = Mathf.Clamp(index, 0, skins.Count - 1);
+        currentSkinIndex = index;
         GameSettings.CursorSkinIndex = index;
 
         CursorSkin skin = skins[index];
         if (image != null) image.sprite = skin.sprite;
         if (rectTransform != null) rectTransform.pivot = skin.pivot;
+
+        ApplyScale(GameSettings.CursorScale);
+    }
+
+    /// <summary>
+    /// Scales the CURRENT skin's own Base Size and persists the choice —
+    /// called on skin switch and by Settings' Cursor Size slider. Sizing
+    /// off the active skin's Base Size (not a fixed number) means each
+    /// skin keeps its own correct aspect ratio at any scale instead of
+    /// every skin sharing one Width/Height that only fits one of them.
+    /// </summary>
+    public void ApplyScale(float scale)
+    {
+        GameSettings.CursorScale = scale;
+
+        if (skins.Count == 0 || rectTransform == null) return;
+
+        rectTransform.sizeDelta = skins[currentSkinIndex].baseSize * scale;
     }
 
     private void LateUpdate()

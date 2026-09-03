@@ -133,9 +133,9 @@ broke was the visual telling you the truth about where you were clicking.
 
 ---
 
-## Update — reliable OS-cursor hiding, and an in-game skin picker
+## Update — reliable OS-cursor hiding, and an in-game skin/size picker
 
-Two gaps found after this guide originally shipped.
+Three gaps found after this guide originally shipped.
 
 **The OS cursor could reappear and stay stuck.** `Cursor.visible = false`
 was only ever called once, in `Awake()`. Losing/regaining window focus,
@@ -146,11 +146,13 @@ Fixed by moving that line into `LateUpdate()`, so it's re-asserted every
 single frame instead of once — whatever brought the OS cursor back gets
 immediately overridden the very next frame.
 
-**There was no way to change the cursor sprite without opening Unity.**
-`CustomCursor` now holds a list of **`CursorSkin`** entries (a sprite +
-its own pivot, since different shapes need different hotspots — swapping
-skins without swapping pivots would misalign the new one), and Settings
-gets a dropdown to pick between them at runtime, persisted like every
+**There was no way to change the cursor sprite, or its size, without
+opening Unity.** `CustomCursor` now holds a list of **`CursorSkin`**
+entries — a sprite, its own pivot (different shapes need different
+hotspots), and its own **Base Size** (different sprites need different
+proportions, or a shared fixed size would stretch whichever one it wasn't
+authored for) — and Settings gets a dropdown to pick between them plus a
+slider that scales whichever one is active, both persisted like every
 other setting.
 
 ### Required Editor steps
@@ -162,20 +164,32 @@ other setting.
 2. Expand **Skins**. Add one entry for what's already there — **Display
    Name** `"Circle"` (or whatever you're calling it), **Sprite** ← the
    sprite currently on the Image component, **Pivot** ← whatever pivot
-   you already worked out in Steps 1-4 above.
+   you already worked out in Steps 1-4 above, **Base Size** ← the
+   RectTransform's current Width/Height (e.g. `16, 16`).
 3. Add another entry per additional cursor you want selectable — your
-   dagger, say. Same three fields each: name, sprite, and *that sprite's
-   own* pivot (recompute it per Steps 2-4, don't reuse the circle's).
+   dagger, say. Same four fields each: name, sprite, *that sprite's own*
+   pivot (recompute per Steps 2-4, don't reuse the circle's), and **Base
+   Size** matching *that* sprite's real aspect ratio. This matters: a UI
+   Image stretches to fill whatever size it's given, so if the dagger's
+   Base Size doesn't match its own proportions, switching to it will
+   visibly squash or stretch it — even though the circle looked fine.
 4. Index `0` is what shows before the player ever opens Settings — put
    whichever skin you want as the default first.
 
-**2. Add the dropdown to `Settings.unity`:**
+**2. Add the dropdown and size slider to `Settings.unity`:**
 
 1. Under the Canvas, add **UI → Dropdown - TextMeshPro**, name it
    `CursorSkinDropdown`, with a label above it same as the other settings.
-2. On **`SettingsMenu`**, assign **Cursor Skin Dropdown** ← that object.
-3. Wire the Dropdown's **On Value Changed (Int32)** → `SettingsMenu` →
+2. Add a **UI → Slider** named `CursorSizeSlider`, with a label. Set its
+   **Min Value** to something like `0.25` and **Max Value** to `3` — below
+   `1` shrinks the current skin below its authored Base Size, above `1`
+   enlarges it.
+3. On **`SettingsMenu`**, assign **Cursor Skin Dropdown** ← the dropdown,
+   **Cursor Size Slider** ← the slider.
+4. Wire the Dropdown's **On Value Changed (Int32)** → `SettingsMenu` →
    `OnCursorSkinChanged`.
+5. Wire the Slider's **On Value Changed (Single)** → `SettingsMenu` →
+   `OnCursorSizeChanged`.
 
 You don't need to type the skin names into the Dropdown yourself —
 `SettingsMenu.Start()` reads them from `CustomCursor.Skins` and populates
@@ -185,13 +199,18 @@ exist.
 ### Test
 
 - Open `Settings`: the dropdown lists every skin by name, showing the
-  currently-saved one selected.
-- Pick a different one: the cursor **in the Settings scene itself**
+  currently-saved one selected; the size slider shows the saved scale.
+- Pick a different skin: the cursor **in the Settings scene itself**
   changes immediately (Settings has its own `CustomCursor` instance, same
   prefab as everywhere else) — you're previewing the real thing, not a
-  mockup.
-- Go to `Game`: same skin shows there too.
-- Quit and relaunch: your choice persisted.
+  mockup. It should show that skin's own aspect ratio correctly, not
+  stretched.
+- Drag the size slider: the cursor shrinks/grows live, no need to reopen
+  anything.
+- Switch skins again after resizing: the new skin also comes in at your
+  chosen scale, not reset to 1×.
+- Go to `Game`: same skin and size show there too.
+- Quit and relaunch: both choices persisted.
 - Alt-tab away and back, or click off the game window and back, while
   playing — the OS arrow should never reappear and stick.
 
@@ -216,10 +235,12 @@ slider), commit, push.
 - [ ] `Cursor.visible = false;` restored afterwards
 - [ ] Cursor Speed slider hidden, deleted, or deliberately left in place
 - [ ] `Skins` populated on `CursorCanvas`'s Custom Cursor, each with its
-      own correct pivot
+      own correct pivot AND Base Size matching its sprite's aspect ratio
 - [ ] `CursorSkinDropdown` wired on `SettingsMenu`, lists every skin,
       switching one previews live in the Settings scene itself
-- [ ] Skin choice persists after quitting and relaunching
+- [ ] `CursorSizeSlider` wired, resizes live, and stays correct across a
+      skin switch
+- [ ] Skin and size choices persist after quitting and relaunching
 - [ ] OS cursor stays hidden through alt-tab / focus loss and regain
 - [ ] Committed and pushed
 
