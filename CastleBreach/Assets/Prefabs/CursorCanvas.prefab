@@ -131,14 +131,14 @@ RectTransform:
   m_GameObject: {fileID: 3682966118369668096}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 10, y: 10, z: 10}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 5711969644942762530}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: -200, y: 0}
   m_SizeDelta: {x: 16, y: 16}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &728545347330712653
@@ -162,14 +162,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.5597484, g: 0.3150349, b: 0.012321413, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: -2413806693520163455, guid: 572c6ce757ef43340b82f198b239eccb, type: 3}
+  m_Sprite: {fileID: 0}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -191,3 +191,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a0f0f2dda1e6ce458611a3b47199367, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CustomCursor
+  skins:
+  - displayName: Dagger
+    sprite: {fileID: 907366570984558189, guid: fec634b9551eaca499b77f406c00ed17, type: 3}
+    pivot: {x: 0.03, y: 0.99}
+    baseSize: {x: 10, y: 10}
+  - displayName: Dagger_Small
+    sprite: {fileID: -2629865453749720453, guid: 6326ce5e3961e714c9f3f70d509928aa, type: 3}
+    pivot: {x: 0.03, y: 0.99}
+    baseSize: {x: 10, y: 10}
+  image: {fileID: 0}
