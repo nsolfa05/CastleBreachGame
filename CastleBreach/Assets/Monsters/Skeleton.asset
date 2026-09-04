@@ -26,7 +26,7 @@ MonoBehaviour:
   attackRange: 0.5
   playerTargetRange: 6
   kingPriorityRange: 2
-  kingPriorityBeatsStructures: 0
+  kingPriorityBeatsStructures: 1
   keepTargetWithinRange: 0.9
   structurePriorityRange: 2
   structureInterestRange: 5
@@ -37,12 +37,19 @@ MonoBehaviour:
     knockbackStrength: 6
     stunEnabled: 0
     stunDuration: 0
-  stunResistance: 0
   currencyDrop: 4
-  tileWeight: 2
+  weight: 2
+  stunResistance: 0
   targetsOnlyKing: 0
   praiseTowerLureRange: 0
   passesThroughGates: 0
+  targetsOnlyPlayer: 0
+  usesRangedAttack: 0
+  rangedDamage: 2
+  rangedProjectileSpeed: 6
+  rangedBoltColor: {r: 0.45, g: 0.75, b: 0.3, a: 1}
+  preferredMinRange: 2
+  retreatSeconds: 2
   fliesOverBarriers: 0
   extraLives: 1
   reviveDelaySeconds: 6
