@@ -23,12 +23,19 @@ using UnityEngine.UI;
 /// dt). Not built yet; no gamepad input exists anywhere in this project.
 ///
 /// LateUpdate, not Update, so nothing else can move the cursor after it's
-/// placed for the frame. Cursor.visible is also re-asserted false every
-/// frame here rather than only once in Awake — a one-time Awake call is
-/// fragile: losing/regaining window focus, alt-tabbing, or another
-/// script's OnDisable calling Cursor.visible = true can all bring the OS
-/// arrow back with nothing to hide it again until the next time this
-/// component happens to re-enable.
+/// placed for the frame. Cursor.visible is also re-asserted every frame
+/// here (per GameSettings.HideOsCursor) rather than only once in Awake —
+/// a one-time Awake call is fragile: losing/regaining window focus,
+/// alt-tabbing, or another script's OnDisable calling Cursor.visible =
+/// true can all bring the OS arrow back with nothing to hide it again
+/// until the next time this component happens to re-enable.
+///
+/// GameSettings.HideOsCursor (Settings' "Hide OS Cursor" toggle) picks
+/// which pointer is real: on (default), the OS arrow is hidden and this
+/// sprite tracks it; off, the OS arrow shows instead and this sprite
+/// hides — never both, since one drawn on top of the other looks like a
+/// bug. See CursorPresenceCheck for what catches a scene that's missing
+/// this component entirely while the toggle expects it hidden.
 ///
 /// IMPORTANT (Editor setup, not code): the Image this sits on must have
 /// Raycast Target OFF. It's always positioned exactly under the pointer,
@@ -101,8 +108,14 @@ public class CustomCursor : MonoBehaviour
 
     private void LateUpdate()
     {
-        Cursor.visible = false;
+        bool hideOs = GameSettings.HideOsCursor;
+        Cursor.visible = !hideOs;
         Cursor.lockState = CursorLockMode.None;
+
+        // Never show both at once: when the player turns the toggle off,
+        // the OS arrow takes over and this sprite steps aside instead of
+        // sitting on top of it.
+        if (image != null) image.enabled = hideOs;
 
         var mouse = Mouse.current;
         if (mouse == null) return;

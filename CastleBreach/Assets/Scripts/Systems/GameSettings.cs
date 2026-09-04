@@ -12,6 +12,7 @@ public static class GameSettings
     private const string CursorSpeedKey = "CursorSpeed";
     private const string CursorSkinIndexKey = "CursorSkinIndex";
     private const string CursorScaleKey = "CursorScale";
+    private const string HideOsCursorKey = "HideOsCursor";
 
     public const float DefaultMasterVolume = 1f;
 
@@ -27,6 +28,7 @@ public static class GameSettings
     private static float? cursorSpeed;
     private static int? cursorSkinIndex;
     private static float? cursorScale;
+    private static bool? hideOsCursor;
 
     public static float MasterVolume
     {
@@ -68,6 +70,21 @@ public static class GameSettings
         {
             cursorScale = value;
             PlayerPrefs.SetFloat(CursorScaleKey, value);
+        }
+    }
+
+    /// <summary>
+    /// Whether the custom cursor should hide the real OS pointer. Off means
+    /// the OS arrow shows and the custom sprite hides instead, rather than
+    /// both showing at once. PlayerPrefs has no bool type, so stored as 0/1.
+    /// </summary>
+    public static bool HideOsCursor
+    {
+        get => hideOsCursor ??= PlayerPrefs.GetInt(HideOsCursorKey, 1) == 1;
+        set
+        {
+            hideOsCursor = value;
+            PlayerPrefs.SetInt(HideOsCursorKey, value ? 1 : 0);
         }
     }
 

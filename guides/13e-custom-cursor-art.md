@@ -216,12 +216,67 @@ exist.
 
 ---
 
+## Update — a Hide OS Cursor toggle, and an automatic missing-cursor check
+
+Two more gaps, both from the same underlying question: what if a player
+(or a scene) doesn't want the custom cursor hiding the real one?
+
+**There was no way to turn off custom-cursor hiding.** Until now,
+`CustomCursor` always hid the OS arrow and showed its own sprite — no
+opt-out. `GameSettings` gets a new `HideOsCursor` bool (default **on**,
+persisted like everything else). `CustomCursor.LateUpdate()` now reads it
+every frame: on, the OS arrow stays hidden and the sprite tracks the
+pointer, same as before; off, the OS arrow shows and the sprite disables
+itself instead — never both at once, since one drawn on top of the other
+reads as a bug, not a choice.
+
+**There was no way to tell, just by looking at the Console, whether a
+scene had actually wired up its cursor.** This project has hit that exact
+failure more than once — a scene missing the `CursorCanvas` prefab
+entirely, or carrying a corrupted instance of it — with the only symptom
+being "the real arrow is showing" and no clue why. A new script,
+`CursorPresenceCheck.cs`, runs itself automatically at startup (via
+`[RuntimeInitializeOnLoadMethod]` — no GameObject, no Inspector wiring)
+and again every time a scene loads. If `Hide OS Cursor` is on but that
+scene has no `CustomCursor` anywhere in it, it logs a `Debug.LogWarning`
+naming the scene, so the Console tells you immediately instead of you
+having to notice the arrow yourself and guess.
+
+### Required Editor steps
+
+**Add the toggle to `Settings.unity`:**
+
+1. Under the Canvas, add **UI → Toggle**, name it `HideOsCursorToggle`,
+   with a label like "Hide OS Cursor" next to it.
+2. On **`SettingsMenu`**, assign **Hide Os Cursor Toggle** ← the toggle.
+3. Wire the Toggle's **On Value Changed (Boolean)** → `SettingsMenu` →
+   `OnHideOsCursorChanged`.
+
+Nothing else to wire — `CursorPresenceCheck` needs no setup at all; it's
+active the moment the script is in the project.
+
+### Test
+
+- Open `Settings`: the toggle shows the saved state (on by default).
+- Turn it off: the OS arrow appears immediately and the custom sprite
+  disappears — in the Settings scene itself, live, same as the skin/size
+  controls.
+- Turn it back on: reverses immediately.
+- Go to `Game`/`Campaign`/`Title`: the same on/off state applies there
+  too, and persists after quitting and relaunching.
+- To see the missing-cursor check fire: temporarily disable the
+  `CursorCanvas` instance in any one scene (or just its `CustomCursor`
+  component) with the toggle left on, then enter Play. The Console should
+  log a warning naming that scene. Re-enable it afterward.
+
+---
+
 ## Step 5 — Save and commit
 
 Follow `saving-and-committing.md`: check your branch first, File → Save,
 File → Save Project, review the Changes tab (expect the new sprite + its
-`.meta`, the `CursorCanvas` prefab, and the `Settings` scene if you hid the
-slider), commit, push.
+`.meta`, the `CursorCanvas` prefab, the `CursorPresenceCheck.cs` script,
+and the `Settings` scene), commit, push.
 
 ---
 
@@ -242,6 +297,11 @@ slider), commit, push.
       skin switch
 - [ ] Skin and size choices persist after quitting and relaunching
 - [ ] OS cursor stays hidden through alt-tab / focus loss and regain
+- [ ] `HideOsCursorToggle` wired on `SettingsMenu`; turning it off shows
+      the real arrow and hides the custom sprite (never both at once)
+- [ ] Hide Os Cursor choice persists after quitting and relaunching
+- [ ] Disabling a scene's `CustomCursor` (with the toggle on) logs a
+      `CursorPresenceCheck` warning naming that scene
 - [ ] Committed and pushed
 
 ## Notes for later

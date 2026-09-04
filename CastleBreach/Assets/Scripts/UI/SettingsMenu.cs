@@ -6,10 +6,11 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Settings screen (§2): Master Volume, Cursor Speed, a Cursor Skin
-/// picker, and Cursor Size, all backed by GameSettings/PlayerPrefs so they
-/// persist between sessions. Wire each control's On Value Changed to the
-/// matching method here — the Slider's own Min/Max Value fields in the
-/// Inspector set the valid range, nothing duplicated here.
+/// picker, Cursor Size, and a Hide OS Cursor toggle, all backed by
+/// GameSettings/PlayerPrefs so they persist between sessions. Wire each
+/// control's On Value Changed to the matching method here — the Slider's
+/// own Min/Max Value fields in the Inspector set the valid range, nothing
+/// duplicated here.
 ///
 /// The skin dropdown's options come from the CustomCursor already present
 /// in this scene (the CursorCanvas prefab, per 13a/13e) rather than being
@@ -23,6 +24,7 @@ public class SettingsMenu : MonoBehaviour
     [SerializeField] private Slider cursorSpeedSlider;
     [SerializeField] private TMP_Dropdown cursorSkinDropdown;
     [SerializeField] private Slider cursorSizeSlider;
+    [SerializeField] private Toggle hideOsCursorToggle;
     [SerializeField] private string titleSceneName = "Title";
 
     private CustomCursor customCursor;
@@ -37,6 +39,9 @@ public class SettingsMenu : MonoBehaviour
 
         if (cursorSizeSlider != null)
             cursorSizeSlider.SetValueWithoutNotify(GameSettings.CursorScale);
+
+        if (hideOsCursorToggle != null)
+            hideOsCursorToggle.SetIsOnWithoutNotify(GameSettings.HideOsCursor);
 
         customCursor = FindFirstObjectByType<CustomCursor>();
         if (cursorSkinDropdown != null && customCursor != null && customCursor.Skins.Count > 0)
@@ -62,6 +67,8 @@ public class SettingsMenu : MonoBehaviour
     {
         if (customCursor != null) customCursor.ApplyScale(value);
     }
+
+    public void OnHideOsCursorChanged(bool value) => GameSettings.HideOsCursor = value;
 
     public void OnBackPressed() => SceneManager.LoadScene(titleSceneName);
 }
