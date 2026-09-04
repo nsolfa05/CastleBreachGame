@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 5e75c4f58192c534c89a3799632bd73d
+guid: 4629e4a043918b34ab30cebb792d2d42
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -3437558288728597940
-    second: sword_cursor_64_0
+      213: -6197536368249452737
+    second: Sword png_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: sword_cursor_64_0
+      name: Sword png_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 60
-        height: 64
+        x: 91
+        y: 35
+        width: 1163
+        height: 1133
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: c4ad1a903f65b40d0800000000000000
-      internalID: -3437558288728597940
+      spriteID: f374def428dedf9a0800000000000000
+      internalID: -6197536368249452737
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      sword_cursor_64_0: -3437558288728597940
+      Sword png_0: -6197536368249452737
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

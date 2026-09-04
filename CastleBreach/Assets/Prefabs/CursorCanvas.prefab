@@ -138,7 +138,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -200, y: 0}
+  m_AnchoredPosition: {x: -1257, y: 0}
   m_SizeDelta: {x: 16, y: 16}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &728545347330712653
@@ -192,12 +192,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CustomCursor
   skins:
-  - displayName: Dagger
-    sprite: {fileID: 907366570984558189, guid: fec634b9551eaca499b77f406c00ed17, type: 3}
+  - displayName: Small Dagger
+    sprite: {fileID: -6197536368249452737, guid: 4629e4a043918b34ab30cebb792d2d42, type: 3}
     pivot: {x: 0.03, y: 0.99}
-    baseSize: {x: 10, y: 10}
-  - displayName: Dagger_Small
-    sprite: {fileID: -2629865453749720453, guid: 6326ce5e3961e714c9f3f70d509928aa, type: 3}
-    pivot: {x: 0.03, y: 0.99}
-    baseSize: {x: 10, y: 10}
+    baseSize: {x: 1, y: 1}
+  - displayName: Large Dagger
+    sprite: {fileID: -6197536368249452737, guid: 4629e4a043918b34ab30cebb792d2d42, type: 3}
+    pivot: {x: 0.03, y: 0.985}
+    baseSize: {x: 6, y: 6}
   image: {fileID: 0}

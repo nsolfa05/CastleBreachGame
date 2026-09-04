@@ -1776,10 +1776,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: CursorCanvas
       objectReference: {fileID: 0}
-    - target: {fileID: 3151906932653471851, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
-      propertyPath: m_AnchoredPosition.x
-      value: -1257
-      objectReference: {fileID: 0}
     - target: {fileID: 5711969644942762530, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
       propertyPath: m_Pivot.x
       value: 0
@@ -1859,62 +1855,6 @@ PrefabInstance:
     - target: {fileID: 5711969644942762530, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
-      propertyPath: skins.Array.size
-      value: 2
-      objectReference: {fileID: 0}
-    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
-      propertyPath: skins.Array.data[0].sprite
-      value: 
-      objectReference: {fileID: -2629865453749720453, guid: 6326ce5e3961e714c9f3f70d509928aa, type: 3}
-    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
-      propertyPath: skins.Array.data[1].sprite
-      value: 
-      objectReference: {fileID: -440934093060705138, guid: 88296e9cb9f912344aa470d9f32e8e8d, type: 3}
-    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
-      propertyPath: skins.Array.data[0].pivot.y
-      value: 0.99
-      objectReference: {fileID: 0}
-    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
-      propertyPath: skins.Array.data[1].pivot.y
-      value: 0.985
-      objectReference: {fileID: 0}
-    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
-      propertyPath: skins.Array.data[0].baseSize.x
-      value: 10
-      objectReference: {fileID: 0}
-    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
-      propertyPath: skins.Array.data[0].baseSize.y
-      value: 10
-      objectReference: {fileID: 0}
-    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
-      propertyPath: skins.Array.data[1].baseSize.x
-      value: 50
-      objectReference: {fileID: 0}
-    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
-      propertyPath: skins.Array.data[1].baseSize.y
-      value: 50
-      objectReference: {fileID: 0}
-    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
-      propertyPath: skins.Array.data[0].displayName
-      value: Small Dagger
-      objectReference: {fileID: 0}
-    - target: {fileID: 7150844559886974043, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
-      propertyPath: skins.Array.data[1].displayName
-      value: Large Dagger
-      objectReference: {fileID: 0}
-    - target: {fileID: 7171105876966193974, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
-      propertyPath: m_Color.b
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7171105876966193974, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
-      propertyPath: m_Color.g
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7171105876966193974, guid: 28ca9f48ecce28946a100136b90cfa40, type: 3}
-      propertyPath: m_Color.r
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -2196,10 +2136,10 @@ MonoBehaviour:
   m_Options:
     m_Options:
     - m_Text: Large Dagger
-      m_Image: {fileID: 907366570984558189, guid: fec634b9551eaca499b77f406c00ed17, type: 3}
+      m_Image: {fileID: -6197536368249452737, guid: 4629e4a043918b34ab30cebb792d2d42, type: 3}
       m_Color: {r: 1, g: 1, b: 1, a: 1}
     - m_Text: Small Dagger
-      m_Image: {fileID: -2629865453749720453, guid: 6326ce5e3961e714c9f3f70d509928aa, type: 3}
+      m_Image: {fileID: -6197536368249452737, guid: 4629e4a043918b34ab30cebb792d2d42, type: 3}
       m_Color: {r: 1, g: 1, b: 1, a: 1}
     - m_Text: Option C
       m_Image: {fileID: 0}
